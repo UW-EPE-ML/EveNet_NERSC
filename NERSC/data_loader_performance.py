@@ -22,7 +22,7 @@ if __name__ == '__main__':
     base_dir = Path("/global/cfs/cdirs/m2616/tihsu/PreTrain_Parquet")
 
     parquet_files = [
-        base_dir / file for file in base_dir.glob("*.parquet")
+        str(base_dir / file) for file in base_dir.glob("*.parquet")
     ]
 
     ds = ray.data.read_parquet(parquet_files)
