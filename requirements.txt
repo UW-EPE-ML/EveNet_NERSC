@@ -1,0 +1,6 @@
+ray[data,train,tune,serve]==2.44.1
+lightning==2.5.1
+torch==2.6.0
+wandb==0.19.8
+numba==0.61.0
+opt-einsum==3.4.0
