@@ -27,4 +27,12 @@ if __name__ == '__main__':
 
     ds = ray.data.read_parquet(parquet_files)
 
-    print(ds.stats)
+    # Step 2: Process the data
+    processed_ds = ds.map(
+        process_event_batch,
+        # concurrency=5,
+        # batch_format="default"
+    )
+
+
+    print(processed_ds.stats)
