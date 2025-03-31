@@ -27,3 +27,4 @@ if __name__ == '__main__':
 
     ds = ray.data.read_parquet(parquet_files)
 
+    print(ds.stats)
