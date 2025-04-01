@@ -62,7 +62,7 @@ def train_func():
     # Create a dataloader for Ray Datasets
     dataset_configs = {
         'batch_size': batch_size,
-        'collate_fn': process_event,
+        # 'collate_fn': process_event,
         'prefetch_batches': 10,
     }
 
@@ -113,6 +113,8 @@ def main(args):
     ]
 
     ds = ray.data.read_parquet(parquet_files, override_num_blocks=len(parquet_files))
+
+    ds = ds.map_batches(process_event)
 
     run_config = RunConfig(
         name="EveNet Training",
