@@ -109,6 +109,7 @@ def main(args):
         process_event_batch,
         # concurrency=5,
         # batch_format="default"
+        compute="streaming"
     )
 
     run_config = RunConfig(
