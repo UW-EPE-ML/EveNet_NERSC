@@ -137,7 +137,7 @@ def main(args):
         run_config=run_config,
         datasets={
             "train": processed_ds,
-            # "validation": validation_dataset
+            "validation": processed_ds,
         },
     )
 
