@@ -67,7 +67,7 @@ def train_func():
     }
 
     shard_stats = train_ds.stats()
-    print(f"[Rank {ray.train.get_context().get_world_rank()}] Dataset shard stats:\n{shard_stats}")
+    print(f"[Rank {ray.train.get_context().get_world_rank()}] Dataset shard stats: {shard_stats}")
 
     train_ds_loader = train_ds.iter_torch_batches(**dataset_configs)
     # val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
@@ -112,7 +112,13 @@ def main(args):
         str(base_dir / file) for file in base_dir.glob("*.parquet")
     ]
 
-    ds = ray.data.read_parquet(parquet_files, override_num_blocks=len(parquet_files))
+    ds = ray.data.read_parquet(
+        parquet_files,
+        override_num_blocks=len(parquet_files),
+        ray_remote_args={
+            "num_cpus": 0.25,
+        }
+    )
 
     ds = ds.map_batches(process_event)
 
