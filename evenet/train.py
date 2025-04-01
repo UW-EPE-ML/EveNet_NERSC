@@ -100,9 +100,6 @@ def main(args):
     # config.load_yaml(args.config)
 
     ray.init(
-        # num_cpus=10,
-        # object_store_memory=10 * 1024 * 1024,
-        # local_mode=True,
         runtime_env=runtime_env,
     )
 
@@ -120,7 +117,9 @@ def main(args):
         }
     )
 
-    ds = ds.map_batches(process_event)
+    ds = ds.map_batches(
+        process_event,
+    )
 
     run_config = RunConfig(
         name="EveNet Training",
