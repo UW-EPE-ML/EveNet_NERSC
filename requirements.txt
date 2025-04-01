@@ -4,3 +4,7 @@ torch==2.6.0
 wandb==0.19.8
 numba==0.61.0
 opt-einsum==3.4.0
+rich==14.0.0
+pyyaml==6.0.2
+scikit-learn==1.6.1
+seaborn==0.13.2

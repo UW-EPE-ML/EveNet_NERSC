@@ -53,11 +53,11 @@ def process_event(row) -> Batch:
     if "num_sequential_vectors" in row:
         num_sequential_vectors["Source"] = row["num_sequential_vectors"]
 
-    return Batch(
+    return {"batch": Batch(
         sources=tuple(sources),
         num_vectors=num_vectors,
         assignment_targets=tuple(assignment_targets),
         regression_targets=regression_targets,
         classification_targets=classification_targets,
         num_sequential_vectors=num_sequential_vectors,
-    )
+    )}

@@ -21,7 +21,7 @@ PermutationGroup = List[List[int]]
 SymbolicPermutationGroup = sympy.combinatorics.PermutationGroup
 
 
-class IndexDict:
+class IndexDict():
     def __init__(self, init_dict, nEvent):
         self.dict_ = init_dict
         self.nEvent = nEvent
