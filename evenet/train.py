@@ -112,7 +112,7 @@ def main(args):
         str(base_dir / file) for file in base_dir.glob("*.parquet")
     ]
 
-    ds = ray.data.read_parquet(parquet_files)
+    ds = ray.data.read_parquet(parquet_files, override_num_blocks=len(parquet_files))
 
     run_config = RunConfig(
         name="EveNet Training",
