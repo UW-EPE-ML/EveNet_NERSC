@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 import ray
 from ray import air, tune
@@ -79,7 +80,11 @@ def train_func():
 
 
 def main(args):
-    # os.environ["RAY_ENABLE_MAC_LARGE_OBJECT_STORE"] = "1"
+    runtime_env = {
+        "env_vars": {
+            "PYTHONPATH": f"{Path(__file__).resolve().parent.parent}:{os.environ.get('PYTHONPATH', '')}"
+        }
+    }
 
     config.load_yaml(args.config)
 
@@ -87,6 +92,7 @@ def main(args):
         num_cpus=10,
         # object_store_memory=10 * 1024 * 1024,
         # local_mode=True,
+        runtime_env=runtime_env,
     )
 
     ds = ray.data.read_parquet([
