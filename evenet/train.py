@@ -63,7 +63,7 @@ def train_func():
     dataset_configs = {
         'batch_size': batch_size,
         'collate_fn': process_event,
-        'prefetch_batches': 2,
+        'prefetch_batches': 10,
     }
 
     shard_stats = train_ds.stats()
