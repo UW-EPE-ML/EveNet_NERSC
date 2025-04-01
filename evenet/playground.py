@@ -58,9 +58,8 @@ def main(args):
     # Step 2: Define transformation logic (based on your code)
     # Let's assume you had previously initialized `self.tensor_data` from your file.
     # Now in ray.data, each record is a dict representing a row from your original data.
-    ds = ds.take_batch(10)
 
-    out = process_event_batch(ds)
+    # ds = ds.take_batch(10)
 
     model = EvenetModel(config = config)
 
@@ -72,7 +71,7 @@ def main(args):
     )
 
     # model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
-    for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=1024)):
+    for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=10)):
         # Each batch is a list of tuples as returned above
         print("Batch ", i)
 

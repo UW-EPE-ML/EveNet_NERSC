@@ -21,14 +21,17 @@ class EveNetEngine(L.LightningModule):
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
+        return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your validation step logic here
+        return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
     def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
-        pass
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return {"optimizer": optimizer}
 
     def configure_model(self) -> None:
         if self.model is not None:
