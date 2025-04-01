@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 from evenet.dataset.types import Batch, Source, AssignmentTargets
 
 
@@ -90,3 +90,22 @@ def process_event_batch(batch: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {
         k: v.astype(np.float32) for k, v in batch_out.items()
     }
+
+
+def convert_batch_to_torch_tensor(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
+    """
+    Convert a batch of data from numpy arrays to torch tensors.
+    :param batch: Batch of data as a dictionary with numpy arrays.
+    :return: Batch of data as a dictionary with torch tensors.
+    """
+    return {k: torch.tensor(v) for k, v in batch.items()}
+
+
+def process_event(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
+    """
+    Process a single event batch and convert it to the desired format.
+    :param batch: Batch of data as a dictionary with numpy arrays.
+    :return: Processed batch as a dictionary with torch tensors.
+    """
+    processed_batch = process_event_batch(batch)
+    return convert_batch_to_torch_tensor(processed_batch)

@@ -24,7 +24,7 @@ import wandb
 import lightning as L
 
 from evenet.control.config import config, DotDict, Config
-from evenet.dataset.preprocess import process_event_batch
+from evenet.dataset.preprocess import process_event
 from evenet.engine import EveNetEngine
 
 
@@ -60,8 +60,8 @@ def train_func():
     val_ds = ray.train.get_dataset_shard("validation")
 
     # Create a dataloader for Ray Datasets
-    train_ds_loader = train_ds.iter_torch_batches(batch_size=batch_size)
-    val_ds_loader = val_ds.iter_torch_batches(batch_size=batch_size)
+    train_ds_loader = train_ds.iter_torch_batches(batch_size=batch_size, collate_fn=process_event)
+    val_ds_loader = val_ds.iter_torch_batches(batch_size=batch_size, collate_fn=process_event)
 
     # Model
     model = EveNetEngine()
@@ -105,13 +105,6 @@ def main(args):
 
     ds = ray.data.read_parquet(parquet_files)
 
-    processed_ds = ds.map_batches(
-        process_event_batch,
-        # concurrency=5,
-        # batch_format="default"
-        compute="streaming"
-    )
-
     run_config = RunConfig(
         name="EveNet Training",
         # checkpoint_config=CheckpointConfig(
@@ -137,8 +130,8 @@ def main(args):
         scaling_config=scaling_config,
         run_config=run_config,
         datasets={
-            "train": processed_ds,
-            "validation": processed_ds,
+            "train": ds,
+            "validation": ds,
         },
     )
 
