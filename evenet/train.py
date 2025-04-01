@@ -101,6 +101,8 @@ def main(args):
         str(base_dir / file) for file in base_dir.glob("*.parquet")
     ]
 
+    ds = ray.data.read_parquet(parquet_files)
+
     processed_ds = ds.map_batches(
         process_event_batch,
         # concurrency=5,
@@ -109,11 +111,11 @@ def main(args):
 
     run_config = RunConfig(
         name="EveNet Training",
-        checkpoint_config=CheckpointConfig(
-            num_to_keep=2,
-            checkpoint_score_attribute="val_loss",
-            checkpoint_score_order="max",
-        ),
+        # checkpoint_config=CheckpointConfig(
+        #     num_to_keep=2,
+        #     checkpoint_score_attribute="val_loss",
+        #     checkpoint_score_order="max",
+        # ),
     )
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
@@ -132,7 +134,7 @@ def main(args):
         scaling_config=scaling_config,
         run_config=run_config,
         datasets={
-            "train": ds,
+            "train": processed_ds,
             # "validation": validation_dataset
         },
     )
