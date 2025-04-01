@@ -95,10 +95,11 @@ def main(args):
         runtime_env=runtime_env,
     )
 
-    ds = ray.data.read_parquet([
-        "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_0.parquet",
-        # "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_1.parquet"
-    ]).limit(1000)
+    base_dir = Path("/global/cfs/cdirs/m2616/tihsu/PreTrain_Parquet")
+
+    parquet_files = [
+        str(base_dir / file) for file in base_dir.glob("*.parquet")
+    ]
 
     processed_ds = ds.map_batches(
         process_event_batch,
