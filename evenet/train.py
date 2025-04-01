@@ -60,8 +60,14 @@ def train_func():
     val_ds = ray.train.get_dataset_shard("validation")
 
     # Create a dataloader for Ray Datasets
-    train_ds_loader = train_ds.iter_torch_batches(batch_size=batch_size, collate_fn=process_event)
-    val_ds_loader = val_ds.iter_torch_batches(batch_size=batch_size, collate_fn=process_event)
+    dataset_configs = {
+        'batch_size': batch_size,
+        'collate_fn': process_event,
+        'prefetch_batches': 2,
+    }
+
+    train_ds_loader = train_ds.iter_torch_batches(**dataset_configs)
+    val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
     model = EveNetEngine()
@@ -73,7 +79,7 @@ def train_func():
         strategy=RayDDPStrategy(),
         plugins=[RayLightningEnvironment()],
         callbacks=[RayTrainReportCallback()],
-        enable_progress_bar=False,
+        enable_progress_bar=True,
     )
 
     trainer = prepare_trainer(trainer)
