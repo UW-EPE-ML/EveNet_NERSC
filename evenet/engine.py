@@ -23,13 +23,17 @@ class EveNetEngine(L.LightningModule):
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
-        print(f"{self.__class__.__name__} training step")
+        step = self.global_step  # Global step counter (across epochs)
+        epoch = self.current_epoch  # Current epoch index
+        print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} training step")
         return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your validation step logic here
-        print(f"{self.__class__.__name__} validation step")
+        step = self.global_step
+        epoch = self.current_epoch
+        print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
         return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
