@@ -3,6 +3,7 @@ from typing import Any, Dict
 import lightning as L
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
+from torch import nn
 
 
 # Dummy model function
@@ -16,7 +17,7 @@ class EveNetEngine(L.LightningModule):
         self.model = None
 
     def forward(self, x):
-        return self.model(x)
+        return x
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
@@ -34,7 +35,11 @@ class EveNetEngine(L.LightningModule):
             return
         # compile model here
         # self.model = torch.compile(model)
-        self.model = model
+        self.model = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 2)
+        )
 
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
