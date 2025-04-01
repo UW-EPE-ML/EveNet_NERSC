@@ -1,4 +1,3 @@
-from configparser import ConfigParser
 from collections import OrderedDict
 from itertools import chain, permutations
 from functools import cache

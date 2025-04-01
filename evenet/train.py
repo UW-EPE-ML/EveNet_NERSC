@@ -11,7 +11,7 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 import wandb
 
 from evenet.control.config import config
-from evenet.dataset.preprocess import process_event
+from evenet.dataset.preprocess import process_event, process_event_batch
 from evenet.network.jet_reconstruction import JetReconstructionModel
 
 
@@ -52,22 +52,25 @@ def main(args):
     ds = ray.data.read_parquet([
         "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_0.parquet",
         # "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_1.parquet"
-    ]).limit(10000)
+    ]).limit(10)
 
     # Step 2: Define transformation logic (based on your code)
     # Let's assume you had previously initialized `self.tensor_data` from your file.
     # Now in ray.data, each record is a dict representing a row from your original data.
+    ds = ds.take_batch(10)
+
+    out = process_event_batch(ds)
 
     # Step 3: Apply transformation
-    processed_ds = ds.map(
-        process_event,
+    processed_ds = ds.map_batches(
+        process_event_batch,
         # concurrency=5,
         # batch_format="default"
     )
 
-    model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
+    # model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
 
-    for i, batch in enumerate(processed_ds.iter_batches(batch_size=1024)):
+    for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=1024)):
         # Each batch is a list of tuples as returned above
         print("Batch ", i)
 

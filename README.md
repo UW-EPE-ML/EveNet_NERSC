@@ -1,41 +1,29 @@
 # EveNet
 
-
 - Option
-  - EventInfo 
-    - MultiProcess.yaml
-      - Model:
-        - Normalization.pkl (from training dataset)
-        - Balance.pkl (from training dataset)
-      - Dataset
-
-```python
-options
-
-eventInfo = EventInfo()
-
-data = pd.read_csv('data.csv')
-data = preprocess(eventInfo)
-
-model = load_model('model.h5', eventInfo)
-
-model(data)
-
-```
-
-- Global_Control (class):
-  - Options
-  - EventInfo
+    - EventInfo
+        - MultiProcess.yaml
+            - Model:
+                - Normalization.pkl (from training dataset)
+                - Balance.pkl (from training dataset)
+            - Dataset
 
 ```yaml
-# Global_Control.yaml
+INPUTS:
+  point_cloud: (num_events, num_particles, num_features)
+  point_cloud_mask: (num_events, num_particles)
+  condition: (num_events, num_conditions)
+  condition_mask: (num_events, 1) # ?? should pad?
 
-train:
-  layer: 4
-  trainable: true
+  classification: (num_events, 1) # one-hot in model
+  regression: (num_events, num_regressions)
+  regression_mask: (num_events, num_regressions)
 
-include: 
-  - train.yaml
-  - eval.v1.yaml
-  - eval.v2.yaml
+  # num_assignment = num_process * num_level1_particles
+  assignment_indices: (num_events, num_assignment, num_level2_particles) # with padding
+  assigment_indices_mask: (num_events, num_assignment, num_level2_particles) # with padding
+  assigment_mask: (num_events, num_assignment)
+
+  num_vectors: (num_events, ) # num_particles
+  num_sequential_vectors: (num_events, ) # num_particles
 ```
