@@ -16,16 +16,20 @@ class EveNetEngine(L.LightningModule):
         super().__init__()
         self.model = None
 
+        print(f"{self.__class__.__name__} initialized")
+
     def forward(self, x):
         return x
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
+        print(f"{self.__class__.__name__} training step")
         return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your validation step logic here
+        print(f"{self.__class__.__name__} validation step")
         return torch.tensor(0.0, requires_grad=True, device=self.device)
         pass
 
@@ -34,6 +38,7 @@ class EveNetEngine(L.LightningModule):
         return {"optimizer": optimizer}
 
     def configure_model(self) -> None:
+        print(f"{self.__class__.__name__} configure model")
         if self.model is not None:
             return
         # compile model here
