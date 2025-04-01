@@ -50,8 +50,10 @@ def setup_logger(log_file: str = "output.log", level=logging.INFO):
 
 def train_func():
     # Unpack the input configs passed from `TorchTrainer(train_loop_config)`
-    batch_size = config.Dataset.batch_size
-    max_epochs = config.Training.epochs
+    # batch_size = config.Dataset.batch_size
+    # max_epochs = config.Training.epochs
+    batch_size = 4096
+    max_epochs = 5
 
     # Fetch the Dataset shards
     train_ds = ray.train.get_dataset_shard("train")
@@ -86,7 +88,7 @@ def main(args):
         }
     }
 
-    config.load_yaml(args.config)
+    # config.load_yaml(args.config)
 
     ray.init(
         num_cpus=10,
