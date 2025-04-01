@@ -75,7 +75,12 @@ def main(args):
         # Each batch is a list of tuples as returned above
         print("Batch ", i)
 
+        model.training_step(batch)
+
+        exit(1)
+
     ray.shutdown()
+
 
 
 if __name__ == '__main__':
