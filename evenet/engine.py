@@ -21,6 +21,10 @@ class EveNetEngine(L.LightningModule):
     def forward(self, x):
         return x
 
+    def on_train_start(self):
+        total_steps = self.trainer.max_epochs * self.trainer.num_training_batches
+        print(f"Total training steps: {total_steps}")
+
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
         step = self.global_step  # Global step counter (across epochs)

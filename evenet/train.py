@@ -57,7 +57,7 @@ def train_func():
 
     # Fetch the Dataset shards
     train_ds = ray.train.get_dataset_shard("train")
-    val_ds = ray.train.get_dataset_shard("validation")
+    # val_ds = ray.train.get_dataset_shard("validation")
 
     # Create a dataloader for Ray Datasets
     dataset_configs = {
@@ -66,8 +66,11 @@ def train_func():
         'prefetch_batches': 2,
     }
 
+    shard_stats = train_ds.stats()
+    print(f"[Rank {ray.train.get_context().get_world_rank()}] Dataset shard stats:\n{shard_stats}")
+
     train_ds_loader = train_ds.iter_torch_batches(**dataset_configs)
-    val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
+    # val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
     model = EveNetEngine()
@@ -84,7 +87,7 @@ def train_func():
 
     trainer = prepare_trainer(trainer)
 
-    trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=val_ds_loader)
+    trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=None)
 
 
 def main(args):
@@ -137,7 +140,7 @@ def main(args):
         run_config=run_config,
         datasets={
             "train": ds,
-            "validation": ds,
+            # "validation": ds,
         },
     )
 
