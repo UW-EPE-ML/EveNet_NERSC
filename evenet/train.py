@@ -116,7 +116,7 @@ def main(args):
         parquet_files,
         override_num_blocks=len(parquet_files),
         ray_remote_args={
-            "num_cpus": 0.25,
+            "num_cpus": 0.2,
         }
     )
 
@@ -134,6 +134,10 @@ def main(args):
     # Schedule four workers for DDP training (1 GPU/worker by default)
     scaling_config = ScalingConfig(
         num_workers=10,
+        resources_per_worker={
+            "CPU": 50,
+            "GPU": 1,
+        },
         use_gpu=True
     )
 
