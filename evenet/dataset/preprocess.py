@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import time
+
 from evenet.dataset.types import Batch, Source, AssignmentTargets
 
 
@@ -107,5 +109,9 @@ def process_event(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
     :param batch: Batch of data as a dictionary with numpy arrays.
     :return: Processed batch as a dictionary with torch tensors.
     """
+    start_time = time.time()
     processed_batch = process_event_batch(batch)
-    return convert_batch_to_torch_tensor(processed_batch)
+    converted_batch = convert_batch_to_torch_tensor(processed_batch)
+    end_time = time.time()
+    print('Processing event batch took {} seconds.'.format(end_time - start_time))
+    return converted_batch
