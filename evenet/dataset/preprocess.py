@@ -4,8 +4,7 @@ import time
 
 from evenet.dataset.types import Batch, Source, AssignmentTargets
 
-
-def process_event_batch(batch: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+def process_event_batch_old(batch: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     ####################################
     # Input: Point Cloud and Conditions
     ####################################
@@ -92,6 +91,11 @@ def process_event_batch(batch: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {
         k: v.astype(np.float32) for k, v in batch_out.items()
     }
+
+
+def process_event_batch(batch: dict[str, np.ndarray], shape_metadata: dict, unflatten) -> dict[str, np.ndarray]:
+    return unflatten(batch, shape_metadata)
+
 
 
 def convert_batch_to_torch_tensor(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:

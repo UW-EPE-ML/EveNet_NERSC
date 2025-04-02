@@ -9,10 +9,14 @@ from ray.air import session
 from ray.train.torch import TorchCheckpoint
 from ray.tune.schedulers import AsyncHyperBandScheduler
 import wandb
+from functools import partial
 
 from evenet.control.config import config
-from evenet.dataset.preprocess import process_event_batch
+from evenet.dataset.preprocess import process_event_batch, process_event_batch_old
 from evenet.network_scratch.evenet_model import EvenetModel
+
+from preprocessing.preprocess import unflatten_dict
+import json
 
 from evenet.engine import EveNetEngine
 
@@ -41,8 +45,10 @@ def main(args):
 
     config.load_yaml(args.config)
 
+    shape_metadata = json.load(open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
+
     ray.init(
-        num_cpus=10,
+        # num_cpus=10,
         # object_store_memory=10 * 1024 * 1024,
         # local_mode=True,
     )
@@ -51,24 +57,26 @@ def main(args):
     sched = AsyncHyperBandScheduler()
 
     ds = ray.data.read_parquet([
-        "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_0.parquet",
+        "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet",
         # "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_1.parquet"
-    ]).limit(10)
-
-    # Step 2: Define transformation logic (based on your code)
-    # Let's assume you had previously initialized `self.tensor_data` from your file.
-    # Now in ray.data, each record is a dict representing a row from your original data.
+    ]).limit(200)
 
     # ds = ds.take_batch(10)
 
+    # ds_test = process_event_batch(ds)
+
     model = EvenetModel(config = config)
 
-    # Step 3: Apply transformation
+    process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
+
     processed_ds = ds.map_batches(
-        process_event_batch,
+        process_event_batch_partial,
+        # process_event_batch_old,
         # concurrency=5,
         # batch_format="default"
     )
+
+    # Step 3: Apply transformation
 
     # model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
     for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=10)):

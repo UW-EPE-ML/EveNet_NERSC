@@ -172,7 +172,8 @@ config = Config(_DEFAULTS)
 
 if __name__ == '__main__':
     # Example usage
-    config.load_yaml("default.yaml")
+    # config.load_yaml("default.yaml")
+    config.load_yaml("preprocess_pretrain.yaml")
     config.display()
 
     a=0

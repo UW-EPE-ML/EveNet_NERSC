@@ -1,0 +1,150 @@
+from pathlib import Path
+import h5py
+import numpy as np
+import pandas as pd
+import torch
+from torch import Tensor
+
+from typing import Union, Tuple, List, Optional, Dict
+from collections import OrderedDict
+from evenet.control.event_info import EventInfo
+import awkward as ak
+
+
+class EveNetDataConverter:
+    def __init__(
+            self,
+            raw_data: dict,
+            event_info: EventInfo,
+            process: str,
+    ):
+
+        self.raw_data = raw_data
+        self.event_info = event_info
+        self.process = process
+        self.total_length = len(self.raw_data["INFO/VetoDoubleAssign"])
+
+    def load_sources(self):
+        label = "INPUTS"
+        output_dict = {}
+        i = 0
+        for folder_key, features in self.event_info.input_features.items():
+            print(folder_key)
+            features_ak = []
+            for feature_info in features:
+                print(feature_info)
+                k = f"{label}/{folder_key}/{feature_info[0]}"
+                log_scale = feature_info[2]
+                print(k, log_scale)
+                if log_scale:
+                    features_ak.append(np.log(self.raw_data[k] + 1))
+                else:
+                    features_ak.append(self.raw_data[k])
+            features_ak = np.stack(features_ak, axis=-1)  # (num_events, num_features)
+            mask_np = ~np.all(features_ak == 0, axis=-1)
+
+            output_dict[f"sources-{i}-data"] = features_ak
+            output_dict[f"sources-{i}-mask"] = mask_np
+            i += 1
+        return output_dict
+
+    def load_assignments(self, assignment_names, assignment_map):
+        label = "TARGETS"
+        output_dict = OrderedDict()
+
+        n_targets = len(assignment_names)
+        max_daughters = max(len(daughters) for _, _, daughters in assignment_map)
+        num_events = self.total_length
+
+        # Init arrays
+        full_indices = np.full((num_events, n_targets, max_daughters), -1, dtype=int)
+        full_mask = np.zeros((num_events, n_targets), dtype=bool)
+        index_mask = np.zeros((num_events, n_targets, max_daughters), dtype=bool)
+
+        for row_idx, (process, product, daughters) in enumerate(assignment_map):
+            if process != self.process:
+                continue  # Skip if this target doesn't belong to current process
+
+            if not daughters:
+                print(f"[WARN] No daughters for {process}/{product}, skipping.")
+                continue
+
+            target_prefix = f"{label}/{process}/{product}"
+            daughter_fields = [f"{target_prefix}/{d}" for d in daughters]
+
+            try:
+                indices = np.stack([self.raw_data[field] for field in daughter_fields], axis=-1)
+            except KeyError as e:
+                print(f"[WARN] Missing field {e}; skipping {target_prefix}")
+                continue
+
+            mask = np.all(indices >= 0, axis=1)
+
+            full_indices[:, row_idx, :len(daughters)] = indices
+            full_mask[:, row_idx] = mask
+            index_mask[:, row_idx, :len(daughters)] = True
+
+        output_dict["assignments-indices"] = full_indices
+        output_dict["assignments-mask"] = full_mask
+        output_dict["assignments-indices-mask"] = index_mask
+
+        return output_dict
+
+    def load_regressions(self, regression_keys, regression_key_map):
+        label = "REGRESSIONS"
+        output_dict = OrderedDict()
+
+        num_events = self.total_length
+
+        num_targets = len(regression_keys)
+        regression_data = np.zeros((num_events, num_targets), dtype=np.float32)
+        regression_mask = np.zeros((num_events, num_targets), dtype=bool)
+
+        # Fill in data and mask
+        for idx, (process, particle, product, target_name) in enumerate(regression_key_map):
+            key = f"{process}/{particle}"
+            if product is not None:
+                data_key = f"{label}/{key}/{product}/{target_name}"
+            else:
+                data_key = f"{label}/{key}/{target_name}"
+            mask_key = f"{label}/{key}/MASK"
+
+            try:
+                regression_data[:, idx] = self.raw_data[data_key]
+                regression_mask[:, idx] = self.raw_data[mask_key]
+            except KeyError as e:
+                # print(f"[WARN] Missing {data_key} or {mask_key}, skipping: {e}")
+                continue
+            print(f"[INFO] Recorded {data_key} and {mask_key}")
+
+        # Store in output
+        output_dict["regression-data"] = regression_data
+        output_dict["regression-mask"] = regression_mask
+
+        return output_dict
+
+    def load_classification(self):
+        output_dict = OrderedDict()
+        label = "CLASSIFICATIONS"
+
+        output_dict[f"classification-EVENT/signal"] = self.raw_data[f"{label}/EVENT/signal"]
+        return output_dict
+
+    def filter_process(self, process_info: dict):
+        process_id = process_info['process_id']
+        category = process_info['category']
+
+        selection = self.raw_data["INFO/VetoDoubleAssign"]
+        data_selected = {key: arr[selection] for key, arr in self.raw_data.items()}
+
+        data_selected['CLASSIFICATIONS/EVENT/signal'] = np.zeros_like(
+            data_selected['INFO/VetoDoubleAssign'], dtype=int
+        ) + process_id
+
+        n_event_original = len(selection)
+        n_event_current = len(data_selected['INFO/VetoDoubleAssign'])
+
+        print(f"Selected {n_event_current} events from {n_event_original} original events. [{category}]")
+
+        self.raw_data = data_selected
+        self.total_length = n_event_current

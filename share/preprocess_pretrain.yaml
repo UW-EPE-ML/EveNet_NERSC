@@ -1,0 +1,17 @@
+process_info:
+  include: process_info/pretrain.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  include: event_info/multi_process.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  include: resonance/standard_model.yaml
+
+  # overwrites
+  # ...

@@ -1,0 +1,189 @@
+import argparse
+import json
+import os
+from copy import deepcopy
+from datetime import datetime
+from pathlib import Path
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import numpy as np
+
+from evenet.control.config import config
+from evenet.control.event_info import EventInfo
+from preprocessing.monitor_gen_matching import monitor_gen_matching
+from preprocessing.process_info import Feynman_diagram
+from preprocessing.evenet_data_converter import EveNetDataConverter
+
+
+def generate_assignment_names(event_info: EventInfo):
+    assignment_names = []
+    assignment_map = []
+
+    for p, c in event_info.product_particles.items():
+        for pp, dp in c.items():
+            assignment_names.append(f"TARGETS/{p}/{pp}")
+            assignment_map.append((p, pp, dp))
+
+    return assignment_names, assignment_map
+
+
+def generate_regression_names(event_info: EventInfo):
+    regression_keys = []
+    regression_key_map = []
+
+    common_process = set(event_info.product_particles) & set(event_info.regressions)
+    # Collect all possible regression keys
+    for process in sorted(common_process):
+        for particle, regression in event_info.regressions[process].items():
+            products = list(regression.items()) if isinstance(regression, dict) else [(None, regression)]
+            for product, targets in products:
+                for target in targets:
+                    if product is not None:
+                        key = f"{process}/{particle}/{product}/{target.name}"
+                    else:
+                        key = f"{process}/{particle}/{target.name}"
+                    regression_keys.append(key)
+                    regression_key_map.append((process, particle, product, target.name))
+
+    return regression_keys, regression_key_map
+
+
+def flatten_dict(data: dict, delimiter: str = ":"):
+    flat_columns = {}
+    shape_metadata = {}
+
+    for key, arr in data.items():
+        shape = arr.shape[1:]
+        shape_metadata[key] = shape
+
+        if arr.ndim == 1:
+            flat_columns[key] = pa.array(arr)
+        else:
+            flat_arr = arr.reshape(arr.shape[0], -1)
+            for i in range(flat_arr.shape[1]):
+                suffix = np.unravel_index(i, shape)
+                col_key = f"{key}{delimiter}" + delimiter.join(map(str, suffix))
+                flat_columns[col_key] = pa.array(flat_arr[:, i])
+
+    table = pa.table(flat_columns)
+    return table, shape_metadata
+
+
+def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter: str = ":"):
+    reconstructed = {}
+    grouped = {}
+    for col in table:
+        base = col.split(delimiter)[0]
+        grouped.setdefault(base, []).append(col)
+    for base, columns in grouped.items():
+        if base not in shape_metadata:
+            reconstructed[base] = table[columns[0]]
+        else:
+            shape = tuple(shape_metadata[base])
+            sorted_columns = sorted(columns, key=lambda x: tuple(map(int, x.split(delimiter)[1:])))
+            flat = np.stack([table[col] for col in sorted_columns], axis=1)
+            full_shape = (flat.shape[0],) + shape
+            reconstructed[base] = flat.reshape(full_shape)
+    # Print shapes
+    for k, v in reconstructed.items():
+        print(f"{k}: {v.shape}")
+
+    return reconstructed
+
+
+def preprocess(in_dir, store_dir, process_info, unique_id):
+    converted_data = []
+
+    assignment_keys, assignment_key_map = generate_assignment_names(config.event_info)
+    regression_keys, regression_key_map = generate_regression_names(config.event_info)
+
+    shape_metadata = None
+
+    # for process in Feynman_diagram:
+    for process in ["QCD", "TT2L", "TT1L"]:
+        print("Processing ", process)
+        matched_data = monitor_gen_matching(
+            in_dir=in_dir,
+            process=process,
+            monitor_plots=False,
+        )
+
+        converter = EveNetDataConverter(
+            raw_data=deepcopy(matched_data),
+            event_info=config.event_info,
+            process=process,
+        )
+
+        # Filter the data
+        converter.filter_process(process_info[process])
+
+        # Load Point Cloud and Mask
+        sources = converter.load_sources()
+        num_sequential_vectors = np.sum(sources['sources-0-mask'], axis=1)
+        num_vectors = num_sequential_vectors + np.sum(sources['sources-1-mask'][:, np.newaxis], axis=1)
+
+        assignments = converter.load_assignments(assignment_keys, assignment_key_map)
+        regressions = converter.load_regressions(regression_keys, regression_key_map)
+        classifications = converter.load_classification()
+
+        process_data = {
+            'num_vectors': num_vectors,
+            'num_sequential_vectors': num_sequential_vectors,
+
+            'x': sources['sources-0-data'],
+            'x_mask': sources['sources-0-mask'],
+            'conditions': sources['sources-1-data'],
+            'conditions_mask': sources['sources-1-mask'][:, np.newaxis],
+
+            'classification': classifications['classification-EVENT/signal'],
+
+            **assignments,
+            **regressions,
+        }
+
+        flattened_data, meta_data = flatten_dict(process_data)
+
+        if shape_metadata is None:
+            shape_metadata = meta_data
+        else:
+            assert (shape_metadata == meta_data), "Shape metadata mismatch"
+
+        converted_data.append(flattened_data)
+
+    final_table = pa.concat_tables(converted_data)
+
+    shuffle_indices = np.random.default_rng(42).permutation(final_table.num_rows)
+    final_table = final_table.take(pa.array(shuffle_indices))
+
+    ### Save to parquet
+    pq.write_table(final_table, f"{store_dir}/data_{unique_id}.parquet")
+
+    with open(f"{store_dir}/shape_metadata.json", "w") as f:
+        json.dump(shape_metadata, f)
+
+
+def main(cfg):
+    config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/preprocess_pretrain.yaml")
+
+    def generate_unique_id():
+        return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+    os.makedirs(cfg.store_dir, exist_ok=True)
+
+    in_tag = Path(cfg.in_dir).name
+
+    preprocess(cfg.in_dir, cfg.store_dir, config.process_info, unique_id=in_tag)
+
+    pass
+
+
+if __name__ == '__main__':
+    usage = 'usage: %prog [options]'
+    parser = argparse.ArgumentParser(description=usage)
+    parser.add_argument('--in_dir', type=str)
+    parser.add_argument('--store_dir', type=str, default='Storage')
+    parser.add_argument('--scan', action='store_true')
+    args = parser.parse_args()
+
+    main(args)

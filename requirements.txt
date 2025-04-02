@@ -8,3 +8,10 @@ rich==14.0.0
 pyyaml==6.0.2
 scikit-learn==1.6.1
 seaborn==0.13.2
+vector==1.6.1
+awkward==2.8.1
+h5py==3.13.0
+uproot==5.6.0
+hist==2.8.1
+mplhep==0.3.59
+pyarrow==19.0.1
