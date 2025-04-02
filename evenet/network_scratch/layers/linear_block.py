@@ -1,0 +1,147 @@
+from torch import Tensor,nn
+import torch
+from evenet.network_scratch.layers.norm import create_normalization
+from evenet.network_scratch.layers.activation import create_activation, create_dropout
+from evenet.network_scratch.layers.mask import FillingMasking
+
+def create_residual_connection(skip_connection: bool, input_dim: int, output_dim: int) -> nn.Module:
+    if input_dim == output_dim or not skip_connection:
+        return nn.Identity()
+
+    return nn.Linear(input_dim, output_dim)
+
+class GRUGate(nn.Module):
+    def __init__(self, hidden_dim, gate_initialization: float = 2.0):
+        super(GRUGate, self).__init__()
+
+        self.linear_W_r = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        self.linear_U_r = nn.Linear(hidden_dim, hidden_dim, bias=False)
+
+        self.linear_W_z = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        self.linear_U_z = nn.Linear(hidden_dim, hidden_dim, bias=False)
+
+        self.linear_W_g = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        self.linear_U_g = nn.Linear(hidden_dim, hidden_dim, bias=False)
+
+        self.gate_bias = nn.Parameter(torch.ones(hidden_dim) * gate_initialization)
+
+    def forward(self, vectors: Tensor, residual: Tensor) -> Tensor:
+        r = torch.sigmoid(self.linear_W_r(vectors) + self.linear_U_r(residual))
+        z = torch.sigmoid(self.linear_W_z(vectors) + self.linear_U_z(residual) - self.gate_bias)
+        h = torch.tanh(self.linear_W_g(vectors) + self.linear_U_g(r * residual))
+
+        return (1 - z) * residual + z * h
+
+
+class GRUBlock(nn.Module):
+    __constants__ = ['input_dim', 'output_dim', 'skip_connection', 'hidden_dim']
+
+    # noinspection SpellCheckingInspection
+    def __init__(self,
+                 input_dim: int,
+                 hidden_dim:int,
+                 output_dim: int,
+                 normalization_type: str,
+                 activation_type: str,
+                 dropout: float,
+                 skip_connection: bool = False):
+        super(GRUBlock, self).__init__()
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.skip_connection = skip_connection
+        self.normalization_type = normalization_type
+        self.dropout = dropout
+        self.activation_type = activation_type
+
+        # Create normalization layer for keeping values in good ranges.
+        self.normalization = create_normalization(self.normalization_type, input_dim)
+
+        # The primary linear layers applied before the gate
+        self.linear_1 = nn.Sequential(
+            nn.Linear(input_dim, self.hidden_dim),
+            create_activation(self.activation_type, self.hidden_dim),
+            create_dropout(self.dropout)
+        )
+
+        self.linear_2 = nn.Sequential(
+            nn.Linear(self.hidden_dim, output_dim),
+            create_activation(self.activation_type, output_dim),
+            create_dropout(self.dropout)
+        )
+
+        # GRU layer to gate and project back to output. This will also handle the
+        # self.gru = GRUGate(output_dim, input_dim)
+        self.gru = GRUGate(output_dim)
+
+        # Possibly need a linear layer to create residual connection.
+        self.residual = create_residual_connection(skip_connection, input_dim, output_dim)
+
+        # Mask out padding values
+        self.masking = FillingMasking()
+
+    def forward(self, x: Tensor, sequence_mask: Tensor) -> Tensor:
+        """
+
+        :param x: shape: (batch_size, num_object, input_dim)
+        :param sequence_mask: (batch_size, num_object)
+        :return:
+            - output: shape (batch_size, num_object, output_dim)
+            - sequence_mask: shape (batch_size, num_object)
+        """
+        batch_size, num_object, input_dim = x.shape
+
+        # -----------------------------------------------------------------------------
+        # Apply normalization first for this type of linear block.
+        # output: (batch_size, num_object, input_dim)
+        # -----------------------------------------------------------------------------
+        output = self.normalization(x, sequence_mask)
+
+        # -----------------------------------------------------------------------------
+        # Flatten the data and apply the basic matrix multiplication and non-linearity.
+        # output: (batch_size * num_object, input_dim)
+        # -----------------------------------------------------------------------------
+        output = output.reshape(num_object * batch_size, self.input_dim)
+
+        # -----------------------------------------------------------------------------
+        # Apply linear layer with expansion in the middle.
+        # output: (batch_size * num_object, hidden_dim)
+        # -----------------------------------------------------------------------------
+        output = self.linear_1(output)
+        output = self.linear_2(output)
+
+        # --------------------------------------------------------------------------
+        # Reshape the data back into the time-series and apply normalization.
+        # output: (batch_size, num_object, output_dim)
+        # --------------------------------------------------------------------------
+        output = output.reshape(batch_size, num_object, self.output_dim)
+
+        # -----------------------------------------------------------------------------
+        # Apply gating mechanism and skip connection using the GRU mechanism.
+        # output: (batch_size, num_object, output_dim)
+        # -----------------------------------------------------------------------------
+        if self.skip_connection:
+            output = self.gru(output, self.residual(x))
+
+        return self.masking(output, sequence_mask)
+
+def create_linear_block(linear_block_type: str,
+                        input_dim: int,
+                        hidden_dim: int,
+                        output_dim: int,
+                        normalization_type: str,
+                        activation_type: str,
+                        dropout: float,
+                        skip_connection: bool) -> nn.Module:
+
+    if linear_block_type == "GRU":
+        return GRUBlock(input_dim,
+                        hidden_dim,
+                        output_dim,
+                        normalization_type,
+                        activation_type,
+                        dropout,
+                        skip_connection)
+
+
