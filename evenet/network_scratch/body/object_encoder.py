@@ -11,6 +11,7 @@ class ObjectEncoder(nn.Module):
     def __init__(
             self,
             hidden_dim: int,
+            position_embedding_dim: int,
             num_heads: int,
             transformer_dim_scale: float,
             num_linear_layers: int,
@@ -53,17 +54,27 @@ class ObjectEncoder(nn.Module):
     def forward(self,
                 encoded_vectors: Tensor,
                 mask: Tensor,
-                padding_mask: Tensor,
+                condition_vectors: Tensor,
+                condition_mask: Tensor,
                 cond_vector: Tensor = None) -> Tuple[Tensor, Tensor]:
         """
 
         :param encoded_vectors: (batch_size, num_vectors, hidden_dim)
+        :param condition_vectors: (batch_size, num_conditions, hidden_dim)
         :param mask: (batch_size, num_vectors, 1)
-        :param padding_mask: (batch_size, num_vectors)
+        :param condition_mask: (batch_size, num_conditions, 1)
         :param cond_vector: (batch_size, hidden_dim)
         :return:
         """
         batch_size, num_vectors, hidden_dim = encoded_vectors.shape
+        batch_size, num_conditions, hidden_dim = condition_vectors.shape
+
+        encoded_vectors, mask = self.combined_embedding(
+            x = encoded_vectors,
+            y = condition_vectors,
+            x_mask = mask,
+            y_mask = condition_mask)
+        padding_mask = ~(mask.squeeze(2).bool())
 
         # -----------------------------------------------------------------------------
         # Embed vectors again into particle space
@@ -74,8 +85,8 @@ class ObjectEncoder(nn.Module):
 
         # -----------------------------------------------------------------------------
         # Add a "particle vector" which will store particle level data.
-        # particle_vector: [B, 1, D]
-        # combined_vectors: [B, T+1, D]
+        # particle_vector: (batch_size, 1, hidden_dim)
+        # combined_vectors: (batch_size, num_vectors + num_conditions + 1, hidden_dim)
         # -----------------------------------------------------------------------------
         particle_vector = self.particle_vector.expand(batch_size, 1, hidden_dim)
 
@@ -88,16 +99,16 @@ class ObjectEncoder(nn.Module):
 
         # -----------------------------------------------------------------------------
         # Also modify the padding mask to indicate that the particle vector is real.
-        # particle_padding_mask: [B, 1]
-        # combined_padding_mask: [B, T + 1]
+        # particle_padding_mask: (batch_size, 1)
+        # combined_padding_mask: (batch_size, num_vectors + num_conditions + 1)
         # -----------------------------------------------------------------------------
         particle_padding_mask = padding_mask.new_zeros(batch_size, 1)
         combined_padding_mask = torch.cat((particle_padding_mask, padding_mask), dim=1)
 
         # -----------------------------------------------------------------------------
         # Also modify the sequence mask to indicate that the particle vector is real.
-        # particle_sequence_mask: [1, B, 1]
-        # combined_sequence_mask: [T + 1, B, 1]
+        # particle_sequence_mask:  (batch_size,1, 1)
+        # combined_sequence_mask:  (batch_size, num_vectors + num_conditions + 1)
         # -----------------------------------------------------------------------------
         particle_sequence_mask = mask.new_ones(batch_size, 1, 1, dtype=torch.bool)
         combined_sequence_mask = torch.cat((particle_sequence_mask, mask), dim=1)
@@ -109,6 +120,6 @@ class ObjectEncoder(nn.Module):
         # encoded_vectors: [T, B, D]
         # -----------------------------------------------------------------------------
         combined_vectors = self.encoder(combined_vectors, combined_padding_mask, combined_sequence_mask)
-        particle_vector, encoded_vectors = combined_vectors[:, 0, :], combined_vectors[:, 1:, :]
+        particle_vector, encoded_vectors, condition_vectors = combined_vectors[:, 0, :], combined_vectors[:, 1: (1+num_vectors) , :], combined_vectors[:, (1 + num_vectors):, :]
 
-        return encoded_vectors, particle_vector
+        return encoded_vectors, condition_vectors, particle_vector

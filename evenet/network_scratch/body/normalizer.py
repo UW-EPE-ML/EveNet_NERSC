@@ -1,12 +1,10 @@
 import torch
 from torch import nn, Tensor
 
-from evenet.network.prediction_selection import mask_1
 
-
-class normalizer(nn.Module):
+class Normalizer(nn.Module):
     def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor):
-        super(normalizer, self).__init__()
+        super(Normalizer, self).__init__()
 
         """
         :param

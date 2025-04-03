@@ -1,12 +1,9 @@
 import os
 import argparse
-import logging
-import sys
 from functools import partial
 from pathlib import Path
 
 import ray
-from ray.train.torch import TorchCheckpoint
 import ray.train
 from ray.train.lightning import (
     prepare_trainer,
@@ -15,38 +12,18 @@ from ray.train.lightning import (
     RayTrainReportCallback,
 )
 from ray.train.torch import TorchTrainer
-from ray.train import RunConfig, ScalingConfig, CheckpointConfig, DataConfig
-import torch
-
-import wandb
+from ray.train import RunConfig, ScalingConfig
 
 import lightning as L
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor, \
+    RichModelSummary
 
-from evenet.control.config import config, DotDict, Config
+from evenet.control.config import config
 from evenet.dataset.preprocess import process_event_batch
 from evenet.engine import EveNetEngine
 from preprocessing.preprocess import unflatten_dict
 import json
-
-
-def setup_logger(log_file: str = "output.log", level=logging.INFO):
-    logger = logging.getLogger()
-    logger.setLevel(level)
-
-    if logger.hasHandlers():
-        logger.handlers.clear()
-
-    # Formatter
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
-    file_handler = logging.FileHandler(log_file)
-    stream_handler = logging.StreamHandler(sys.stdout)
-
-    for handler in [file_handler, stream_handler]:
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    return logger
 
 
 def train_func(cfg):
@@ -54,25 +31,45 @@ def train_func(cfg):
     max_epochs = cfg['epochs']
     prefetch_batches = cfg['prefetch_batches']
 
-    # Fetch the Dataset shards
-    train_ds = ray.train.get_dataset_shard("train")
-    # val_ds = ray.train.get_dataset_shard("validation")
+    wandb_config = cfg.get("wandb", {})
+    wandb_logger = None
+    if ray.train.get_context().get_world_rank() == 0:
+        wandb_logger = WandbLogger(
+            project=wandb_config.get("project", "EveNet"),
+            name=wandb_config.get("run_name", None),
+            tags=wandb_config.get("tags", []),
+            entity=wandb_config.get("entity", None),
+        )
 
-    # Create a dataloader for Ray Datasets
     dataset_configs = {
         'batch_size': batch_size,
-        # 'collate_fn': process_event,
         'prefetch_batches': prefetch_batches,
     }
 
-    shard_stats = train_ds.stats()
-    print(f"[Rank {ray.train.get_context().get_world_rank()}] Dataset shard stats: {shard_stats}")
+    # Fetch the Dataset shards
+    train_ds = ray.train.get_dataset_shard("train")
+    # val_ds = ray.train.get_dataset_shard("validation")
 
     train_ds_loader = train_ds.iter_torch_batches(**dataset_configs)
     # val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
-    model = EveNetEngine()
+    model = EveNetEngine(global_config=config)
+
+    # callbacks
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val_loss",
+        save_top_k=1,
+        mode="min",
+        filename="best-{epoch}-{val_loss:.4f}",
+    )
+    early_stop_callback = EarlyStopping(
+        monitor="val_loss",  # metric to monitor
+        patience=5,  # epochs to wait for improvement
+        mode="min",  # "min" if lower is better (e.g. for loss)
+        verbose=True,  # optional: prints when triggered
+        min_delta=0.001,  # minimum change to qualify as improvement
+    )
 
     trainer = L.Trainer(
         max_epochs=max_epochs,
@@ -80,8 +77,16 @@ def train_func(cfg):
         devices="auto",
         strategy=RayDDPStrategy(),
         plugins=[RayLightningEnvironment()],
-        callbacks=[RayTrainReportCallback()],
+        callbacks=[
+            # RayTrainReportCallback(),
+            checkpoint_callback,
+            early_stop_callback,
+            LearningRateMonitor(),
+            DeviceStatsMonitor(),
+            RichModelSummary(max_depth=1)
+        ],
         enable_progress_bar=True,
+        logger=wandb_logger,
     )
 
     trainer = prepare_trainer(trainer)
@@ -90,9 +95,14 @@ def train_func(cfg):
 
 
 def main(args):
+    assert (
+            "WANDB_API_KEY" in os.environ
+    ), 'Please set WANDB_API_KEY="abcde" when running this script.'
+
     runtime_env = {
         "env_vars": {
-            "PYTHONPATH": f"{Path(__file__).resolve().parent.parent}:{os.environ.get('PYTHONPATH', '')}"
+            "PYTHONPATH": f"{Path(__file__).resolve().parent.parent}:{os.environ.get('PYTHONPATH', '')}",
+            "WANDB_API_KEY": os.environ["WANDB_API_KEY"]
         }
     }
 
@@ -130,17 +140,13 @@ def main(args):
 
     run_config = RunConfig(
         name="EveNet Training",
-        # checkpoint_config=CheckpointConfig(
-        #     num_to_keep=2,
-        #     checkpoint_score_attribute="val_loss",
-        #     checkpoint_score_order="max",
-        # ),
     )
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
     scaling_config = ScalingConfig(
         num_workers=platform_info.number_of_workers,
         resources_per_worker=platform_info.resources_per_worker,
+        # use_gpu=False,
         use_gpu=True
     )
 
@@ -148,6 +154,9 @@ def main(args):
         "batch_size": platform_info.batch_size,
         "epochs": config.options.Training.epochs,
         "prefetch_batches": platform_info.prefetch_batches,
+        'wandb': {
+            **config.wandb,
+        }
     }
 
     trainer = TorchTrainer(

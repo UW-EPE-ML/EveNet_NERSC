@@ -57,7 +57,7 @@ _DEFAULTS = {
             "num_jet_encoder_layers": 0,
 
             # Number of hidden layers to use for the particle classification head.
-            "num_detector_layers": 1,
+            "num_detection_layers": 1,
 
             # Number of hidden layers to use for the particle classification head.
             "num_regression_layers": 1,

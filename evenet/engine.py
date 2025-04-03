@@ -1,44 +1,122 @@
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import lightning as L
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
-from torch import nn
 
-
-# Dummy model function
-def model(x):
-    return 1
+from evenet.network_scratch.evenet_model import EvenetModel
 
 
 class EveNetEngine(L.LightningModule):
-    def __init__(self):
+    def __init__(self, global_config):
         super().__init__()
-        self.model = None
+        self.model: Union[EvenetModel, None] = None
+        self.config = global_config
+
+        self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
+
+        self.classification_scale = global_config.options.Training.classification_loss_scale
+        self.target_classification_key = 'classification'
+
+        self.regression_scale = global_config.options.Training.regression_loss_scale
+        self.target_regression_key = 'regression'
+        self.target_regression_mask_key = 'regression_mask'
+
+        ###### Initialize Loss ######
+        self.cls_loss = None
+        if self.classification_scale > 0:
+            import evenet.network_scratch.loss.classification as cls_loss
+            self.cls_loss = cls_loss.loss
+
+        self.reg_loss = None
+        if self.regression_scale > 0:
+            import evenet.network_scratch.loss.regression as reg_loss
+            self.reg_loss = reg_loss.loss
 
         print(f"{self.__class__.__name__} initialized")
 
     def forward(self, x):
-        return x
+        return self.model(x)
 
     def on_train_start(self):
-        total_steps = self.trainer.max_epochs * self.trainer.num_training_batches
-        print(f"Total training steps: {total_steps}")
+        pass
+
+    def shared_step(self, batch: Any, *args: Any, **kwargs: Any):
+        batch_size = batch["x"].shape[0]
+        device = self.device
+
+        inputs = {
+            key: value for key, value in batch.items()
+            if key in self.input_keys
+        }
+
+        target_classification = None
+        if self.classification_scale > 0:
+            target_classification = batch[self.target_classification_key]
+
+        target_regression, target_regression_mask = None, None
+        if self.regression_scale > 0:
+            target_regression = batch[self.target_regression_key]
+            target_regression_mask = batch[self.target_regression_mask_key]
+
+        outputs = self.model.shared_step(
+            batch=inputs,
+            batch_size=batch_size,
+        )
+
+        loss = torch.zeros_like(batch_size, device=device)
+        loss_dict = {}
+        if self.classification_scale > 0:
+            cls_loss = self.cls_loss(
+                outputs["classification"],
+                target_classification
+            )
+            loss += cls_loss * self.classification_scale
+            loss_dict["classification_loss"] = cls_loss
+
+        if self.regression_scale > 0:
+            reg_loss = self.reg_loss(
+                outputs["regression"],
+                target_regression,
+                target_regression_mask,
+            )
+            loss += reg_loss * self.regression_scale
+            loss_dict["regression_loss"] = reg_loss
+
+        return loss, loss_dict
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your training step logic here
-        step = self.global_step  # Global step counter (across epochs)
-        epoch = self.current_epoch  # Current epoch index
-        print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} training step")
-        return torch.tensor(0.0, requires_grad=True, device=self.device)
-        pass
+        step = self.global_step
+        epoch = self.current_epoch
+        # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} training step")
+
+        loss, loss_dict = self.shared_step(*args, **kwargs)
+
+        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
+
+        return loss.mean()
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your validation step logic here
         step = self.global_step
         epoch = self.current_epoch
-        print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
-        return torch.tensor(0.0, requires_grad=True, device=self.device)
+        # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
+
+        loss, loss_dict = self.shared_step(*args, **kwargs)
+
+        self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            self.log(f"val/{name}", val.mean(), prog_bar=False, sync_dist=True)
+
+        return loss.mean()
+
+    def on_validation_epoch_end(self) -> None:
+        # Implement your logic for the end of the validation epoch here
         pass
 
     def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
@@ -50,18 +128,12 @@ class EveNetEngine(L.LightningModule):
         if self.model is not None:
             return
         # compile model here
-        # self.model = torch.compile(model)
-        self.model = nn.Sequential(
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 2)
+        self.model = torch.compile(
+            EvenetModel(
+                config=self.config,
+                classification=self.classification_scale > 0,
+                regression=self.regression_scale > 0,
+                generation=False,
+                assignment=False,
+            )
         )
-
-    def on_validation_epoch_end(self) -> None:
-        # Implement your logic for the end of the validation epoch here
-
-        self.log_dict(
-            {"val_loss": 0.0},
-            prog_bar=True, logger=True, sync_dist=True
-        )
-        pass

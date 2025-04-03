@@ -2,25 +2,42 @@ import torch
 import pickle
 from evenet.control.config import DotDict
 
-from evenet.network_scratch.body.normalizer import normalizer
-from evenet.network_scratch.body.embedding import GlobalVectorEmbedding, PETBody, CombinedEmbedding
-from evenet.network_scratch.body.object_encoder import ObjectEncoder
+from evenet.network_scratch.layers.utils import RandomDrop
 
-from evenet.network_scratch.heads.classification.classification_head import ClassificationHead
+from evenet.network_scratch.body.normalizer import Normalizer
+from evenet.network_scratch.body.embedding import GlobalVectorEmbedding, PETBody
+from evenet.network_scratch.body.object_encoder import ObjectEncoder
+from evenet.network_scratch.heads.classification.classification_head import ClassificationHead, RegressionHead
+from evenet.network_scratch.heads.assignment.assignment_head import AssignmentHead
+
 from torch import Tensor, nn
 from typing import Dict
+import re
 
 
 class EvenetModel(nn.Module):
-    def __init__(self, config: DotDict):
+    def __init__(
+            self,
+            config: DotDict,
+            classification: bool = True,
+            regression: bool = True,
+            generation: bool = False,
+            assignment: bool = False,
+    ):
         super().__init__()
         # Initialize the model with the given configuration
         self.options = config.options
         self.event_info = config.event_info
         # self.save_hyperparameters(self.options)
+        self.include_classification = classification
+        self.include_regression = regression
+        self.include_generation = generation
+        self.include_assignment = assignment
 
         with open(self.options.Dataset.normalization_file, 'rb') as f:
             loaded_normalization_dict = pickle.load(f)
+
+        self.normalization_dict = loaded_normalization_dict
 
         # Initialize the normalization layer
         input_normalizers_setting = dict()
@@ -40,13 +57,13 @@ class EvenetModel(nn.Module):
                     )
             else:
                 input_normalizers_setting[input_type] = input_normalizers_setting_local
-        self.sequential_normalizer = normalizer(
+        self.sequential_normalizer = Normalizer(
             log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"],
             mean=input_normalizers_setting["SEQUENTIAL"]["mean"],
             std=input_normalizers_setting["SEQUENTIAL"]["std"]
         )
 
-        self.global_normalizer = normalizer(
+        self.global_normalizer = Normalizer(
             log_mask=input_normalizers_setting["GLOBAL"]["log_mask"],
             mean=input_normalizers_setting["GLOBAL"]["mean"],
             std=input_normalizers_setting["GLOBAL"]["std"]
@@ -57,40 +74,41 @@ class EvenetModel(nn.Module):
 
         # Initialize the embedding layers
 
-        self.global_embedding = GlobalVectorEmbedding(linear_block_type=self.options.Network.linear_block_type,
-                                                      input_dim=self.global_input_dim,
-                                                      hidden_dim_scale=self.options.Network.transformer_dim_scale,
-                                                      initial_embedding_dim=self.options.Network.initial_embedding_dim,
-                                                      final_embedding_dim=self.options.Network.hidden_dim,
-                                                      normalization_type=self.options.Network.normalization,
-                                                      activation_type=self.options.Network.linear_activation,
-                                                      skip_connection=False,
-                                                      num_embedding_layers=self.options.Network.num_embedding_layers,
-                                                      dropout=self.options.Network.dropout)
+        self.global_embedding = GlobalVectorEmbedding(
+            linear_block_type=self.options.Network.linear_block_type,
+            input_dim=self.global_input_dim,
+            hidden_dim_scale=self.options.Network.transformer_dim_scale,
+            initial_embedding_dim=self.options.Network.initial_embedding_dim,
+            final_embedding_dim=self.options.Network.hidden_dim,
+            normalization_type=self.options.Network.normalization,
+            activation_type=self.options.Network.linear_activation,
+            skip_connection=False,
+            num_embedding_layers=self.options.Network.num_embedding_layers,
+            dropout=self.options.Network.dropout
+        )
 
         self.local_feature_indices = self.options.Network.local_point_index
-        self.PET_body = PETBody(num_feat=len(self.local_feature_indices),
-                                num_keep=self.options.Network.num_feature_keep,
-                                feature_drop=self.options.Network.PET_drop_probability,
-                                projection_dim=self.options.Network.hidden_dim,
-                                local=self.options.Network.enable_local_embedding,
-                                K=self.options.Network.local_Krank,
-                                num_local=self.options.Network.num_local_layer,
-                                num_layers=self.options.Network.PET_num_layers,
-                                num_heads=self.options.Network.PET_num_heads,
-                                drop_probability=self.options.Network.PET_drop_probability,
-                                talking_head=self.options.Network.PET_talking_head,
-                                layer_scale=self.options.Network.PET_layer_scale,
-                                layer_scale_init=self.options.Network.PET_layer_scale_init,
-                                dropout=self.options.Network.dropout,
-                                mode="train")
-        self.combined_embedding = CombinedEmbedding(
-            hidden_dim=self.options.Network.hidden_dim,
-            position_embedding_dim=self.options.Network.position_embedding_dim,
+        self.PET_body = PETBody(
+            num_feat=len(self.local_feature_indices),
+            num_keep=self.options.Network.num_feature_keep,
+            feature_drop=self.options.Network.PET_drop_probability,
+            projection_dim=self.options.Network.hidden_dim,
+            local=self.options.Network.enable_local_embedding,
+            K=self.options.Network.local_Krank,
+            num_local=self.options.Network.num_local_layer,
+            num_layers=self.options.Network.PET_num_layers,
+            num_heads=self.options.Network.PET_num_heads,
+            drop_probability=self.options.Network.PET_drop_probability,
+            talking_head=self.options.Network.PET_talking_head,
+            layer_scale=self.options.Network.PET_layer_scale,
+            layer_scale_init=self.options.Network.PET_layer_scale_init,
+            dropout=self.options.Network.dropout,
+            mode="train"
         )
 
         self.object_encoder = ObjectEncoder(
             hidden_dim=self.options.Network.hidden_dim,
+            position_embedding_dim=self.options.Network.position_embedding_dim,
             num_heads=self.options.Network.num_attention_heads,
             transformer_dim_scale=self.options.Network.transformer_dim_scale,
             num_linear_layers=self.options.Network.num_jet_embedding_layers,
@@ -104,7 +122,76 @@ class EvenetModel(nn.Module):
             num_layers=self.options.Network.num_classification_layers,
             hidden_dim=self.options.Network.hidden_dim,
             dropout=self.options.Network.dropout,
+        ) if self.include_classification else None
+
+        self.regression_head = RegressionHead(
+            event_info=self.event_info,
+            means=self.normalization_dict["regression_mean"],
+            stds=self.normalization_dict["regression_std"],
+            num_layers=self.options.Network.num_regression_layers,
+            hidden_dim=self.options.Network.hidden_dim,
+            dropout=self.options.Network.dropout,
+        ) if self.include_regression else None
+
+        # Initialize the resonance particle condition
+
+        self.num_resonance_particle_feature = self.event_info.resonance_particle_properties_mean.size(0)
+        self.resonance_particle_properties = (
+            nn.ParameterDict({topology_name:
+                nn.Parameter(
+                    self.event_info.pairing_topology[topology_name][
+                        "resonance_particle_properties"],
+                    requires_grad=False)
+                for topology_name in self.event_info.pairing_topology}))
+
+        self.resonance_particle_properties_normalizer = Normalizer(
+            mean=self.event_info.resonance_particle_properties_mean,
+            std=self.event_info.resonance_particle_properties_std,
+            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean).bool())
+        self.resonance_particle_embed = nn.Sequential(
+            RandomDrop(self.options.Network.feature_drop, self.options.Network.num_feature_keep),
+            nn.Linear(self.num_resonance_particle_feature, self.options.Network.hidden_dim),
+            nn.GELU(),
+            nn.Linear(self.options.Network.hidden_dim, self.options.Network.hidden_dim)
         )
+
+        # Initialize the assignment head
+        self.process_names = self.event_info.process_names
+
+        self.multiprocess_assign_head = nn.ModuleDict({
+            topology_name: AssignmentHead(
+                split_attention=self.options.Network.split_symmetric_attention,
+                hidden_dim=self.options.Network.hidden_dim,
+                position_embedding_dim=self.options.Network.position_embedding_dim,
+                num_heads=self.options.Network.num_attention_heads,
+                transformer_dim_scale=self.options.Network.transformer_dim_scale,
+                num_linear_layers=self.options.Network.num_jet_embedding_layers,
+                num_encoder_layers=self.options.Network.num_jet_encoder_layers,
+                num_detection_layers=self.options.Network.num_detection_layers,
+                dropout=self.options.Network.dropout,
+                combinatorial_scale=self.options.Network.combinatorial_scale,
+                product_names=self.event_info.pairing_topology_category[topology_name]["product_particles"].names,
+                product_symmetries=self.event_info.pairing_topology_category[topology_name]["product_symmetry"],
+                softmax_output=True
+            )
+            for topology_name in self.event_info.pairing_topology_category
+        })
+
+        # Record attention head basic information
+        self.permutation_indices = dict()
+        self.num_targets = dict()
+
+        for process in self.event_info.process_names:
+            self.permutation_indices[process] = []
+            self.num_targets[process] = []
+            for event_particle_name, product_symmetry in self.event_info.product_symmetries[process].items():
+                topology_name = ''.join(self.event_info.product_particles[process][event_particle_name].names)
+                topology_name = f"{event_particle_name}/{topology_name}"
+                topology_name = re.sub(r'\d+', '', topology_name)
+                topology_category_name = self.event_info.pairing_topology[topology_name]["pairing_topology_category"]
+                self.permutation_indices[process].append(
+                    self.multiprocess_assign_head[topology_category_name].permutation_indices)
+                self.num_targets[process].append(self.multiprocess_assign_head[topology_category_name].num_targets)
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
         """
@@ -133,38 +220,100 @@ class EvenetModel(nn.Module):
                 - 1: valid assignment
                 - 0: invalid assignment
         """
+
+        #############
+        ##  Input  ##
+        #############
+
         input_point_cloud = x['x']
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
         global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
 
-        # Normalize the input point cloud
+        #########################
+        ## Input normalization ##
+        #########################
+
         input_point_cloud = self.sequential_normalizer(input_point_cloud, input_point_cloud_mask)
         global_conditions = self.global_normalizer(global_conditions, global_conditions_mask)
 
-        # Embedding
+        #############################
+        ## Central embedding (PET) ##
+        #############################
+
         global_conditions = self.global_embedding(global_conditions, global_conditions_mask)
         local_feature = input_point_cloud[..., self.local_feature_indices]
         input_point_cloud = self.PET_body(local_feature, input_point_cloud, input_point_cloud_mask, time)
 
-        # Object encoding for classification/assignment/regression
-        embeddings, embeddings_mask = self.combined_embedding(
-            x=input_point_cloud,
-            y=global_conditions,
-            x_mask=input_point_cloud_mask,
-            y_mask=global_conditions_mask
-        )
-        embeddings_padding_mask = ~(embeddings_mask.squeeze(2).bool())
-        embeddings, event_token = self.object_encoder(embeddings, embeddings_mask, embeddings_padding_mask)
+        ######################################
+        ## Embedding for deterministic task ##
+        ######################################
+
+        embeddings, embedded_global_conditions, event_token = self.object_encoder(
+            encoded_vectors=input_point_cloud,
+            mask=input_point_cloud_mask,
+            condition_vectors=global_conditions,
+            condition_mask=global_conditions_mask)
+
+        ########################################
+        ## Output Head for deterministic task ##
+        ########################################
+
         # Classification head
-        classifications = self.class_head(event_token)
+        classifications = None
+        if self.include_classification:
+            classifications = self.class_head(event_token)
+        # Regression head
+        regressions = None
+        if self.include_regression:
+            regressions = self.regression_head(event_token)
+
+        # Assignment head
+        # Create output lists for each particle in event.
+        assignments = dict()
+        detections = dict()
+
+        # Pass the shared hidden state to every decoder branch
+
+        branch_decoder_result = dict()
+        for topology_name in self.event_info.pairing_topology:
+            # Condition embedding for each assignment head
+            topology_category_name = self.event_info.pairing_topology[topology_name]["pairing_topology_category"]
+            condition_variable = self.resonance_particle_properties_normalizer(
+                self.resonance_particle_properties[topology_name])
+            condition_variable = self.resonance_particle_embed(condition_variable)
+
+            (
+                assignment,
+                detection,
+                assignment_mask,
+                event_particle_vector,
+                product_particle_vectors
+            ) = self.multiprocess_assign_head[topology_category_name](
+                embeddings, input_point_cloud_mask, embedded_global_conditions,
+                global_conditions_mask, condition_variable
+            )
+
+            branch_decoder_result[topology_name] = {"assignment": assignment, "detection": detection}
+
+        for process in self.process_names:
+            assignments[process] = []
+            detections[process] = []
+            for event_particle_name, product_symmetry in self.event_info.product_symmetries[process].items():
+                topology_name = ''.join(self.event_info.product_particles[process][event_particle_name].names)
+                topology_name = f"{event_particle_name}/{topology_name}"
+                topology_name = re.sub(r'\d+', '', topology_name)
+                assignments[process].append(branch_decoder_result[topology_name]["assignment"].clone())
+                detections[process].append(branch_decoder_result[topology_name]["detection"].clone())
 
         return {
-            "classifications": classifications,
+            "classification": classifications,
+            "regression": regressions,
+            "assignments": assignments,
+            "detections": detections
         }
 
-    def training_step(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        batch_size = batch['x'].shape[0]
+    def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> Dict[str, Tensor]:
         time = batch['x'].new_ones((batch_size,))
         output = self.forward(batch, time)
         return output

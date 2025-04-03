@@ -1,3 +1,5 @@
+from typing import Any
+
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import Module
@@ -342,7 +344,7 @@ class CombinedEmbedding(nn.Module):
             dropout = 0.0,
             skip_connection=False
         )
-    def forward(self, x: Tensor, y: Tensor, x_mask: Tensor, y_mask: Tensor) -> Tensor:
+    def forward(self, x: Tensor, y: Tensor, x_mask: Tensor, y_mask: Tensor) -> tuple[Any, Tensor]:
 
         """
 

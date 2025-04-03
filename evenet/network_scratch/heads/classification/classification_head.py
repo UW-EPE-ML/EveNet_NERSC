@@ -2,6 +2,7 @@ from torch import nn, Tensor
 from typing import Dict
 from evenet.control.event_info import EventInfo
 from evenet.network_scratch.layers.linear_block import create_linear_block
+from evenet.network_scratch.body.normalizer import Normalizer
 from collections import OrderedDict
 import torch
 
@@ -106,14 +107,70 @@ class ClassificationHead(nn.Module):
 
     def forward(self, x) -> Dict[str, Tensor]:
         """
-        :param x: input point cloud (batch_size, num_objects, num_features)
-        :param mask: mask for point cloud (batch_size, num_objects)
-                - 1: valid point
-                - 0: invalid point
-        :return: tensor (batch_size, num_objects, num_features)
+        :param x: input point cloud (batch_size, hidden_dim)
+        :return: Dict[str, Tensor]
         """
 
         return {
             key: network(x)
             for key, network in self.networks.items()
         }
+
+class RegressionHead(nn.Module):
+    def __init__(
+            self,
+            event_info: EventInfo,
+            means: Dict[str, Tensor],
+            stds: Dict[str, Tensor],
+            num_layers: int,
+            hidden_dim: int,
+            dropout: float = 0.0,
+    ):
+        super(RegressionHead, self).__init__()
+        networks = OrderedDict()
+        normalizers = OrderedDict()
+        self.regressions_target = OrderedDict()
+        for name in event_info.regressions:
+            target_list = []
+            for target in event_info.regression_names:
+                # regression_names Format : "process_name/target_name"
+                process_name = target.split("/")[0]
+                if process_name == name:
+                    target_list.append(target)
+            num_regressions = len(target_list)
+            if num_regressions == 0:
+                continue
+            networks[f"regression/{name}"] = BranchLinear(
+                num_layers=num_layers,
+                hidden_dim=hidden_dim,
+                num_outputs=num_regressions,
+                dropout=dropout,
+                batch_norm=True
+            )
+            self.regressions_target[name] = target_list
+            mean = torch.cat([means[target].unsqueeze(-1) for target in target_list], dim=-1)
+            std = torch.cat([stds[target].unsqueeze(-1) for target in target_list], dim=-1)
+            normalizers[f"regression/{name}"] = Normalizer(
+                mean=mean,
+                std=std,
+                log_mask= torch.zeros_like(mean, dtype=torch.bool)
+            )
+        self.networks = nn.ModuleDict(networks)
+        self.normalizers = nn.ModuleDict(normalizers)
+    def forward(self, x) -> Dict[str, Tensor]:
+        """
+
+        :param x: event token, shape (batch_size, hidden_dim)
+        :return:
+        """
+
+        regression = {
+            key: network(x)
+            for key, network in self.networks.items()
+        }
+        # Apply the normalizers to the regression outputs
+        regression_denormalized = {
+            key: normalizer.denormalize(regression[key])
+            for key, normalizer in self.normalizers.items()
+        }
+        return regression_denormalized

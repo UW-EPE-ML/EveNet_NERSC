@@ -12,7 +12,7 @@ import wandb
 from functools import partial
 
 from evenet.control.config import config
-from evenet.dataset.preprocess import process_event_batch, process_event_batch_old
+from evenet.dataset.preprocess import process_event_batch, convert_batch_to_torch_tensor
 from evenet.network_scratch.evenet_model import EvenetModel
 
 from preprocessing.preprocess import unflatten_dict
@@ -54,18 +54,17 @@ def main(args):
     )
 
     # for early stopping
-    sched = AsyncHyperBandScheduler()
 
     ds = ray.data.read_parquet([
         "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet",
         # "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_1.parquet"
-    ])# .limit(200)
+    ]).limit(1024)
 
     # ds = ds.take_batch(10)
 
     # ds_test = process_event_batch(ds)
 
-    model = EvenetModel(config = config)
+    model = EvenetModel(config = config).to("cpu")
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
@@ -76,6 +75,12 @@ def main(args):
         # batch_format="default"
     )
 
+    batch = processed_ds.take_batch(1024)
+
+    model.shared_step(convert_batch_to_torch_tensor(batch), batch_size=1024)
+
+    exit(1)
+
     # Step 3: Apply transformation
 
     # model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
@@ -83,7 +88,7 @@ def main(args):
         # Each batch is a list of tuples as returned above
         print("Batch ", i)
 
-        model.training_step(batch)
+        model.shared_step(batch, batch_size=1024)
 
         exit(1)
 
