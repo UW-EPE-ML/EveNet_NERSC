@@ -127,7 +127,7 @@ def main(args):
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
-        batch_size=4096 * 10,
+        batch_size=4096 * 5,
     )  # .repartition(len(parquet_files) * 8)
 
     run_config = RunConfig(
