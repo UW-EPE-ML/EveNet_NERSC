@@ -93,8 +93,57 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
     return reconstructed
 
 
-def preprocess(in_dir, store_dir, process_info, unique_id):
+def masked_stats(arr):
+    mask = arr != 0
+    values = np.where(mask, arr, 0)
+
+    count = mask.sum(axis=0)
+    sum_ = values.sum(axis=0)
+    sumsq = (values ** 2).sum(axis=0)
+
+    return {"sum": sum_, "sumsq": sumsq, "count": count}
+
+
+def merge_stats(stats_list):
+    def merge_two(a, b):
+        return {
+            "sum": a["sum"] + b["sum"],
+            "sumsq": a["sumsq"] + b["sumsq"],
+            "count": a["count"] + b["count"]
+        }
+
+    def compute_mean_std(agg):
+        mean = agg["sum"] / agg["count"]
+        std = np.sqrt(agg["sumsq"] / agg["count"] - mean ** 2)
+        return mean, std
+
+    # Accumulate across all files
+    total = {
+        "x": None,
+        "conditions": None,
+        "regression-data": {}
+    }
+
+    for s in stats_list:
+        for key in ["x", "conditions", "regression-data"]:
+            if total[key] is None:
+                total[key] = s[key]
+            else:
+                total[key] = merge_two(total[key], s[key])
+
+    # Final result
+    result = {
+        "x": compute_mean_std(total["x"]),
+        "conditions": compute_mean_std(total["conditions"]),
+        "regression-data": compute_mean_std(total["regression-data"]),
+    }
+    return result
+
+
+def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
     converted_data = []
+    converted_statistics = []
+    config.load_yaml(global_config)
 
     assignment_keys, assignment_key_map = generate_assignment_names(config.event_info)
     regression_keys, regression_key_map = generate_regression_names(config.event_info)
@@ -158,6 +207,13 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
 
         converted_data.append(flattened_data)
 
+        # Calculating normalization statistics
+        x_stats = masked_stats(process_data['x'].reshape(-1, process_data['x'].shape[-1]))
+        cond_stats = masked_stats(process_data['conditions'])
+        regression_stats = masked_stats(process_data['regression-data'])
+
+        converted_statistics.append({"x": x_stats, "conditions": cond_stats, "regressions": regression_stats})
+
     final_table = pa.concat_tables(converted_data)
 
     shuffle_indices = np.random.default_rng(42).permutation(final_table.num_rows)
@@ -172,16 +228,20 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
     print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
     print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
 
+    return converted_statistics
+
 
 def process_single_run(args):
-    pretrain_dir, run_folder_name, store_dir, process_info = args
+    pretrain_dir, run_folder_name, store_dir, process_info, global_config = args
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
     print(f"[INFO] Processing {in_tag}")
-    preprocess(run_folder, store_dir, process_info, unique_id=in_tag)
+    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, global_config=global_config)
+
+    return single_statistics
 
 
-def run_parallel(cfg, num_workers=60):
+def run_parallel(cfg, global_config, num_workers=8):
     tasks = []
 
     for pretrain_dir in cfg.pretrain_dirs:
@@ -191,11 +251,17 @@ def run_parallel(cfg, num_workers=60):
                     pretrain_dir,
                     run_folder.name,
                     cfg.store_dir,
-                    config.process_info
+                    config.process_info,
+                    global_config,
                 ))
 
     with Pool(processes=num_workers) as pool:
-        pool.map(process_single_run, tasks)
+        results = pool.map(process_single_run, tasks)
+
+    # Merge statistics
+    merged_statistics = merge_stats([item for sublist in results for item in sublist])
+    with open(f"{cfg.store_dir}/normalization.json", "w") as f:
+        json.dump(merged_statistics, f)
 
 
 def main(cfg):
@@ -209,7 +275,8 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        run_parallel(cfg, num_workers=60)
+        run_parallel(cfg, cfg.preprocess_config, num_workers=60)
+        # run_parallel(cfg, cfg.preprocess_config, num_workers=10)
 
     else:
         in_tag = Path(cfg.in_dir).name
