@@ -138,7 +138,7 @@ def main(args):
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
     scaling_config = ScalingConfig(
-        num_workers=platform_info.num_of_workers,
+        num_workers=platform_info.number_of_workers,
         resources_per_worker=platform_info.resources_per_worker,
         use_gpu=True
     )
