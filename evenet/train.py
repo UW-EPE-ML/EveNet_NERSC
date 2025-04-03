@@ -112,7 +112,7 @@ def main(args):
 
     ds = ray.data.read_parquet(
         parquet_files,
-        override_num_blocks=len(parquet_files) * platform_info.num_of_workers,
+        override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
         ray_remote_args={
             "num_cpus": 0.5,
         }
