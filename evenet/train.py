@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 import sys
+from functools import partial
 from pathlib import Path
 
 import ray
@@ -24,8 +25,10 @@ import wandb
 import lightning as L
 
 from evenet.control.config import config, DotDict, Config
-from evenet.dataset.preprocess import process_event
+from evenet.dataset.preprocess import process_event_batch
 from evenet.engine import EveNetEngine
+from preprocessing.preprocess import unflatten_dict
+import json
 
 
 def setup_logger(log_file: str = "output.log", level=logging.INFO):
@@ -103,11 +106,13 @@ def main(args):
         runtime_env=runtime_env,
     )
 
-    base_dir = Path("/global/cfs/cdirs/m2616/tihsu/PreTrain_Parquet")
+    base_dir = Path("/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250403")
 
     parquet_files = [
         str(base_dir / file) for file in base_dir.glob("*.parquet")
     ]
+
+    shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
     ds = ray.data.read_parquet(
         parquet_files,
@@ -117,8 +122,10 @@ def main(args):
         }
     )
 
+    process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
+
     ds = ds.map_batches(
-        process_event,
+        process_event_batch_partial,
     )
 
     run_config = RunConfig(
