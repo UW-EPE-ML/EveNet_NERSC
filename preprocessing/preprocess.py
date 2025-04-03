@@ -184,10 +184,10 @@ def main(cfg):
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
         for pretrain_dir in cfg.pretrain_dirs:
-            for run_folder in os.listdir(pretrain_dir):
-                in_tag = Path(pretrain_dir).name + "_" + run_folder
-                print(f"[INFO] Processing {in_tag}")
-
+            for run_folder in Path(pretrain_dir).iterdir():
+                if run_folder.is_dir():
+                    in_tag = Path(pretrain_dir).name + "_" + run_folder
+                    print(f"[INFO] Processing {in_tag}")
 
                 preprocess(run_folder, cfg.store_dir, config.process_info, unique_id=in_tag)
 
