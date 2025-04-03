@@ -1,6 +1,6 @@
 import torch
 import pickle
-from evenet.control.config import DotDict
+from evenet.control.global_config import DotDict
 
 from evenet.network_scratch.layers.utils import RandomDrop
 

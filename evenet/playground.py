@@ -43,7 +43,7 @@ def setup_logger(log_file: str = "output.log", level=logging.INFO):
 def main(args):
     # os.environ["RAY_ENABLE_MAC_LARGE_OBJECT_STORE"] = "1"
 
-    config.load_yaml(args.config)
+    config.load_yaml(args.global_config)
 
     shape_metadata = json.load(open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
 

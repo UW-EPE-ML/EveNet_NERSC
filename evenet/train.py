@@ -1,5 +1,6 @@
 import os
 import argparse
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor, \
     RichModelSummary
 
-from evenet.control.config import config
+from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
 from evenet.engine import EveNetEngine
 from preprocessing.preprocess import unflatten_dict
@@ -54,7 +55,8 @@ def train_func(cfg):
     # val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
-    model = EveNetEngine(global_config=config)
+    model = EveNetEngine(global_config=global_config)
+
 
     # callbacks
     checkpoint_callback = ModelCheckpoint(
@@ -106,8 +108,8 @@ def main(args):
         }
     }
 
-    config.load_yaml(args.config)
-    platform_info = config.platform
+    global_config.load_yaml(args.config)
+    platform_info = global_config.platform
 
     ray.init(
         runtime_env=runtime_env,
@@ -135,7 +137,7 @@ def main(args):
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
-        batch_size=platform_info.batch_size * config.platform.prefetch_batches,
+        batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
     )
 
     run_config = RunConfig(
@@ -152,10 +154,10 @@ def main(args):
 
     trainer_config = {
         "batch_size": platform_info.batch_size,
-        "epochs": config.options.Training.epochs,
+        "epochs": global_config.options.Training.epochs,
         "prefetch_batches": platform_info.prefetch_batches,
         'wandb': {
-            **config.wandb,
+            **global_config.wandb,
         }
     }
 

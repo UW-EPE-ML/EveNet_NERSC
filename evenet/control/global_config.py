@@ -36,6 +36,12 @@ class DotDict(dict):
         else:
             raise AttributeError(f"'DotDict' has no attribute '{key}'")
 
+    def __deepcopy__(self, memo):
+        copied = DotDict()
+        for k, v in self.items():
+            copied[k] = deepcopy(v, memo)
+        return copied
+
     def _wrap(self, value):
         if isinstance(value, dict):
             return DotDict(value)
@@ -67,7 +73,7 @@ class Config:
 
     def __init__(self, defaults: dict):
         self._defaults = DotDict(deepcopy(defaults))
-        self._config = DotDict(deepcopy(defaults))
+        self._global_config = DotDict(deepcopy(defaults))
 
     def load_yaml(self, path: str | Path):
         path = Path(path)
@@ -83,42 +89,44 @@ class Config:
 
                 # Merge included YAML first
                 merged = {**inc_data, **content}  # overwrite with inline
-                self._config[section] = self._config.get(section, DotDict())
-                self._config[section].merge(merged)
+                self._global_config[section] = self._global_config.get(section, DotDict())
+                self._global_config[section].merge(merged)
 
             else:
                 # No include — just use this block directly
-                self._config[section] = self._config.get(section, DotDict())
-                self._config[section].merge(content)
+                self._global_config[section] = self._global_config.get(section, DotDict())
+                self._global_config[section].merge(content)
 
         required = ["event_info", "resonance"]
-        missing = [key for key in required if key not in self._config]
+        missing = [key for key in required if key not in self._global_config]
         if missing:
             raise ValueError(f"Missing required config section(s): {', '.join(missing)}")
 
-        self._config["event_info"] = EventInfo.construct(
-            config=self._config.pop("event_info"),
-            resonance_info=self._config["resonance"],
+        self._global_config["event_info"] = EventInfo.construct(
+            config=self._global_config.pop("event_info"),
+            resonance_info=self._global_config["resonance"],
         )
 
-        if 'process_info' in self._config:
-            self._config['process_info'].pop('EXCLUDE', None)
+        if 'process_info' in self._global_config:
+            self._global_config['process_info'].pop('EXCLUDE', None)
 
     def update(self, data: dict):
-        self._config.merge(data)
+        self._global_config.merge(data)
 
     def to_dict(self):
-        return self._config.to_dict()
+        return self._global_config.to_dict()
 
     def save(self, path: str | Path):
         with open(path, 'w') as f:
             yaml.dump(self.to_dict(), f)
 
     def __getattr__(self, key):
-        return getattr(self._config, key)
+        if key == "_global_config":
+            return object.__getattribute__(self, "_global_config")
+        return getattr(self._global_config, key)
 
     def __getitem__(self, key):
-        return self._config[key]
+        return self._global_config[key]
 
     def __str__(self):
         import pprint
@@ -141,7 +149,7 @@ class Config:
         table.add_column("Parameter", justify="left", style="cyan")
         table.add_column("Value", justify="left")
 
-        flat_current = self._flatten_dict(self._config['options'])
+        flat_current = self._flatten_dict(self._global_config['options'])
         flat_default = self._flatten_dict(self._defaults)
 
         for key in sorted(flat_current.keys()):
@@ -153,7 +161,7 @@ class Config:
         console.print(table)
 
         console = Console()
-        tree = self.dict_to_rich_tree(self._config['resonance'])
+        tree = self.dict_to_rich_tree(self._global_config['resonance'])
         console.print(tree)
 
     def dict_to_rich_tree(self, data, tree=None):
@@ -171,15 +179,15 @@ class Config:
 
 
 # --- Global instance --- #
-config = Config(_DEFAULTS)
+global_config = Config(_DEFAULTS)
 
 if __name__ == '__main__':
     # Example usage
     # config.load_yaml("default.yaml")
-    config.load_yaml("preprocess_pretrain.yaml")
-    config.display()
+    global_config.load_yaml("preprocess_pretrain.yaml")
+    global_config.display()
 
-    a=0
+    a = 0
 
     # config.options.Network.hidden_dim
     # config.event_info.INPUTS.SEQUENTIAL.Source.mass

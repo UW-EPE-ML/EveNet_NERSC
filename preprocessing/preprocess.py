@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 import numpy as np
 from multiprocessing import Pool, cpu_count
 
-from evenet.control.config import config
+from evenet.control.global_config import global_config
 from evenet.control.event_info import EventInfo
 from preprocessing.monitor_gen_matching import monitor_gen_matching
 from preprocessing.normalization import masked_stats, merge_stats
@@ -97,20 +97,20 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
     converted_data = []
     converted_statistics = []
     # if hasattr(config, 'event_info'):
-    config.load_yaml(global_config)
+    global_config.load_yaml(global_config)
 
-    assignment_keys, assignment_key_map = generate_assignment_names(config.event_info)
-    regression_keys, regression_key_map = generate_regression_names(config.event_info)
+    assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
+    regression_keys, regression_key_map = generate_regression_names(global_config.event_info)
 
     shape_metadata = None
 
-    for process in config.process_info:
+    for process in global_config.process_info:
         # for process in ["QCD", "TT2L", "TT1L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
             process=process,
-            feynman_diagram_process=config.process_info[process],
+            feynman_diagram_process=global_config.process_info[process],
             monitor_plots=False,
         )
 
@@ -119,7 +119,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
 
         converter = EveNetDataConverter(
             raw_data=deepcopy(matched_data),
-            event_info=config.event_info,
+            event_info=global_config.event_info,
             process=process,
         )
 
@@ -204,7 +204,7 @@ def run_parallel(cfg, global_config, num_workers=8):
                     pretrain_dir,
                     run_folder.name,
                     cfg.store_dir,
-                    config.process_info,
+                    global_config.process_info,
                     global_config,
                 ))
 
@@ -220,7 +220,7 @@ def run_parallel(cfg, global_config, num_workers=8):
 
 
 def main(cfg):
-    config.load_yaml(cfg.preprocess_config)
+    global_config.load_yaml(cfg.preprocess_config)
 
     def generate_unique_id():
         return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -235,7 +235,7 @@ def main(cfg):
 
     else:
         in_tag = Path(cfg.in_dir).name
-        preprocess(cfg.in_dir, cfg.store_dir, config.process_info, unique_id=in_tag)
+        preprocess(cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag)
 
 
 if __name__ == '__main__':
