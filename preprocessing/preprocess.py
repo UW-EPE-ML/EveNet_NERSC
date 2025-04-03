@@ -213,7 +213,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
         cond_stats = masked_stats(process_data['conditions'])
         regression_stats = masked_stats(process_data['regression-data'])
 
-        converted_statistics.append({"x": x_stats, "conditions": cond_stats, "regressions": regression_stats})
+        converted_statistics.append({"x": x_stats, "conditions": cond_stats, "regressions-data": regression_stats})
 
     final_table = pa.concat_tables(converted_data)
 
