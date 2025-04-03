@@ -3,7 +3,10 @@ import pickle
 from evenet.control.config import DotDict
 
 from evenet.network_scratch.body.normalizer import normalizer
-from evenet.network_scratch.body.embedding import GlobalVectorEmbedding, PETBody
+from evenet.network_scratch.body.embedding import GlobalVectorEmbedding, PETBody, CombinedEmbedding
+from evenet.network_scratch.body.object_encoder import ObjectEncoder
+
+from evenet.network_scratch.heads.classification.classification_head import ClassificationHead
 from torch import Tensor, nn
 from typing import Dict
 
@@ -81,8 +84,27 @@ class EvenetModel(nn.Module):
                                 layer_scale_init=self.options.Network.PET_layer_scale_init,
                                 dropout=self.options.Network.dropout,
                                 mode="train")
+        self.combined_embedding = CombinedEmbedding(
+            hidden_dim=self.options.Network.hidden_dim,
+            position_embedding_dim=self.options.Network.position_embedding_dim,
+        )
 
+        self.object_encoder = ObjectEncoder(
+            hidden_dim=self.options.Network.hidden_dim,
+            num_heads=self.options.Network.num_attention_heads,
+            transformer_dim_scale=self.options.Network.transformer_dim_scale,
+            num_linear_layers=self.options.Network.num_jet_embedding_layers,
+            num_encoder_layers=self.options.Network.num_jet_encoder_layers,
+            dropout=self.options.Network.dropout,
+            conditioned=False
+        )
 
+        self.class_head = ClassificationHead(
+            event_info=self.event_info,
+            num_layers=self.options.Network.num_classification_layers,
+            hidden_dim=self.options.Network.hidden_dim,
+            dropout=self.options.Network.dropout,
+        )
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
         """
@@ -112,22 +134,37 @@ class EvenetModel(nn.Module):
                 - 0: invalid assignment
         """
         input_point_cloud = x['x']
-        input_point_cloud_mask = x['x_mask']
+        input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
-        global_conditions_mask = x['conditions_mask']  # (batch_size, 1)
+        global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+
         # Normalize the input point cloud
         input_point_cloud = self.sequential_normalizer(input_point_cloud, input_point_cloud_mask)
         global_conditions = self.global_normalizer(global_conditions, global_conditions_mask)
+
         # Embedding
-        global_conditions, global_padding_mask, global_sequence_mask, global_mask = self.global_embedding(
-            global_conditions, global_conditions_mask)
+        global_conditions = self.global_embedding(global_conditions, global_conditions_mask)
         local_feature = input_point_cloud[..., self.local_feature_indices]
         input_point_cloud = self.PET_body(local_feature, input_point_cloud, input_point_cloud_mask, time)
 
+        # Object encoding for classification/assignment/regression
+        embeddings, embeddings_mask = self.combined_embedding(
+            x=input_point_cloud,
+            y=global_conditions,
+            x_mask=input_point_cloud_mask,
+            y_mask=global_conditions_mask
+        )
+        embeddings_padding_mask = ~(embeddings_mask.squeeze(2).bool())
+        embeddings, event_token = self.object_encoder(embeddings, embeddings_mask, embeddings_padding_mask)
+        # Classification head
+        classifications = self.class_head(event_token)
 
-        return 0
+        return {
+            "classifications": classifications,
+        }
 
     def training_step(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
         batch_size = batch['x'].shape[0]
         time = batch['x'].new_ones((batch_size,))
-        self.forward(batch, time)
+        output = self.forward(batch, time)
+        return output

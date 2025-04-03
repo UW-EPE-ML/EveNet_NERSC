@@ -32,7 +32,7 @@ class normalizer(nn.Module):
         x = torch.where(self.log_mask_expanded, torch.log1p(x), x)  # log1p(x) = log(1 + x) to avoid log(0) issues
         x = (x - self.mean) / self.std
         if mask is not None:
-            x = x * mask.unsqueeze(-1)
+            x = x * mask
         return x
 
     def denormalize(self, x: Tensor, mask: Tensor = None) -> Tensor:
@@ -47,6 +47,6 @@ class normalizer(nn.Module):
         x = (x * self.std) + self.mean
         x = torch.where(self.log_mask_expanded, torch.expm1(x), x)
         if mask is not None:
-            x = x  * mask.unsqueeze(-1)
+            x = x  * mask
         return x
 

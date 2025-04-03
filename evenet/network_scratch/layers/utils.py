@@ -69,7 +69,7 @@ class TalkingHeadAttention(nn.Module):
         attn = self.proj_l(attn.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
         if mask is not None:
-            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+            mask = mask.squeeze(2).unsqueeze(1).repeat(1, self.num_heads, 1, 1)
             attn += (1.0 - mask) * -1e9
 
         attn = F.softmax(attn, dim=-1)
@@ -89,6 +89,6 @@ class LayerScale(nn.Module):
 
     def forward(self, x, mask=None):
         if mask is not None:
-            return x * self.gamma * mask.unsqueeze(-1)
+            return x * self.gamma * mask
         else:
             return x * self.gamma

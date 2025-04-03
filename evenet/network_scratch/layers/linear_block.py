@@ -39,7 +39,7 @@ class GRUBlock(nn.Module):
     # noinspection SpellCheckingInspection
     def __init__(self,
                  input_dim: int,
-                 hidden_dim:int,
+                 hidden_dim_scale: float,
                  output_dim: int,
                  normalization_type: str,
                  activation_type: str,
@@ -48,7 +48,7 @@ class GRUBlock(nn.Module):
         super(GRUBlock, self).__init__()
 
         self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = int(round(hidden_dim_scale * input_dim))
         self.output_dim = output_dim
         self.skip_connection = skip_connection
         self.normalization_type = normalization_type
@@ -77,9 +77,6 @@ class GRUBlock(nn.Module):
 
         # Possibly need a linear layer to create residual connection.
         self.residual = create_residual_connection(skip_connection, input_dim, output_dim)
-
-        # Mask out padding values
-        self.masking = FillingMasking()
 
     def forward(self, x: Tensor, sequence_mask: Tensor) -> Tensor:
         """
@@ -124,11 +121,11 @@ class GRUBlock(nn.Module):
         if self.skip_connection:
             output = self.gru(output, self.residual(x))
 
-        return self.masking(output, sequence_mask)
+        return output * sequence_mask
 
 def create_linear_block(linear_block_type: str,
                         input_dim: int,
-                        hidden_dim: int,
+                        hidden_dim_scale: float,
                         output_dim: int,
                         normalization_type: str,
                         activation_type: str,
@@ -137,7 +134,7 @@ def create_linear_block(linear_block_type: str,
 
     if linear_block_type == "GRU":
         return GRUBlock(input_dim,
-                        hidden_dim,
+                        hidden_dim_scale,
                         output_dim,
                         normalization_type,
                         activation_type,

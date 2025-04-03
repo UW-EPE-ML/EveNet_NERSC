@@ -49,7 +49,7 @@ class EmbeddingStack(nn.Module):
                                 num_embedding_layers: int) -> list[Module]:
         embedding_layers = [create_linear_block(linear_block_type=linear_block_type,
                                                 input_dim=input_dim,
-                                                hidden_dim=int(round(hidden_dim_scale * input_dim)),
+                                                hidden_dim_scale = hidden_dim_scale,
                                                 output_dim=initial_embedding_dim,
                                                 normalization_type=normalization_type,
                                                 activation_type=activation_type,
@@ -63,8 +63,7 @@ class EmbeddingStack(nn.Module):
                 break
             embedding_layers.append(create_linear_block(linear_block_type=linear_block_type,
                                                         input_dim=current_embedding_dim,
-                                                        hidden_dim=int(
-                                                            round(hidden_dim_scale * current_embedding_dim)),
+                                                        hidden_dim_scale=hidden_dim_scale,
                                                         output_dim=next_embedding_dim,
                                                         normalization_type=normalization_type,
                                                         activation_type=activation_type,
@@ -74,7 +73,7 @@ class EmbeddingStack(nn.Module):
 
         embedding_layers.append(create_linear_block(linear_block_type=linear_block_type,
                                                     input_dim=current_embedding_dim,
-                                                    hidden_dim=int(round(hidden_dim_scale * current_embedding_dim)),
+                                                    hidden_dim_scale=hidden_dim_scale,
                                                     output_dim=final_embedding_dim,
                                                     normalization_type=normalization_type,
                                                     activation_type=activation_type,
@@ -122,49 +121,21 @@ class GlobalVectorEmbedding(nn.Module):
                                               skip_connection=skip_connection,
                                               num_embedding_layers=num_embedding_layers
                                               )
-
     def forward(self, vectors: Tensor, mask: Tensor) -> Tensor:
-        batch_size, max_vectors, input_dim = vectors.shape
-        # -----------------------------------------------
-        # Create an negative mask for transformer layers.
-        # padding_mask: (batch_size, max_vectors)
-        # -----------------------------------------------
-        mask = mask.to(torch.int).to(torch.bool)
-        padding_mask = ~mask
-
-        # -------------------------------------------------------------------------------------------------
-        # Create a positive mask indicating jet is real. This is for zeroing vectors at intermediate steps.
-        # Alternatively, replace it with all ones if we are not masking (basically never).
-        # sequence_mask: (batch_size, max_vectors, 1)
-        # -------------------------------------------------------------------------------------------------
-        sequence_mask = mask.view(batch_size, max_vectors, 1).contiguous()
-
-        # ----------------------------------------------------------------------------
-        # Create a negative mask indicating that all of the vectors that we embed will
-        # be sequential variables and not global variables.
-        # global_mask: (max_vectors,)
-        # ----------------------------------------------------------------------------
-        global_mask = sequence_mask.new_ones((max_vectors,))
-
-        # -------------------------------------------------------------
-        # Reshape vector to have time axis first for transformer input.
-        # output: (max_vectors, batch_size, input_dim)
-        # -------------------------------------------------------------
-        embeddings = vectors.contiguous()
 
         # --------------------------------
         # Embed vectors into latent space.
         # output: (max_vectors, batch_size, final_embedding_dim)
         # --------------------------------
-
-        encoded = self.embedding_stack(embeddings, sequence_mask)
+        embeddings = vectors.contiguous()
+        encoded = self.embedding_stack(embeddings, mask)
 
         # ----------------------------
         # Local Embedding (For Point-Edge Point Cloud)
         # output: [T, B, D]
         # ----------------------------
 
-        return encoded, padding_mask, sequence_mask, global_mask
+        return encoded
 
 
 class FourierEmbedding(nn.Module):
@@ -223,7 +194,7 @@ class LocalEmbeddingLayer(nn.Module):
         :return:
         """
         mask = mask.to(torch.int)
-        coord_shift = 999.0 * (mask == 0).float().unsqueeze(-1)
+        coord_shift = 999.0 * (mask == 0).float()
         local_features = x.contiguous()
         for idx, local_embed in enumerate(self.local_embed_layer):
             local_features = local_embed(coord_shift + points, local_features)  # [T, B, D]
@@ -321,7 +292,7 @@ class PETBody(nn.Module):
 
         time_emb = self.time_embedding(time)
         time_emb = time_emb.squeeze(1).unsqueeze(1).repeat(1, encoded.shape[1], 1)
-        time_emb = time_emb * mask.unsqueeze(-1)
+        time_emb = time_emb * mask
         time_emb = self.time_embed_linear(time_emb)
         scale, shift = torch.chunk(time_emb, 2, dim=-1)
 
@@ -338,3 +309,52 @@ class PETBody(nn.Module):
             encoded = transformer_block(encoded, mask)
 
         return torch.add(encoded, skip_connection)
+
+class PositionEmbedding(nn.Module):
+    def __init__(self, embedding_dim: int):
+        super(PositionEmbedding, self).__init__()
+
+        self.position_embedding = nn.Parameter(torch.randn(1, 1, embedding_dim))
+
+    def forward(self, current_embeddings: Tensor) -> Tensor:
+        batch_size, num_vectors, input_dim = current_embeddings.shape
+
+        position_embedding = self.position_embedding.expand(batch_size, num_vectors, -1)
+        return torch.cat((current_embeddings, position_embedding), dim=2)
+
+class CombinedEmbedding(nn.Module):
+    def __init__(self,
+                 hidden_dim,
+                 position_embedding_dim):
+        super(CombinedEmbedding, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.position_embedding_dim = position_embedding_dim
+
+        self.first_position_embedding = PositionEmbedding(self.position_embedding_dim)
+        self.second_position_embedding = PositionEmbedding(self.position_embedding_dim)
+        self.final_embedding = create_linear_block(
+            linear_block_type = "GRU",
+            input_dim = self.hidden_dim + self.position_embedding_dim,
+            hidden_dim_scale = 1.0,
+            output_dim = self.hidden_dim,
+            normalization_type = "LayerNorm",
+            activation_type = "gelu",
+            dropout = 0.0,
+            skip_connection=False
+        )
+    def forward(self, x: Tensor, y: Tensor, x_mask: Tensor, y_mask: Tensor) -> Tensor:
+
+        """
+
+        :param x: (batch_size, num_objects, hidden_dim)
+        :param y: (batch_size, num_objects, hidden_dim)
+        :param x_mask: (batch_size, num_objects, 1)
+        :param y_mask: (batch_size, num_objects, 1)
+        :return:
+        """
+        x_embed = self.first_position_embedding(x)
+        y_embed = self.second_position_embedding(y)
+        embeddings = torch.cat((x_embed, y_embed), dim=1)
+        embeddings_mask = torch.cat((x_mask, y_mask), dim=1)
+        embeddings = self.final_embedding(embeddings, embeddings_mask)
+        return embeddings, embeddings_mask
