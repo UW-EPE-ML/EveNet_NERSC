@@ -115,9 +115,9 @@ def main(args):
         parquet_files,
         # str(base_dir),
         override_num_blocks=len(parquet_files) * 10,
-        # ray_remote_args={
-        #     "num_cpus": 1.0,
-        # }
+        ray_remote_args={
+            "num_cpus": 0.1,
+        }
     )
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
@@ -141,7 +141,7 @@ def main(args):
     scaling_config = ScalingConfig(
         num_workers=10,
         resources_per_worker={
-            "CPU": 18,
+            "CPU": 36,
             "GPU": 1,
         },
         use_gpu=True
