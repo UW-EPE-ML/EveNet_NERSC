@@ -340,6 +340,8 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         else:
             for key_ in dataset_structure:
                 data_dict[key_] = np.concatenate([data_dict[key_], np.array(list(h5fr[key_]))])
+
+        break
         h5fr.close()
 
     ##########################

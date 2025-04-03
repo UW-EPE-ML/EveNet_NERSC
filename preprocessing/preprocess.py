@@ -113,15 +113,27 @@ def merge_stats(stats_list):
         }
 
     def compute_mean_std(agg):
-        mean = agg["sum"] / agg["count"]
-        std = np.sqrt(agg["sumsq"] / agg["count"] - mean ** 2)
-        return mean, std
+        count = agg["count"]
+        sum_ = agg["sum"]
+        sumsq = agg["sumsq"]
+
+        # Avoid divide-by-zero by substituting 1 where count is 0 (doesn't matter because we mask later)
+        safe_count = np.where(count == 0, 1, count)
+
+        mean = sum_ / safe_count
+        std = np.sqrt(sumsq / safe_count - mean ** 2)
+
+        # Zero out mean/std where count == 0
+        mean = np.where(count == 0, 0.0, mean)
+        std = np.where(count == 0, 0.0, std)
+
+        return {'mean': mean, 'std': std}
 
     # Accumulate across all files
     total = {
         "x": None,
         "conditions": None,
-        "regression-data": {}
+        "regression-data": None,
     }
 
     for s in stats_list:
@@ -144,7 +156,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
     converted_data = []
     converted_statistics = []
     # if hasattr(config, 'event_info'):
-    #     config.load_yaml(global_config)
+    config.load_yaml(global_config)
 
     assignment_keys, assignment_key_map = generate_assignment_names(config.event_info)
     regression_keys, regression_key_map = generate_regression_names(config.event_info)
@@ -262,7 +274,7 @@ def run_parallel(cfg, global_config, num_workers=8):
     print(results)
 
     # Merge statistics
-    merged_statistics = merge_stats([[item] for sublist in results for item in sublist])
+    merged_statistics = merge_stats([item for sublist in results for item in sublist])
     with open(f"{cfg.store_dir}/normalization.json", "w") as f:
         json.dump(merged_statistics, f)
 
