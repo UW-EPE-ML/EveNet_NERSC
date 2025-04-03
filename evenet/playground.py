@@ -59,7 +59,7 @@ def main(args):
     ds = ray.data.read_parquet([
         "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet",
         # "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/PreTrain_Parquet/multi_process_1.parquet"
-    ]).limit(200)
+    ])# .limit(200)
 
     # ds = ds.take_batch(10)
 
@@ -79,7 +79,7 @@ def main(args):
     # Step 3: Apply transformation
 
     # model = JetReconstructionModel(config=config, torch_script=False, total_events=10000)
-    for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=10)):
+    for i, batch in enumerate(processed_ds.iter_torch_batches(batch_size=1024)):
         # Each batch is a list of tuples as returned above
         print("Batch ", i)
 

@@ -101,6 +101,9 @@ class Config:
             resonance_info=self._config["resonance"],
         )
 
+        if 'process_info' in self._config:
+            self._config['process_info'].pop('EXCLUDE', None)
+
     def update(self, data: dict):
         self._config.merge(data)
 

@@ -12,7 +12,7 @@ import numpy as np
 from evenet.control.config import config
 from evenet.control.event_info import EventInfo
 from preprocessing.monitor_gen_matching import monitor_gen_matching
-from preprocessing.process_info import Feynman_diagram
+# from preprocessing.process_info import Feynman_diagram
 from preprocessing.evenet_data_converter import EveNetDataConverter
 
 
@@ -100,14 +100,18 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
 
     shape_metadata = None
 
-    # for process in Feynman_diagram:
-    for process in ["QCD", "TT2L", "TT1L"]:
-        print("Processing ", process)
+    for process in config.process_info:
+        # for process in ["QCD", "TT2L", "TT1L"]:
+        # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
             process=process,
+            feynman_diagram_process=config.process_info[process],
             monitor_plots=False,
         )
+
+        if matched_data is None:
+            continue
 
         converter = EveNetDataConverter(
             raw_data=deepcopy(matched_data),
@@ -149,6 +153,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
         else:
             assert (shape_metadata == meta_data), "Shape metadata mismatch"
 
+        print(f"[INFO] Current table size: {flattened_data.nbytes / 1024 / 1024:.2f} MB")
+
         converted_data.append(flattened_data)
 
     final_table = pa.concat_tables(converted_data)
@@ -162,28 +168,42 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
     with open(f"{store_dir}/shape_metadata.json", "w") as f:
         json.dump(shape_metadata, f)
 
+    print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
+    print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
+
 
 def main(cfg):
-    config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/preprocess_pretrain.yaml")
+    config.load_yaml(cfg.preprocess_config)
 
     def generate_unique_id():
         return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
     os.makedirs(cfg.store_dir, exist_ok=True)
 
-    in_tag = Path(cfg.in_dir).name
+    if cfg.pretrain_dirs is not None:
+        print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-    preprocess(cfg.in_dir, cfg.store_dir, config.process_info, unique_id=in_tag)
+        for pretrain_dir in cfg.pretrain_dirs:
+            for run_folder in os.listdir(pretrain_dir):
+                in_tag = Path(pretrain_dir).name + "_" + run_folder
 
-    pass
+                preprocess(run_folder, cfg.store_dir, config.process_info, unique_id=in_tag)
+
+    else:
+        in_tag = Path(cfg.in_dir).name
+        preprocess(cfg.in_dir, cfg.store_dir, config.process_info, unique_id=in_tag)
 
 
 if __name__ == '__main__':
     usage = 'usage: %prog [options]'
     parser = argparse.ArgumentParser(description=usage)
+    parser.add_argument('preprocess_config', help='Path to config file', default='preprocess_pretrain.yaml')
     parser.add_argument('--in_dir', type=str)
     parser.add_argument('--store_dir', type=str, default='Storage')
-    parser.add_argument('--scan', action='store_true')
+    parser.add_argument(
+        '--pretrain_dirs', type=str, nargs='+',
+        help='Pretrain directories, accept a list of directories, will force using 2-level directory structure'
+    )
     args = parser.parse_args()
 
     main(args)

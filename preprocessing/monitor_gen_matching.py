@@ -5,6 +5,7 @@ import glob
 import numpy as np
 import vector
 from preprocessing.dqm_util import get_hist, draw_hist, find_dataset_name, valid_components_mask
+from tqdm import tqdm
 
 vector.register_awkward()
 from preprocessing.process_info import *
@@ -84,7 +85,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
     for product_ in last_product:
         if "l" in product_:
             n_gen_lepton += last_product[product_]
-    print("nGenLepton", n_gen_lepton)
+    # print("nGenLepton", n_gen_lepton)
 
     # ---------------------------
     # Reconstructed:
@@ -125,7 +126,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
 
     matched_index_safe = ak.where((matched_index > -1), matched_index, 0)  # The padded one will not be used in any case
 
-    print(ak.num(v4_combined))
+    # print(ak.num(v4_combined))
     reco_v4 = ak.where((matched_index > -1), v4_combined[matched_index_safe], reco_v4)
     reco_v4 = ak.where(
         (abs(pdg_id) == 12) | (abs(pdg_id) == 14) | (abs(pdg_id) == 16),
@@ -142,9 +143,9 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
         }
     )
 
-    for i in range(2):
-        for j in range(len(parton[i])):
-            print("events: ", i, "partons: ", j, parton[i][j])
+    # for i in range(2):
+    #     for j in range(len(parton[i])):
+    #         print("events: ", i, "partons: ", j, parton[i][j])
 
     event_dict = dict()
     candidate_dict = dict()
@@ -179,7 +180,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
         event_dict[ele_idx] = ak.flatten(
             ak.fill_none(ak.pad_none(event_dict[ele_idx], 1, axis=1), -1, axis=1), axis=1
         )
-        print('Event', ele_idx, ak.type(event_dict[ele_idx]), event_dict[ele_idx])
+        # print('Event', ele_idx, ak.type(event_dict[ele_idx]), event_dict[ele_idx])
 
     gen_v4 = vector.zip(
         {
@@ -199,15 +200,17 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
     for product in diagram['diagram']:
         if product == 'SYMMETRY': continue
         product_name = 'EVENT/{}'.format(product)
-        reco_dict_ = assign_Reco_LorentzVector(event_dict, diagram['diagram'][product], parton, product_name, reconstructed_momentum)
-        matched_index_dict = assign_matched_index(event_dict, diagram['diagram'][product], parton, product_name, matched_index_dict)
+        reco_dict_ = assign_Reco_LorentzVector(event_dict, diagram['diagram'][product], parton, product_name,
+                                               reconstructed_momentum)
+        matched_index_dict = assign_matched_index(event_dict, diagram['diagram'][product], parton, product_name,
+                                                  matched_index_dict)
 
-        for reco_ in matched_index_dict:
-            print('index', reco_, matched_index_dict[reco_])
+        # for reco_ in matched_index_dict:
+        #     print('index', reco_, matched_index_dict[reco_])
 
         for reco_ in reco_dict_:
             reconstructed_momentum[reco_] = reco_dict_[reco_]
-            print('recopt', reco_, reconstructed_momentum[reco_].pt)
+            # print('recopt', reco_, reconstructed_momentum[reco_].pt)
 
     default_reco_v4 = vector.zip({
         "pt": -1,
@@ -222,7 +225,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
                 axis=-1
             )[..., 0], default_reco_v4
         )
-        print("gen level", particle_, gen_level_momentum[particle_].pt)
+        # print("gen level", particle_, gen_level_momentum[particle_].pt)
 
     combined_index = None
     for product in matched_index_dict:
@@ -251,7 +254,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
         )
 
     else:
-        print("Assign no veto double assignment")
+        # print("Assign no veto double assignment")
         unique_check = ak.values_astype(ak.ones_like(objects['event'][:, 0]), bool)
 
     if return_data:
@@ -305,7 +308,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
     return reconstructed_momentum, dqm_plot, None
 
 
-def monitor_gen_matching(in_dir, process, out_dir=None, monitor_plots: bool = False):
+def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None, monitor_plots: bool = False):
     ################################
     # Collect all necessary arrays #
     ################################
@@ -313,15 +316,22 @@ def monitor_gen_matching(in_dir, process, out_dir=None, monitor_plots: bool = Fa
     data_dict = dict()
     dataset_structure = None
 
-    for h5name in glob.glob(os.path.join(in_dir, '{process}_*.h5'.format(process=process))):
-        if not re.match(os.path.join(in_dir, "{process}_[0-9]+\\.h5".format(process=process)),
-                        h5name): continue
-        print(h5name)
+    process_files = [
+        h5name for h5name in glob.glob(os.path.join(in_dir, '{process}_*.h5'.format(process=process)))
+        if re.match(os.path.join(in_dir, "{process}_[0-9]+\\.h5".format(process=process)), h5name)
+    ]
+
+    if len(process_files) == 0:
+        print(f"[Warning] No files found for process: {process}")
+        return None
+
+    for h5name in tqdm(process_files, desc=f'{process} -- Loading files', unit='file'):
+        # print(h5name)
         h5fr = h5py.File(h5name, mode='r')
 
         if dataset_structure is None:
             dataset_structure = find_dataset_name(h5fr, list(h5fr))
-            print(dataset_structure)
+            # print(dataset_structure)
             for key_ in dataset_structure:
                 data_dict[key_] = np.array(list(h5fr[key_]))
 
@@ -349,8 +359,8 @@ def monitor_gen_matching(in_dir, process, out_dir=None, monitor_plots: bool = Fa
         objects[key_] = object_
 
     objects = select_event(objects)
-    for key_ in objects:
-        print(key_, ak.type(objects[key_]))
+    # for key_ in objects:
+    #     print(key_, ak.type(objects[key_]))
     del data_dict
 
     dqm_plot = dict()
@@ -367,8 +377,6 @@ def monitor_gen_matching(in_dir, process, out_dir=None, monitor_plots: bool = Fa
     ###################
     ## Gen Matching  ##
     ###################
-
-    feynman_diagram_process = Feynman_diagram[process]
     reco, dqm_plot, processed_data = build_dataset_with_matching(
         objects, feynman_diagram_process,
         process,
@@ -405,7 +413,8 @@ if __name__ == '__main__':
     parser.add_argument('--store', action='store_true')
     config = parser.parse_args()
     if config.scan:
-        for process_ in Feynman_diagram:
+        # for process_ in Feynman_diagram:
+        for process_ in []:
             store_string = '--store' if config.store else ''
             os.system(
                 f'python3 Monitor_GenMatching.py --indir {config.indir} --outdir {config.outdir} --store_dir {config.store_dir} --process {process_} {store_string}')

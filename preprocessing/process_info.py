@@ -30,80 +30,6 @@ for pdg_ in PDG_Dict:
     if is_full_neutrino: neutrino_representation.append(pdg_)
     if is_resonance_particle: resonance_representation.append(pdg_)
 
-Feynman_diagram = {
-    "QCD": {"diagram": {}},
-    "QCD_2b": {"diagram": {}},
-    "QCD_2b2j": {"diagram": {}},
-    "QCD_4b": {"diagram": {}},
-    "TTHadronics": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                "t2": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                "SYMMETRY": ["t1", "t2"]}},
-    "TTHadronics_mlm": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                    "t2": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                    "SYMMETRY": ["t1", "t2"]}},
-    "TT1L": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                         "t2": {"b": None, "W": {"l": None, "v": None}}}},
-    "TT1L_mlm": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                             "t2": {"b": None, "W": {"l": None, "v": None}}}},
-    "TT2L": {"diagram": {"t1": {"b": None, "W": {"l+": None, "v": None}},
-                         "t2": {"b": None, "W": {"l-": None, "v": None}}}},
-    "TT2L_mlm": {"diagram": {"t1": {"b": None, "W": {"l+": None, "v": None}},
-                             "t2": {"b": None, "W": {"l-": None, "v": None}}}},
-    "WJetsToLNu": {"diagram": {"W": {"l": None, "v": None}}},
-    "WJetsToQQ": {"diagram": {"W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}},
-    "ZJetsToQQ": {"diagram": {"Z": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}},
-    "ZJetsToLL": {"diagram": {"Z": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]}}},
-    "ZZ_4L": {"diagram": {"Z1": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]},
-                          "Z2": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]},
-                          "SYMMETRY": ["Z1", "Z2"]}},
-    "ZZ_2L": {"diagram": {"Z1": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]},
-                          "Z2": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}},
-    "WZ_1L": {"diagram": {"W": {"l": None, "v": None},
-                          "Z": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}},
-    "WW_1L": {"diagram": {"W1": {"l": None, "v": None},
-                          "W2": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}},
-    "WW_2L": {"diagram": {"W1": {"l": None, "v": None},
-                          "W2": {"l": None, "v": None},
-                          "SYMMETRY": ["W1", "W2"]}},
-    "WZ_2L": {"diagram": {"W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]},
-                          "Z": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]}}},
-    "WZ_3L": {"diagram": {"W": {"l": None, "v": None},
-                          "Z": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]}}},
-    "ttW_FullHadronics": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                      "t2": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                      "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]},
-                                      "SYMMETRY": ["t1", "t2"]}},
-    "ttZ_FullHadronics": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                      "t2": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                      "Z": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]},
-                                      "SYMMETRY": ["t1", "t2"]}},
-    "ttZ_Leptonic": {"diagram": {"t1": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                 "t2": {"b": None, "W": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}},
-                                 "Z": {"l1": None, "l2": None, "SYMMETRY": ["l1", "l2"]},
-                                 "SYMMETRY": ["t1", "t2"]}},
-
-    "haa_ma20": {"diagram": {"H": {"a1": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "a2": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "SYMMETRY": ["a1", "a2"]}},
-                 "store_full_name": True},
-
-    "haa_ma30": {"diagram": {"H": {"a1": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "a2": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "SYMMETRY": ["a1", "a2"]}},
-                 "store_full_name": True},
-
-    "haa_ma40": {"diagram": {"H": {"a1": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "a2": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "SYMMETRY": ["a1", "a2"]}},
-                 "store_full_name": True},
-
-    "haa_ma60": {"diagram": {"H": {"a1": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "a2": {"b1": None, "b2": None, "SYMMETRY": ["b1", "b2"]},
-                                   "SYMMETRY": ["a1", "a2"]}},
-                 "store_full_name": True},
-    "Zjets_m300": {"diagram": {"Z": {"q1": None, "q2": None, "SYMMETRY": ["q1", "q2"]}}}
-}
-
 
 def return_last_product(process_diagram, last_product=dict()):
     for product in process_diagram:
@@ -176,18 +102,18 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
 
         candidate_array[product_name] = product_from_mother.index
 
-        print('---product decay---')
-        for i in product_from_mother[0]:
-            print(candidate_name, i)
+        # print('---product decay---')
+        # for i in product_from_mother[0]:
+        #     print(candidate_name, i)
 
         if products[product] is not None:
 
             ranking = None if ((symmetry_map is None) or (product not in symmetry_map)) else symmetry_map[product]
             product_decay_array, process_summary = select_by_products(parton, product_from_mother, products[product],
                                                                       product_name, rank=ranking)
-            print('---product decay---')
-            for i in product_decay_array[1]:
-                print(candidate_name, i)
+            # print('---product decay---')
+            # for i in product_decay_array[1]:
+            #     print(candidate_name, i)
             cartesian_selection = ak.argcartesian([product_decay_array.M1, candidate_array.index], axis=1)
             matches_selection = cartesian_selection[
                 (product_decay_array.M1[cartesian_selection["0"]] == candidate_array.index[cartesian_selection["1"]])]
@@ -246,7 +172,7 @@ def assign_Reco_LorentzVector(Event_dict, products, parton, candidate_name, reco
                 ak.pad_none(parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
                             1, axis=-1)[..., 0],
                 default_reco_v4)  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
-            print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
+            # print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
 
         if candidate_name not in reconstructed_momentum_dict:
             reconstructed_momentum_dict[candidate_name] = reconstructed_momentum_dict[product_name]
@@ -278,5 +204,5 @@ def assign_matched_index(Event_dict, products, parton, candidate_name, matched_i
                 parton[parton.index == ak.unflatten(Event_dict[product_name], counts=1, axis=-1)]["matched_index"], 1,
                 axis=-1)[..., 0], -1)
             matched_index_dict[product_name] = ak.unflatten(matched_index_dict[product_name], counts=1, axis=-1)
-            print('product type', ak.type(matched_index_dict[product_name]))
+            # print('product type', ak.type(matched_index_dict[product_name]))
     return matched_index_dict

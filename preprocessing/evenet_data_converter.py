@@ -29,13 +29,13 @@ class EveNetDataConverter:
         output_dict = {}
         i = 0
         for folder_key, features in self.event_info.input_features.items():
-            print(folder_key)
+            # print(folder_key)
             features_ak = []
             for feature_info in features:
-                print(feature_info)
+                # print(feature_info)
                 k = f"{label}/{folder_key}/{feature_info[0]}"
                 log_scale = feature_info[2]
-                print(k, log_scale)
+                # print(k, log_scale)
                 if log_scale:
                     features_ak.append(np.log(self.raw_data[k] + 1))
                 else:
@@ -83,6 +83,8 @@ class EveNetDataConverter:
             full_indices[:, row_idx, :len(daughters)] = indices
             full_mask[:, row_idx] = mask
             index_mask[:, row_idx, :len(daughters)] = True
+
+            print(f"[INFO] ASSIGNMENT Loaded {target_prefix}")
 
         output_dict["assignments-indices"] = full_indices
         output_dict["assignments-mask"] = full_mask
@@ -144,7 +146,7 @@ class EveNetDataConverter:
         n_event_original = len(selection)
         n_event_current = len(data_selected['INFO/VetoDoubleAssign'])
 
-        print(f"Selected {n_event_current} events from {n_event_original} original events. [{category}]")
+        print(f"Veto Double Assignment:  {n_event_current}/{n_event_original}. [{category}: {self.process}]")
 
         self.raw_data = data_selected
         self.total_length = n_event_current
