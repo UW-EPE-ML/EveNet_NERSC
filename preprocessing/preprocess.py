@@ -262,7 +262,7 @@ def run_parallel(cfg, global_config, num_workers=8):
     print(results)
 
     # Merge statistics
-    merged_statistics = merge_stats([item for sublist in results for item in sublist])
+    merged_statistics = merge_stats([[item] for sublist in results for item in sublist])
     with open(f"{cfg.store_dir}/normalization.json", "w") as f:
         json.dump(merged_statistics, f)
 
