@@ -128,6 +128,8 @@ def main(args):
         process_event_batch_partial,
     )
 
+    ds = ds.repartition(120)
+
     run_config = RunConfig(
         name="EveNet Training",
         # checkpoint_config=CheckpointConfig(

@@ -87,8 +87,8 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
             full_shape = (flat.shape[0],) + shape
             reconstructed[base] = flat.reshape(full_shape)
     # Print shapes
-    for k, v in reconstructed.items():
-        print(f"{k}: {v.shape}")
+    # for k, v in reconstructed.items():
+    #     print(f"{k}: {v.shape}")
 
     return reconstructed
 
