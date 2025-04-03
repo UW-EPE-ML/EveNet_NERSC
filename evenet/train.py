@@ -143,7 +143,7 @@ def main(args):
     scaling_config = ScalingConfig(
         num_workers=16,
         resources_per_worker={
-            "CPU": 32,
+            "CPU": 30,
             "GPU": 1,
         },
         use_gpu=True
