@@ -116,7 +116,7 @@ def main(args):
 
     ds = ray.data.read_parquet(
         parquet_files,
-        override_num_blocks=len(parquet_files) * 4,
+        override_num_blocks=2440, # len(parquet_files) * 4,
         ray_remote_args={
             "num_cpus": 0.25,
         }
@@ -127,8 +127,6 @@ def main(args):
     ds = ds.map_batches(
         process_event_batch_partial,
     )
-
-    ds = ds.repartition(120)
 
     run_config = RunConfig(
         name="EveNet Training",
