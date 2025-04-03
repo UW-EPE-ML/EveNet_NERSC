@@ -143,8 +143,8 @@ def merge_stats(stats_list):
 def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
     converted_data = []
     converted_statistics = []
-    if hasattr(config, 'event_info'):
-        config.load_yaml(global_config)
+    # if hasattr(config, 'event_info'):
+    #     config.load_yaml(global_config)
 
     assignment_keys, assignment_key_map = generate_assignment_names(config.event_info)
     regression_keys, regression_key_map = generate_regression_names(config.event_info)
