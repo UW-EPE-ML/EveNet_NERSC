@@ -6,10 +6,7 @@ from functools import partial
 from pathlib import Path
 
 import ray
-from ray import air, tune
-from ray.air import session
 from ray.train.torch import TorchCheckpoint
-from ray.tune.schedulers import AsyncHyperBandScheduler
 import ray.train
 from ray.train.lightning import (
     prepare_trainer,
@@ -115,11 +112,12 @@ def main(args):
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
     ds = ray.data.read_parquet(
-        parquet_files,
-        override_num_blocks=len(parquet_files) * 4,
-        ray_remote_args={
-            "num_cpus": 0.5,
-        }
+        # parquet_files,
+        str(base_dir),
+        # override_num_blocks=len(parquet_files) * 4,
+        # ray_remote_args={
+        #     "num_cpus": 1.0,
+        # }
     )
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
@@ -128,7 +126,7 @@ def main(args):
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
-    ).repartition(len(parquet_files) * 8)
+    )  # .repartition(len(parquet_files) * 8)
 
     run_config = RunConfig(
         name="EveNet Training",
