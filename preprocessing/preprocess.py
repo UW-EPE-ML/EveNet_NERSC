@@ -8,6 +8,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 import numpy as np
+from multiprocessing import Pool, cpu_count
 
 from evenet.control.config import config
 from evenet.control.event_info import EventInfo
@@ -172,6 +173,31 @@ def preprocess(in_dir, store_dir, process_info, unique_id):
     print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
 
 
+def process_single_run(args):
+    pretrain_dir, run_folder_name, store_dir, process_info = args
+    run_folder = Path(pretrain_dir) / run_folder_name
+    in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
+    print(f"[INFO] Processing {in_tag}")
+    preprocess(run_folder, store_dir, process_info, unique_id=in_tag)
+
+
+def run_parallel(cfg, num_workers=60):
+    tasks = []
+
+    for pretrain_dir in cfg.pretrain_dirs:
+        for run_folder in Path(pretrain_dir).iterdir():
+            if run_folder.is_dir():
+                tasks.append((
+                    pretrain_dir,
+                    run_folder.name,
+                    cfg.store_dir,
+                    config.process_info
+                ))
+
+    with Pool(processes=num_workers) as pool:
+        pool.map(process_single_run, tasks)
+
+
 def main(cfg):
     config.load_yaml(cfg.preprocess_config)
 
@@ -183,13 +209,7 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        for pretrain_dir in cfg.pretrain_dirs:
-            for run_folder in Path(pretrain_dir).iterdir():
-                if run_folder.is_dir():
-                    in_tag = f"{Path(pretrain_dir).name}_{run_folder.name}"
-                    print(f"[INFO] Processing {in_tag}")
-
-                    preprocess(run_folder, cfg.store_dir, config.process_info, unique_id=in_tag)
+        run_parallel(cfg, num_workers=60)
 
     else:
         in_tag = Path(cfg.in_dir).name
