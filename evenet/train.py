@@ -119,7 +119,7 @@ def main(args):
         ray_remote_args={
             "num_cpus": 0.5,
         }
-    ).repartition(16)
+    )# .repartition(16)
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
@@ -127,6 +127,7 @@ def main(args):
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
+        batch_size=4096 * 10,
     )  # .repartition(len(parquet_files) * 8)
 
     run_config = RunConfig(
@@ -142,7 +143,7 @@ def main(args):
     scaling_config = ScalingConfig(
         num_workers=16,
         resources_per_worker={
-            "CPU": 30,
+            "CPU": 32,
             "GPU": 1,
         },
         use_gpu=True
