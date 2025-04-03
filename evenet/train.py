@@ -49,9 +49,10 @@ def setup_logger(log_file: str = "output.log", level=logging.INFO):
     return logger
 
 
-def train_func():
-    batch_size = config.platform.batch_size
-    max_epochs = config.options.Training.epochs
+def train_func(cfg):
+    batch_size = cfg['batch_size']
+    max_epochs = cfg['epochs']
+    prefetch_batches = cfg['prefetch_batches']
 
     # Fetch the Dataset shards
     train_ds = ray.train.get_dataset_shard("train")
@@ -61,7 +62,7 @@ def train_func():
     dataset_configs = {
         'batch_size': batch_size,
         # 'collate_fn': process_event,
-        'prefetch_batches': config.platform.prefetch_batches,
+        'prefetch_batches': prefetch_batches,
     }
 
     shard_stats = train_ds.stats()
@@ -143,8 +144,15 @@ def main(args):
         use_gpu=True
     )
 
+    trainer_config = {
+        "batch_size": platform_info.batch_size,
+        "epochs": config.options.Training.epochs,
+        "prefetch_batches": platform_info.prefetch_batches,
+    }
+
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
+        train_loop_config=trainer_config,
         scaling_config=scaling_config,
         run_config=run_config,
         datasets={
