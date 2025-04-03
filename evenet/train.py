@@ -114,7 +114,7 @@ def main(args):
     ds = ray.data.read_parquet(
         parquet_files,
         # str(base_dir),
-        # override_num_blocks=len(parquet_files) * 4,
+        override_num_blocks=len(parquet_files) * 4,
         # ray_remote_args={
         #     "num_cpus": 1.0,
         # }
@@ -141,7 +141,7 @@ def main(args):
     scaling_config = ScalingConfig(
         num_workers=10,
         resources_per_worker={
-            "CPU": 30,
+            "CPU": 18,
             "GPU": 1,
         },
         use_gpu=True
