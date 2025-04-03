@@ -16,6 +16,7 @@ from ray.train.lightning import (
 )
 from ray.train.torch import TorchTrainer
 from ray.train import RunConfig, ScalingConfig, CheckpointConfig, DataConfig
+import torch
 
 import wandb
 
@@ -114,11 +115,11 @@ def main(args):
     ds = ray.data.read_parquet(
         parquet_files,
         # str(base_dir),
-        override_num_blocks=len(parquet_files) * 10,
+        override_num_blocks=len(parquet_files) * 16,
         ray_remote_args={
-            "num_cpus": 0.1,
+            "num_cpus": 0.5,
         }
-    )
+    ).repartition(16)
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
@@ -139,9 +140,9 @@ def main(args):
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
     scaling_config = ScalingConfig(
-        num_workers=10,
+        num_workers=16,
         resources_per_worker={
-            "CPU": 36,
+            "CPU": 30,
             "GPU": 1,
         },
         use_gpu=True

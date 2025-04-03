@@ -34,11 +34,11 @@ port=6379
 
 echo "STARTING HEAD at $head_node"
 echo "Head node IP: $head_node_ip"
-srun --nodes=1 --ntasks=1 --gpus=0 --gpus-per-task=4 --cpus-per-task=32 -w $head_node start-head.sh $head_node_ip &
+srun --nodes=1 --ntasks=1 --gpus=0 --gpus-per-task=4 --cpus-per-task=128 -w $head_node start-head.sh $head_node_ip &
 sleep 10
 
 worker_num=$(($SLURM_JOB_NUM_NODES - 1)) #number of nodes other than the head node
-srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=32 --gpus=0  --exclude $head_node start-worker.sh $head_node_ip:$port &
+srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0  --exclude $head_node start-worker.sh $head_node_ip:$port &
 sleep 5
 ##############################################################################################
 
