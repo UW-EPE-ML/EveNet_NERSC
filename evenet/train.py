@@ -50,11 +50,8 @@ def setup_logger(log_file: str = "output.log", level=logging.INFO):
 
 
 def train_func():
-    # Unpack the input configs passed from `TorchTrainer(train_loop_config)`
-    # batch_size = config.Dataset.batch_size
-    # max_epochs = config.Training.epochs
-    batch_size = 4096
-    max_epochs = 5
+    batch_size = config.platform.batch_size
+    max_epochs = config.options.Training.epochs
 
     # Fetch the Dataset shards
     train_ds = ray.train.get_dataset_shard("train")
@@ -64,7 +61,7 @@ def train_func():
     dataset_configs = {
         'batch_size': batch_size,
         # 'collate_fn': process_event,
-        'prefetch_batches': 5,
+        'prefetch_batches': config.platform.prefetch_batches,
     }
 
     shard_stats = train_ds.stats()
@@ -98,13 +95,14 @@ def main(args):
         }
     }
 
-    # config.load_yaml(args.config)
+    config.load_yaml(args.config)
+    platform_info = config.platform
 
     ray.init(
         runtime_env=runtime_env,
     )
 
-    base_dir = Path("/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250403")
+    base_dir = Path(platform_info.data_parquet_dir)
 
     parquet_files = [
         str(base_dir / file) for file in base_dir.glob("*.parquet")
@@ -114,12 +112,11 @@ def main(args):
 
     ds = ray.data.read_parquet(
         parquet_files,
-        # str(base_dir),
-        override_num_blocks=len(parquet_files) * 16,
+        override_num_blocks=len(parquet_files) * platform_info.num_of_workers,
         ray_remote_args={
             "num_cpus": 0.5,
         }
-    )# .repartition(16)
+    )
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
@@ -127,8 +124,8 @@ def main(args):
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
-        batch_size=4096 * 5,
-    )  # .repartition(len(parquet_files) * 8)
+        batch_size=platform_info.batch_size * config.platform.prefetch_batches,
+    )
 
     run_config = RunConfig(
         name="EveNet Training",
@@ -141,17 +138,13 @@ def main(args):
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
     scaling_config = ScalingConfig(
-        num_workers=16,
-        resources_per_worker={
-            "CPU": 30,
-            "GPU": 1,
-        },
+        num_workers=platform_info.num_of_workers,
+        resources_per_worker=platform_info.resources_per_worker,
         use_gpu=True
     )
 
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        # train_loop_config=config,
         scaling_config=scaling_config,
         run_config=run_config,
         datasets={

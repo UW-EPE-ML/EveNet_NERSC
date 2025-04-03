@@ -4,7 +4,6 @@ Dataset:
   balance_file_save_path: null
   balance_jets: false
   balance_particles: false
-  batch_size: 4096
   dataset_limit: 1.0
   dataset_randomization: 0
   event_info_file: null
@@ -12,7 +11,6 @@ Dataset:
   normalization_file: "./normalization_file/PreTrain_norm.pkl"
   normalization_file_save_path: null
   normalize_features: true
-  num_dataloader_workers: 4
   partial_events: false
   portion_for_balance: 1.0
   portion_for_statistics: 1.0

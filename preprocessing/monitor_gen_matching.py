@@ -200,10 +200,12 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
     for product in diagram['diagram']:
         if product == 'SYMMETRY': continue
         product_name = 'EVENT/{}'.format(product)
-        reco_dict_ = assign_Reco_LorentzVector(event_dict, diagram['diagram'][product], parton, product_name,
-                                               reconstructed_momentum)
-        matched_index_dict = assign_matched_index(event_dict, diagram['diagram'][product], parton, product_name,
-                                                  matched_index_dict)
+        reco_dict_ = assign_Reco_LorentzVector(
+            event_dict, diagram['diagram'][product], parton, product_name, reconstructed_momentum
+        )
+        matched_index_dict = assign_matched_index(
+            event_dict, diagram['diagram'][product], parton, product_name, matched_index_dict
+        )
 
         # for reco_ in matched_index_dict:
         #     print('index', reco_, matched_index_dict[reco_])

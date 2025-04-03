@@ -5,6 +5,7 @@ from torch import Tensor, nn
 
 from evenet.network_scratch.layers.linear_block import create_linear_block
 from evenet.network_scratch.layers.transformer import create_transformer
+from evenet.network_scratch.body.embedding import CombinedEmbedding
 
 class ObjectEncoder(nn.Module):
     def __init__(
@@ -23,13 +24,20 @@ class ObjectEncoder(nn.Module):
         if conditioned:
             self.dense_particle = nn.Linear(2 * hidden_dim, hidden_dim)
 
-        self.encoder = create_transformer("GatedTransformer",
-                                          num_layers=num_encoder_layers,
-                                          hidden_dim=hidden_dim,
-                                          num_heads=num_heads,
-                                          transformer_activation="gelu",
-                                          transformer_dim_scale=transformer_dim_scale,
-                                          dropout=dropout)
+        self.combined_embedding = CombinedEmbedding(
+            hidden_dim=hidden_dim,
+            position_embedding_dim=position_embedding_dim
+        )
+
+        self.encoder = create_transformer(
+            "GatedTransformer",
+            num_layers=num_encoder_layers,
+            hidden_dim=hidden_dim,
+            num_heads=num_heads,
+            transformer_activation="gelu",
+            transformer_dim_scale=transformer_dim_scale,
+            dropout=dropout
+        )
         self.embedding = nn.ModuleList([
             create_linear_block(
                 linear_block_type="GRU",
@@ -91,7 +99,7 @@ class ObjectEncoder(nn.Module):
         # particle_sequence_mask: [1, B, 1]
         # combined_sequence_mask: [T + 1, B, 1]
         # -----------------------------------------------------------------------------
-        particle_sequence_mask = mask.new_ones(batch_size,1, 1, dtype=torch.bool)
+        particle_sequence_mask = mask.new_ones(batch_size, 1, 1, dtype=torch.bool)
         combined_sequence_mask = torch.cat((particle_sequence_mask, mask), dim=1)
 
         # -----------------------------------------------------------------------------
@@ -101,6 +109,6 @@ class ObjectEncoder(nn.Module):
         # encoded_vectors: [T, B, D]
         # -----------------------------------------------------------------------------
         combined_vectors = self.encoder(combined_vectors, combined_padding_mask, combined_sequence_mask)
-        particle_vector, encoded_vectors = combined_vectors[:,0,:], combined_vectors[:, 1:, :]
+        particle_vector, encoded_vectors = combined_vectors[:, 0, :], combined_vectors[:, 1:, :]
 
         return encoded_vectors, particle_vector
