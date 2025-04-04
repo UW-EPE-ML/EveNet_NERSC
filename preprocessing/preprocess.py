@@ -93,11 +93,11 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
     return reconstructed
 
 
-def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
+def preprocess(in_dir, store_dir, process_info, unique_id, global_cfg=None):
     converted_data = []
     converted_statistics = []
     # if hasattr(config, 'event_info'):
-    global_config.load_yaml(global_config)
+    global_config.load_yaml(global_cfg)
 
     assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
     regression_keys, regression_key_map = generate_regression_names(global_config.event_info)
@@ -185,16 +185,16 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_config=None):
 
 
 def process_single_run(args):
-    pretrain_dir, run_folder_name, store_dir, process_info, global_config = args
+    pretrain_dir, run_folder_name, store_dir, process_info, cfg_dir = args
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
     print(f"[INFO] Processing {in_tag}")
-    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, global_config=global_config)
+    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, global_cfg=cfg_dir)
 
     return single_statistics
 
 
-def run_parallel(cfg, global_config, num_workers=8):
+def run_parallel(cfg, cfg_dir, num_workers=8):
     tasks = []
 
     for pretrain_dir in cfg.pretrain_dirs:
@@ -205,7 +205,7 @@ def run_parallel(cfg, global_config, num_workers=8):
                     run_folder.name,
                     cfg.store_dir,
                     global_config.process_info,
-                    global_config,
+                    cfg_dir,
                 ))
 
     with Pool(processes=num_workers) as pool:

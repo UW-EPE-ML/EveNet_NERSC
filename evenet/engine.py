@@ -20,7 +20,7 @@ class EveNetEngine(L.LightningModule):
 
         self.regression_scale = global_config.options.Training.regression_loss_scale
         self.target_regression_key = 'regression-data'
-        self.target_regression_mask_key = 'regression_mask'
+        self.target_regression_mask_key = 'regression-mask'
 
         ###### Initialize Loss ######
         self.cls_loss = None
@@ -72,20 +72,23 @@ class EveNetEngine(L.LightningModule):
         loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
         loss_dict = {}
         if self.classification_scale > 0:
+            cls_output = next(iter(outputs["classification"].values()))
             cls_loss = self.cls_loss(
-                outputs["classification"],
+                cls_output,
                 target_classification
             )
-            loss += cls_loss * self.classification_scale
+            loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
         if self.regression_scale > 0:
+            reg_output = outputs["regression"]
+            reg_output = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
             reg_loss = self.reg_loss(
-                outputs["regression"],
-                target_regression,
-                target_regression_mask,
+                reg_output,
+                target_regression.float(),
+                target_regression_mask.float(),
             )
-            loss += reg_loss * self.regression_scale
+            loss = loss + reg_loss * self.regression_scale
             loss_dict["regression_loss"] = reg_loss
 
         return loss, loss_dict

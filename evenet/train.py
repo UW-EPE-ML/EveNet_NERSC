@@ -57,7 +57,6 @@ def train_func(cfg):
     # Model
     model = EveNetEngine(global_config=global_config)
 
-
     # callbacks
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
@@ -77,7 +76,9 @@ def train_func(cfg):
         max_epochs=max_epochs,
         accelerator="auto",
         devices="auto",
-        strategy=RayDDPStrategy(),
+        # accelerator="cpu",
+        # devices=1,
+        strategy=RayDDPStrategy(find_unused_parameters=True),
         plugins=[RayLightningEnvironment()],
         callbacks=[
             # RayTrainReportCallback(),
@@ -149,7 +150,7 @@ def main(args):
         num_workers=platform_info.number_of_workers,
         resources_per_worker=platform_info.resources_per_worker,
         # use_gpu=False,
-        use_gpu=True
+        use_gpu=platform_info.get("use_gpu", True),
     )
 
     trainer_config = {
