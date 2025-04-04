@@ -75,12 +75,15 @@ class EveNetEngine(L.LightningModule):
                 cls_output,
                 target_classification
             )
+            print("target_classification unique:", torch.unique(target_classification))
+            print("cls_output unique:", torch.unique(cls_output))
+            print("cls_loss:", cls_loss)
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
         if self.regression_scale > 0:
             reg_output = outputs["regression"]
-            reg_output = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
+            reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
             reg_loss = self.reg_loss(
                 reg_output,
                 target_regression.float(),

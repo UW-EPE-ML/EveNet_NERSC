@@ -91,8 +91,7 @@ def train_func(cfg):
             checkpoint_callback,
             early_stop_callback,
             LearningRateMonitor(),
-            DeviceStatsMonitor(),
-            RichModelSummary(max_depth=1)
+            RichModelSummary(max_depth=3)
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
