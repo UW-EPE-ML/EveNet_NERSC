@@ -3,7 +3,7 @@ from torch import nn, Tensor
 
 
 class Normalizer(nn.Module):
-    def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor):
+    def __init__(self, mean: Tensor, std: Tensor, log_mask: Tensor):
         super(Normalizer, self).__init__()
 
         """
@@ -13,10 +13,10 @@ class Normalizer(nn.Module):
             std: standard deviation for normalization . shape (num_features,)
         """
         # Initialize mean and std as parameters
-        self.log_mask = nn.Parameter(log_mask, requires_grad=False)
-        self.mean = nn.Parameter(mean, requires_grad=False)
-        self.std = nn.Parameter(std, requires_grad=False)
-        self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
+        self.register_buffer("log_mask", log_mask)
+        self.register_buffer("mean", mean)
+        self.register_buffer("std", std)
+        # self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0) if self.log_mask is not None else None
 
     @torch.no_grad()
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
@@ -28,7 +28,7 @@ class Normalizer(nn.Module):
         :return: tensor (batch_size, num_objects, num_features)
         """
         # Apply the log mask to the input tensor
-        x = torch.where(self.log_mask_expanded, torch.log1p(x), x)  # log1p(x) = log(1 + x) to avoid log(0) issues
+        # x = torch.where(self.log_mask_expanded, torch.log1p(x), x)  # log1p(x) = log(1 + x) to avoid log(0) issues # TODO
         x = (x - self.mean) / self.std
         if mask is not None:
             x = x * mask
@@ -45,7 +45,7 @@ class Normalizer(nn.Module):
         :return: tensor (batch_size, num_objects, num_features)
         """
         x = (x * self.std) + self.mean
-        x = torch.where(self.log_mask_expanded, torch.expm1(x), x)
+        # x = torch.where(self.log_mask_expanded, torch.expm1(x), x) # TODO
         if mask is not None:
             x = x * mask
         return x

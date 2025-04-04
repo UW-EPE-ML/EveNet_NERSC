@@ -98,14 +98,14 @@ class PostProcessor:
                 'Conditions': torch.tensor(merged_stats["conditions"]["mean"], dtype=torch.float32),
             },
             'input_std': {
-                'Source': merged_stats["x"]["std"],
-                'Conditions': merged_stats["conditions"]["std"],
+                'Source': torch.tensor(merged_stats["x"]["std"], dtype=torch.float32),
+                'Conditions': torch.tensor(merged_stats["conditions"]["std"], dtype=torch.float32),
             },
             'input_num_mean': {
                 'Source': torch.tensor(merged_stats["input_num"]["mean"], dtype=torch.float32)
             },
             'input_num_std': {
-                'Source': merged_stats["input_num"]["std"]
+                'Source': torch.tensor(merged_stats["input_num"]["std"], dtype=torch.float32)
             },
             'regression_mean': {
                 k: torch.tensor(merged_stats["regression"]["mean"][i], dtype=torch.float32)
