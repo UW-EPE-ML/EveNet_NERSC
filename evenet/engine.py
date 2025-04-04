@@ -78,6 +78,9 @@ class EveNetEngine(L.LightningModule):
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
+            print('cls_output: ',torch.isnan(cls_output).any(), torch.isinf(cls_output).any())
+            print('target_classification: ',torch.isnan(target_classification).any(), torch.isinf(target_classification).any())
+
         if self.regression_scale > 0:
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
@@ -88,6 +91,10 @@ class EveNetEngine(L.LightningModule):
             )
             loss = loss + reg_loss * self.regression_scale
             loss_dict["regression_loss"] = reg_loss
+
+            print('reg_output: ',torch.isnan(reg_output).any(), torch.isinf(reg_output).any())
+            print('target_regression: ',torch.isnan(target_regression).any(), torch.isinf(target_regression).any())
+            print('target_regression_mask: ',torch.isnan(target_regression_mask).any(), torch.isinf(target_regression_mask).any())
 
         return loss, loss_dict
 
