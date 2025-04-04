@@ -72,12 +72,18 @@ def train_func(cfg):
         min_delta=0.001,  # minimum change to qualify as improvement
     )
 
+    accelerator_config = {
+        "accelerator": "auto",
+        "devices": "auto",
+    }
+    # if this is macOS, set the accelerator to "cpu"
+    if os.uname().sysname == "Darwin":
+        accelerator_config["accelerator"] = "cpu"
+        accelerator_config["devices"] = 1
+
+
     trainer = L.Trainer(
         max_epochs=max_epochs,
-        accelerator="auto",
-        devices="auto",
-        # accelerator="cpu",
-        # devices=1,
         strategy=RayDDPStrategy(find_unused_parameters=True),
         plugins=[RayLightningEnvironment()],
         callbacks=[
@@ -90,6 +96,7 @@ def train_func(cfg):
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
+        **accelerator_config,
     )
 
     trainer = prepare_trainer(trainer)

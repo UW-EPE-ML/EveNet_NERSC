@@ -18,6 +18,7 @@ class Normalizer(nn.Module):
         self.std = nn.Parameter(std, requires_grad=False)
         self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
 
+    @torch.no_grad()
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
         :param x: input point cloud (batch_size, num_objects, num_features)
@@ -33,6 +34,7 @@ class Normalizer(nn.Module):
             x = x * mask
         return x
 
+    @torch.no_grad()
     def denormalize(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
 

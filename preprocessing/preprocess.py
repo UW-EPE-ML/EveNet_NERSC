@@ -211,12 +211,9 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
     with Pool(processes=num_workers) as pool:
         results = pool.map(process_single_run, tasks)
 
-    print(results)
-
     # Merge statistics
     merged_statistics = merge_stats([item for sublist in results for item in sublist])
-    with open(f"{cfg.store_dir}/normalization.json", "w") as f:
-        json.dump(merged_statistics, f)
+    np.savez(f"{cfg.store_dir}/normalization.npz", **merged_statistics)
 
 
 def main(cfg):

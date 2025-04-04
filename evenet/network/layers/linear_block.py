@@ -1,14 +1,16 @@
-from torch import Tensor,nn
+from torch import Tensor, nn
 import torch
 from evenet.network.layers.norm import create_normalization
 from evenet.network.layers.activation import create_activation, create_dropout
 from evenet.network.layers.mask import FillingMasking
+
 
 def create_residual_connection(skip_connection: bool, input_dim: int, output_dim: int) -> nn.Module:
     if input_dim == output_dim or not skip_connection:
         return nn.Identity()
 
     return nn.Linear(input_dim, output_dim)
+
 
 class GRUGate(nn.Module):
     def __init__(self, hidden_dim, gate_initialization: float = 2.0):
@@ -37,14 +39,16 @@ class GRUBlock(nn.Module):
     __constants__ = ['input_dim', 'output_dim', 'skip_connection', 'hidden_dim']
 
     # noinspection SpellCheckingInspection
-    def __init__(self,
-                 input_dim: int,
-                 hidden_dim_scale: float,
-                 output_dim: int,
-                 normalization_type: str,
-                 activation_type: str,
-                 dropout: float,
-                 skip_connection: bool = False):
+    def __init__(
+            self,
+            input_dim: int,
+            hidden_dim_scale: float,
+            output_dim: int,
+            normalization_type: str,
+            activation_type: str,
+            dropout: float,
+            skip_connection: bool = False
+    ):
         super(GRUBlock, self).__init__()
 
         self.input_dim = input_dim
@@ -123,15 +127,17 @@ class GRUBlock(nn.Module):
 
         return output * sequence_mask
 
-def create_linear_block(linear_block_type: str,
-                        input_dim: int,
-                        hidden_dim_scale: float,
-                        output_dim: int,
-                        normalization_type: str,
-                        activation_type: str,
-                        dropout: float,
-                        skip_connection: bool) -> nn.Module:
 
+def create_linear_block(
+        linear_block_type: str,
+        input_dim: int,
+        hidden_dim_scale: float,
+        output_dim: int,
+        normalization_type: str,
+        activation_type: str,
+        dropout: float,
+        skip_connection: bool
+) -> nn.Module:
     if linear_block_type == "GRU":
         return GRUBlock(input_dim,
                         hidden_dim_scale,
@@ -140,5 +146,3 @@ def create_linear_block(linear_block_type: str,
                         activation_type,
                         dropout,
                         skip_connection)
-
-
