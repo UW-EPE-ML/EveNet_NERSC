@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 def masked_stats(arr):
@@ -90,26 +91,28 @@ class PostProcessor:
 
         saved_results = {
             'input_mean': {
-                'Source': merged_stats["x"]["mean"],
-                'Conditions': merged_stats["conditions"]["mean"],
+                'Source': torch.tensor(merged_stats["x"]["mean"], dtype=torch.float32),
+                'Conditions': torch.tensor(merged_stats["conditions"]["mean"], dtype=torch.float32),
             },
             'input_std': {
                 'Source': merged_stats["x"]["std"],
                 'Conditions': merged_stats["conditions"]["std"],
             },
             'input_num_mean': {
-                'Source': merged_stats["input_num"]["mean"]
+                'Source': torch.tensor(merged_stats["input_num"]["mean"], dtype=torch.float32)
             },
             'input_num_std': {
                 'Source': merged_stats["input_num"]["std"]
             },
             'regression_mean': {
-                k: merged_stats["regression"]["mean"][i] for i, k in enumerate(regression_names)
+                k: torch.tensor(merged_stats["regression"]["mean"][i], dtype=torch.float32)
+                for i, k in enumerate(regression_names)
             },
             'regression_std': {
-                k: merged_stats["regression"]["std"][i] for i, k in enumerate(regression_names)
+                k: torch.tensor(merged_stats["regression"]["std"][i], dtype=torch.float32)
+                for i, k in enumerate(regression_names)
             },
         }
 
         if saved_results_path:
-            np.savez(f"{saved_results_path}/normalization.npz", **saved_results)
+            torch.save(saved_results, f"{saved_results_path}/normalization.pt")

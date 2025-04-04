@@ -1,6 +1,8 @@
 import json
 import math
+import pickle
 
+import numpy as np
 import pyarrow.parquet as pq
 import pandas as pd
 import torch
@@ -20,10 +22,10 @@ shape_metadata = json.load(
 
 # Load the Parquet file locally
 df = pq.read_table(
-    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_Run_2.Dec20_run_yulei_11.parquet").to_pandas()
+    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_Run_2.Dec20_run_yulei_17.parquet").to_pandas()
 
 # Optional: Subsample for speed
-df = df.head(500)
+df = df.head(5000)
 
 # Convert to dict-of-arrays if needed
 batch = {col: df[col].to_numpy() for col in df.columns}
@@ -34,9 +36,17 @@ processed_batch = process_event_batch(batch, shape_metadata=shape_metadata, unfl
 # Convert to torch
 torch_batch = convert_batch_to_torch_tensor(processed_batch)
 
+# with open("/Users/avencastmini/PycharmProjects/EveNet/workspace/normalization_file/PreTrain_norm.pkl", 'rb') as f:
+#     normalization_file = pickle.load(f)
+
+
 # Run forward
-model = EvenetModel(config=global_config, device=torch.device("cpu"))
+model = EvenetModel(
+    config=global_config,
+    device=torch.device("cpu"),
+)
 model.train()
+
 
 def check_nan_hook(module, input, output):
     if isinstance(output, torch.Tensor) and torch.isnan(output).any():
@@ -46,11 +56,14 @@ def check_nan_hook(module, input, output):
             if isinstance(inp, torch.Tensor) and torch.isnan(inp).any():
                 print(f"[NaN Detected] Forward input {i} of {module.__class__.__name__}")
 
+
 def check_grad_hook(param, name):
     def hook(grad):
         if grad is not None and torch.isnan(grad).any():
             print(f"[NaN Detected] Grad of {name}")
+
     return hook
+
 
 def gelu_backward_hook(module, grad_input, grad_output):
     if any(torch.isnan(g).any() for g in grad_input):
@@ -58,6 +71,7 @@ def gelu_backward_hook(module, grad_input, grad_output):
     if any(torch.isinf(g).any() for g in grad_input):
         print(f"[Inf Detected] in backward of {module.__class__.__name__}")
     return grad_input
+
 
 for name, module in model.named_modules():
     if isinstance(module, torch.nn.GELU):
@@ -67,9 +81,8 @@ for name, module in model.named_modules():
 # Optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-
 batch_size = len(df)
-num_splits = 10
+num_splits = 50
 split_batches = []
 
 for i in range(num_splits):

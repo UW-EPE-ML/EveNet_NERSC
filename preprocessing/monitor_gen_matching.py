@@ -270,8 +270,8 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
         data_dict['INPUTS/Source/btag'] = pad_object(v4_combined.isBTag, nMaxJet)
         data_dict['INPUTS/Source/isLepton'] = pad_object(v4_combined.isLepton, nMaxJet)
         data_dict['INPUTS/Source/charge'] = pad_object(v4_combined.charge, nMaxJet)
-        data_dict['INPUTS/Met/met'] = ak.to_numpy(objects['event'][:, 0])
-        data_dict['INPUTS/Met/met_phi'] = ak.to_numpy(objects['event'][:, 1])
+        data_dict['INPUTS/Conditions/met'] = ak.to_numpy(objects['event'][:, 0])
+        data_dict['INPUTS/Conditions/met_phi'] = ak.to_numpy(objects['event'][:, 1])
         # Store matched indices
         for product, value in matched_index_dict.items():
             output_name = build_output_name(product, process, diagram, tag="TARGETS")

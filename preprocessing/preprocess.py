@@ -105,8 +105,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None):
 
     shape_metadata = None
 
-    # for process in global_config.process_info:
-    for process in ["TT2L", "TT1L"]:
+    for process in global_config.process_info:
+    # for process in ["TT2L", "TT1L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,

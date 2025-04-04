@@ -251,9 +251,11 @@ class LocalEmbeddingBlock(nn.Module):
 
 
 class PETBody(nn.Module):
-    def __init__(self, num_feat, num_keep, feature_drop, projection_dim, local, K, num_local,
-                 num_layers, num_heads, drop_probability, talking_head, layer_scale,
-                 layer_scale_init, dropout, mode):
+    def __init__(
+            self, num_feat, num_keep, feature_drop, projection_dim, local, K, num_local,
+            num_layers, num_heads, drop_probability, talking_head, layer_scale,
+            layer_scale_init, dropout, mode
+    ):
         super().__init__()
         self.num_keep = num_keep
         self.feature_drop = feature_drop
@@ -282,8 +284,10 @@ class PETBody(nn.Module):
             self.local_embedding = LocalEmbeddingLayer(num_feat, projection_dim, K, num_local)
 
         self.transformer_blocks = nn.ModuleList([
-            TransformerBlockModule(projection_dim, num_heads, dropout, talking_head, layer_scale, layer_scale_init,
-                                   drop_probability)
+            TransformerBlockModule(
+                projection_dim, num_heads, dropout, talking_head, layer_scale, layer_scale_init,
+                drop_probability
+            )
             for _ in range(num_layers)
         ])
 

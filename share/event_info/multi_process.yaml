@@ -19,7 +19,7 @@ INPUTS:
   # REQUIRED - GLOBAL - inputs which will have a single vector per event.
   # ---------------------------------------------------------------------
   GLOBAL:
-    Met:
+    Conditions:
       met: log_normalize
       met_phi: normalize
 

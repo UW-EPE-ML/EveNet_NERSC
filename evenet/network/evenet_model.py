@@ -36,8 +36,11 @@ class EvenetModel(nn.Module):
         self.include_assignment = assignment
         self.device = device
 
-        with open(self.options.Dataset.normalization_file, 'rb') as f:
-            loaded_normalization_dict = pickle.load(f)
+        # with open(self.options.Dataset.normalization_file, "rb") as f:
+        #     # Load the normalization dictionary from the file
+        #     loaded_normalization_dict = pickle.load(f)
+
+        loaded_normalization_dict = torch.load(self.options.Dataset.normalization_file)
 
         self.normalization_dict = loaded_normalization_dict
 
@@ -142,12 +145,15 @@ class EvenetModel(nn.Module):
 
         self.num_resonance_particle_feature = self.event_info.resonance_particle_properties_mean.size(0)
         self.resonance_particle_properties = (
-            nn.ParameterDict({topology_name:
-                nn.Parameter(
-                    self.event_info.pairing_topology[topology_name][
-                        "resonance_particle_properties"].to(self.device),
-                    requires_grad=False)
-                for topology_name in self.event_info.pairing_topology}))
+            nn.ParameterDict({
+                topology_name:
+                    nn.Parameter(
+                        self.event_info.pairing_topology[topology_name][
+                            "resonance_particle_properties"].to(self.device),
+                        requires_grad=False)
+                for topology_name in self.event_info.pairing_topology}
+            )
+        )
 
         self.resonance_particle_properties_normalizer = Normalizer(
             mean=self.event_info.resonance_particle_properties_mean.to(self.device),
@@ -236,6 +242,7 @@ class EvenetModel(nn.Module):
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
         global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
 
+        batch_size = input_point_cloud.shape[0]
         #########################
         ## Input normalization ##
         #########################
@@ -286,7 +293,10 @@ class EvenetModel(nn.Module):
             # Condition embedding for each assignment head
             topology_category_name = self.event_info.pairing_topology[topology_name]["pairing_topology_category"]
             condition_variable = self.resonance_particle_properties_normalizer(
-                self.resonance_particle_properties[topology_name])
+                self.resonance_particle_properties[topology_name]
+            )
+            num_res = condition_variable.shape[-1]
+            condition_variable = condition_variable.view(1, 1,num_res).expand(batch_size, 1, num_res)
             condition_variable = self.resonance_particle_embed(condition_variable)
 
             (
