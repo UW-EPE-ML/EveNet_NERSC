@@ -95,6 +95,7 @@ def train_func(cfg):
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
+        val_check_interval=20,
         **accelerator_config,
     )
 
