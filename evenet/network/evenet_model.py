@@ -187,7 +187,7 @@ class EvenetModel(nn.Module):
                 softmax_output=True
             )
             for topology_name in self.event_info.pairing_topology_category
-        })
+        }) if self.include_assignment else None
 
         # Record attention head basic information
         self.permutation_indices = dict()
@@ -286,41 +286,41 @@ class EvenetModel(nn.Module):
         assignments = dict()
         detections = dict()
 
-        # Pass the shared hidden state to every decoder branch
+        if self.include_assignment:
+            # Pass the shared hidden state to every decoder branch
+            branch_decoder_result = dict()
+            for topology_name in self.event_info.pairing_topology:
+                # Condition embedding for each assignment head
+                topology_category_name = self.event_info.pairing_topology[topology_name]["pairing_topology_category"]
+                condition_variable = self.resonance_particle_properties_normalizer(
+                    self.resonance_particle_properties[topology_name]
+                )
+                num_res = condition_variable.shape[-1]
+                condition_variable = condition_variable.view(1, 1, num_res).expand(batch_size, 1, num_res)
+                condition_variable = self.resonance_particle_embed(condition_variable)
 
-        branch_decoder_result = dict()
-        for topology_name in self.event_info.pairing_topology:
-            # Condition embedding for each assignment head
-            topology_category_name = self.event_info.pairing_topology[topology_name]["pairing_topology_category"]
-            condition_variable = self.resonance_particle_properties_normalizer(
-                self.resonance_particle_properties[topology_name]
-            )
-            num_res = condition_variable.shape[-1]
-            condition_variable = condition_variable.view(1, 1,num_res).expand(batch_size, 1, num_res)
-            condition_variable = self.resonance_particle_embed(condition_variable)
+                (
+                    assignment,
+                    detection,
+                    assignment_mask,
+                    event_particle_vector,
+                    product_particle_vectors
+                ) = self.multiprocess_assign_head[topology_category_name](
+                    embeddings, input_point_cloud_mask, embedded_global_conditions,
+                    global_conditions_mask, condition_variable
+                )
 
-            (
-                assignment,
-                detection,
-                assignment_mask,
-                event_particle_vector,
-                product_particle_vectors
-            ) = self.multiprocess_assign_head[topology_category_name](
-                embeddings, input_point_cloud_mask, embedded_global_conditions,
-                global_conditions_mask, condition_variable
-            )
+                branch_decoder_result[topology_name] = {"assignment": assignment, "detection": detection}
 
-            branch_decoder_result[topology_name] = {"assignment": assignment, "detection": detection}
-
-        for process in self.process_names:
-            assignments[process] = []
-            detections[process] = []
-            for event_particle_name, product_symmetry in self.event_info.product_symmetries[process].items():
-                topology_name = ''.join(self.event_info.product_particles[process][event_particle_name].names)
-                topology_name = f"{event_particle_name}/{topology_name}"
-                topology_name = re.sub(r'\d+', '', topology_name)
-                assignments[process].append(branch_decoder_result[topology_name]["assignment"].clone())
-                detections[process].append(branch_decoder_result[topology_name]["detection"].clone())
+            for process in self.process_names:
+                assignments[process] = []
+                detections[process] = []
+                for event_particle_name, product_symmetry in self.event_info.product_symmetries[process].items():
+                    topology_name = ''.join(self.event_info.product_particles[process][event_particle_name].names)
+                    topology_name = f"{event_particle_name}/{topology_name}"
+                    topology_name = re.sub(r'\d+', '', topology_name)
+                    assignments[process].append(branch_decoder_result[topology_name]["assignment"].clone())
+                    detections[process].append(branch_decoder_result[topology_name]["detection"].clone())
 
         return {
             "classification": classifications,
