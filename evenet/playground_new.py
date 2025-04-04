@@ -2,15 +2,15 @@ import json
 
 import pyarrow.parquet as pq
 import pandas as pd
-
-from evenet.control.config import config
+import torch
+from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch, convert_batch_to_torch_tensor
 from evenet.network.evenet_model import EvenetModel
 
 from preprocessing.preprocess import unflatten_dict
 
 
-config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/default.yaml")
+global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/default.yaml")
 
 shape_metadata = json.load(
     open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
@@ -31,5 +31,5 @@ processed_batch = process_event_batch(batch, shape_metadata=shape_metadata, unfl
 torch_batch = convert_batch_to_torch_tensor(processed_batch)
 
 # Run forward
-model = EvenetModel(config=config)
+model = EvenetModel(config=global_config, device=torch.device("cpu"))
 outputs = model.shared_step(torch_batch, batch_size=len(df))

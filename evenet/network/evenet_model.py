@@ -135,6 +135,7 @@ class EvenetModel(nn.Module):
             num_layers=self.options.Network.num_regression_layers,
             hidden_dim=self.options.Network.hidden_dim,
             dropout=self.options.Network.dropout,
+            device=self.device,
         ) if self.include_regression else None
 
         # Initialize the resonance particle condition

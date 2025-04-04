@@ -124,6 +124,7 @@ class RegressionHead(nn.Module):
             stds: Dict[str, Tensor],
             num_layers: int,
             hidden_dim: int,
+            device,
             dropout: float = 0.0,
     ):
         super(RegressionHead, self).__init__()
@@ -151,8 +152,8 @@ class RegressionHead(nn.Module):
             mean = torch.cat([means[target].unsqueeze(-1) for target in target_list], dim=-1)
             std = torch.cat([stds[target].unsqueeze(-1) for target in target_list], dim=-1)
             normalizers[f"regression/{name}"] = Normalizer(
-                mean=mean.to(self.device),
-                std=std.to(self.device),
+                mean=mean.to(device),
+                std=std.to(device),
                 log_mask= torch.zeros_like(mean, dtype=torch.bool)
             )
         self.networks = nn.ModuleDict(networks)
