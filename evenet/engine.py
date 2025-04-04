@@ -138,6 +138,7 @@ class EveNetEngine(L.LightningModule):
                 if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
                     print(f"🚨 Gradient in {name} is NaN or Inf!")
                     raise ValueError("Gradient check failed.")
+        print(f"Gradient check passed.")
         super().backward(loss, *args, **kwargs)
 
     def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
