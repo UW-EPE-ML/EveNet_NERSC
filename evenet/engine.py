@@ -19,7 +19,7 @@ class EveNetEngine(L.LightningModule):
         self.target_classification_key = 'classification'
 
         self.regression_scale = global_config.options.Training.regression_loss_scale
-        self.target_regression_key = 'regression'
+        self.target_regression_key = 'regression-data'
         self.target_regression_mask_key = 'regression_mask'
 
         ###### Initialize Loss ######
