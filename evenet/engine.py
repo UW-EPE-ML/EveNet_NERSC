@@ -132,7 +132,7 @@ class EveNetEngine(L.LightningModule):
         return {"optimizer": optimizer}
 
     def configure_model(self) -> None:
-        print(f"{self.__class__.__name__} configure model")
+        print(f"{self.__class__.__name__} configure model on device {self.device}")
         if self.model is not None:
             return
         # compile model here

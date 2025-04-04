@@ -15,13 +15,10 @@ class Normalizer(nn.Module):
         # Initialize mean and std as parameters
         self.log_mask = nn.Parameter(log_mask, requires_grad=False)
         self.mean = nn.Parameter(mean, requires_grad=False)
-        self.std  = nn.Parameter(std, requires_grad=False)
+        self.std = nn.Parameter(std, requires_grad=False)
         self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
 
-        print("log_mask_expanded.device:", self.log_mask_expanded.device)
-        print("log_mask.device:", self.log_mask.device)
-        print("mean.device:", self.mean.device)
-        print("std.device:", self.std.device)
+        print("log_mask_expanded.device:", self.log_mask_expanded.device, "log_mask.device:", self.log_mask.device)
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
@@ -53,6 +50,5 @@ class Normalizer(nn.Module):
         x = (x * self.std) + self.mean
         x = torch.where(self.log_mask_expanded, torch.expm1(x), x)
         if mask is not None:
-            x = x  * mask
+            x = x * mask
         return x
-
