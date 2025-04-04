@@ -34,6 +34,7 @@ class EvenetModel(nn.Module):
         self.include_regression = regression
         self.include_generation = generation
         self.include_assignment = assignment
+        self.device = device
 
         with open(self.options.Dataset.normalization_file, 'rb') as f:
             loaded_normalization_dict = pickle.load(f)
@@ -45,7 +46,9 @@ class EvenetModel(nn.Module):
         for input_name, input_type in self.event_info.input_types.items():
             input_normalizers_setting_local = {
                 "log_mask": torch.tensor(
-                    [feature_info.log_scale for feature_info in self.event_info.input_features[input_name]]),
+                    [feature_info.log_scale for feature_info in self.event_info.input_features[input_name]],
+                    device=self.device
+                ),
                 "mean": loaded_normalization_dict["input_mean"][input_name],
                 "std": loaded_normalization_dict["input_std"][input_name]
             }
@@ -146,9 +149,9 @@ class EvenetModel(nn.Module):
                 for topology_name in self.event_info.pairing_topology}))
 
         self.resonance_particle_properties_normalizer = Normalizer(
-            mean=self.event_info.resonance_particle_properties_mean,
-            std=self.event_info.resonance_particle_properties_std,
-            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean).bool())
+            mean=self.event_info.resonance_particle_properties_mean.to(self.device),
+            std=self.event_info.resonance_particle_properties_std.to(self.device),
+            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool())
         self.resonance_particle_embed = nn.Sequential(
             RandomDrop(self.options.Network.feature_drop, self.options.Network.num_feature_keep),
             nn.Linear(self.num_resonance_particle_feature, self.options.Network.hidden_dim),
