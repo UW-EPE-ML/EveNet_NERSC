@@ -3,7 +3,7 @@ from torch import nn, Tensor
 
 
 class Normalizer(nn.Module):
-    def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor, tag: str):
+    def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor):
         super(Normalizer, self).__init__()
 
         """
@@ -17,8 +17,6 @@ class Normalizer(nn.Module):
         self.mean = nn.Parameter(mean, requires_grad=False)
         self.std = nn.Parameter(std, requires_grad=False)
         self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
-
-        print(tag, "- log_mask_expanded.device:", self.log_mask_expanded.device, "log_mask.device:", self.log_mask.device)
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
@@ -44,9 +42,6 @@ class Normalizer(nn.Module):
                 - 0: invalid point
         :return: tensor (batch_size, num_objects, num_features)
         """
-        print("x.device:", x.device)
-        print("log_mask_expanded.device:", self.log_mask_expanded.device)
-
         x = (x * self.std) + self.mean
         x = torch.where(self.log_mask_expanded, torch.expm1(x), x)
         if mask is not None:
