@@ -27,12 +27,12 @@ wandb:
 options:
   include: options/options.yaml
 
-  # overwrites
-  Training:
-    epochs: 1
-  Dataset:
-    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_balance.pkl"
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
+#  # overwrites
+#  Training:
+#    epochs: 1
+#  Dataset:
+#    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_balance.pkl"
+#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
 
 event_info:
   include: event_info/multi_process.yaml
