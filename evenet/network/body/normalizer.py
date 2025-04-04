@@ -18,6 +18,11 @@ class Normalizer(nn.Module):
         self.std  = nn.Parameter(std, requires_grad=False)
         self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
 
+        print("log_mask_expanded.device:", self.log_mask_expanded.device)
+        print("log_mask.device:", self.log_mask.device)
+        print("mean.device:", self.mean.device)
+        print("std.device:", self.std.device)
+
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
         :param x: input point cloud (batch_size, num_objects, num_features)
@@ -42,6 +47,9 @@ class Normalizer(nn.Module):
                 - 0: invalid point
         :return: tensor (batch_size, num_objects, num_features)
         """
+        print("x.device:", x.device)
+        print("log_mask_expanded.device:", self.log_mask_expanded.device)
+
         x = (x * self.std) + self.mean
         x = torch.where(self.log_mask_expanded, torch.expm1(x), x)
         if mask is not None:

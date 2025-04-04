@@ -22,7 +22,7 @@ wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
-  tags: [ "Pretrain", "Parquet", "Mac" ]
+  tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node" ]
 
 options:
   include: options/options.yaml
