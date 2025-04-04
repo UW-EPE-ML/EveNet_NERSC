@@ -25,9 +25,6 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Loss ######
         self.cls_loss = None
 
-        print(self.classification_scale > 0, self.classification_scale)
-        print(self.regression_scale > 0, self.regression_scale)
-
         if self.classification_scale > 0:
             import evenet.network.loss.classification as cls_loss
             self.cls_loss = cls_loss.loss
@@ -37,6 +34,7 @@ class EveNetEngine(L.LightningModule):
         if self.regression_scale > 0:
             import evenet.network.loss.regression as reg_loss
             self.reg_loss = reg_loss.loss
+            print(f"{self.__class__.__name__} regression loss initialized")
 
         print(f"{self.__class__.__name__} initialized")
 

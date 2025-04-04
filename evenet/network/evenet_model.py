@@ -64,13 +64,15 @@ class EvenetModel(nn.Module):
         self.sequential_normalizer = Normalizer(
             log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"].to(self.device),
             mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
-            std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device)
+            std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device),
+            tag="sequential"
         )
 
         self.global_normalizer = Normalizer(
             log_mask=input_normalizers_setting["GLOBAL"]["log_mask"].to(self.device),
             mean=input_normalizers_setting["GLOBAL"]["mean"].to(self.device),
-            std=input_normalizers_setting["GLOBAL"]["std"].to(self.device)
+            std=input_normalizers_setting["GLOBAL"]["std"].to(self.device),
+            tag="global"
         )
 
         self.global_input_dim = input_normalizers_setting["GLOBAL"]["log_mask"].size()[-1]
@@ -152,7 +154,9 @@ class EvenetModel(nn.Module):
         self.resonance_particle_properties_normalizer = Normalizer(
             mean=self.event_info.resonance_particle_properties_mean.to(self.device),
             std=self.event_info.resonance_particle_properties_std.to(self.device),
-            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool())
+            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool(),
+            tag="resonance_particle_properties"
+        )
         self.resonance_particle_embed = nn.Sequential(
             RandomDrop(self.options.Network.feature_drop, self.options.Network.num_feature_keep),
             nn.Linear(self.num_resonance_particle_feature, self.options.Network.hidden_dim),

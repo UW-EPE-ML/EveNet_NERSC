@@ -3,7 +3,7 @@ from torch import nn, Tensor
 
 
 class Normalizer(nn.Module):
-    def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor):
+    def __init__(self, log_mask: Tensor, mean: Tensor, std: Tensor, tag: str):
         super(Normalizer, self).__init__()
 
         """
@@ -18,7 +18,7 @@ class Normalizer(nn.Module):
         self.std = nn.Parameter(std, requires_grad=False)
         self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0)
 
-        print("log_mask_expanded.device:", self.log_mask_expanded.device, "log_mask.device:", self.log_mask.device)
+        print(tag, "- log_mask_expanded.device:", self.log_mask_expanded.device, "log_mask.device:", self.log_mask.device)
 
     def forward(self, x: Tensor, mask: Tensor = None) -> Tensor:
         """
