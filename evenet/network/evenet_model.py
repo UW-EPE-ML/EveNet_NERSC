@@ -144,7 +144,7 @@ class EvenetModel(nn.Module):
             nn.ParameterDict({topology_name:
                 nn.Parameter(
                     self.event_info.pairing_topology[topology_name][
-                        "resonance_particle_properties"],
+                        "resonance_particle_properties"].to(self.device),
                     requires_grad=False)
                 for topology_name in self.event_info.pairing_topology}))
 

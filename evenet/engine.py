@@ -64,7 +64,7 @@ class EveNetEngine(L.LightningModule):
             batch_size=batch_size,
         )
 
-        loss = torch.zeros_like(batch_size)
+        loss = torch.zeros(batch_size)
         loss_dict = {}
         if self.classification_scale > 0:
             cls_loss = self.cls_loss(
