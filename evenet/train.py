@@ -24,6 +24,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
 from evenet.engine import EveNetEngine
+from evenet.network.callbacks.ema import EMACallback
 from preprocessing.preprocess import unflatten_dict
 import json
 
@@ -32,6 +33,7 @@ def train_func(cfg):
     batch_size = cfg['batch_size']
     max_epochs = cfg['epochs']
     prefetch_batches = cfg['prefetch_batches']
+    total_events = cfg['total_events']
 
     wandb_config = cfg.get("wandb", {})
     wandb_logger = None
@@ -56,7 +58,11 @@ def train_func(cfg):
     val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
-    model = EveNetEngine(global_config=global_config)
+    model = EveNetEngine(
+        global_config=global_config,
+        world_size=ray.train.get_context().get_world_size(),
+        total_events=total_events,
+    )
 
     # callbacks
     checkpoint_callback = ModelCheckpoint(
@@ -91,11 +97,12 @@ def train_func(cfg):
             checkpoint_callback,
             early_stop_callback,
             LearningRateMonitor(),
-            RichModelSummary(max_depth=3)
+            RichModelSummary(max_depth=3),
+            EMACallback(decay=0.999),
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
-        val_check_interval=20,
+        # val_check_interval=20,
         **accelerator_config,
     )
 
@@ -169,6 +176,8 @@ def main(args):
     train_ds = register_dataset(train_files, process_event_batch_partial, platform_info)
     valid_ds = register_dataset(val_files, process_event_batch_partial, platform_info)
 
+    total_events = train_ds.count()
+
     run_config = RunConfig(
         name="EveNet Training",
     )
@@ -187,7 +196,8 @@ def main(args):
         "prefetch_batches": platform_info.prefetch_batches,
         'wandb': {
             **global_config.wandb,
-        }
+        },
+        "total_events": total_events,
     }
 
     trainer = TorchTrainer(

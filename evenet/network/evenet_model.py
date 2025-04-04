@@ -64,6 +64,7 @@ class EvenetModel(nn.Module):
                     )
             else:
                 input_normalizers_setting[input_type] = input_normalizers_setting_local
+
         self.sequential_normalizer = Normalizer(
             log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"].to(self.device),
             mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
@@ -78,9 +79,9 @@ class EvenetModel(nn.Module):
 
         self.global_input_dim = input_normalizers_setting["GLOBAL"]["log_mask"].size()[-1]
         self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["log_mask"].size()[-1]
+        self.local_feature_indices = self.options.Network.local_point_index
 
-        # Initialize the embedding layers
-
+        # [1] Body
         self.global_embedding = GlobalVectorEmbedding(
             linear_block_type=self.options.Network.linear_block_type,
             input_dim=self.global_input_dim,
@@ -93,8 +94,7 @@ class EvenetModel(nn.Module):
             num_embedding_layers=self.options.Network.num_embedding_layers,
             dropout=self.options.Network.dropout
         )
-
-        self.local_feature_indices = self.options.Network.local_point_index
+        # [1] Body
         self.PET_body = PETBody(
             num_feat=len(self.local_feature_indices),
             num_keep=self.options.Network.num_feature_keep,
@@ -112,7 +112,7 @@ class EvenetModel(nn.Module):
             dropout=self.options.Network.dropout,
             mode="train"
         )
-
+        # [2] Classification + Regression + Assignment Body
         self.object_encoder = ObjectEncoder(
             hidden_dim=self.options.Network.hidden_dim,
             position_embedding_dim=self.options.Network.position_embedding_dim,
@@ -123,14 +123,14 @@ class EvenetModel(nn.Module):
             dropout=self.options.Network.dropout,
             conditioned=False
         )
-
+        # [3] Classification Head
         self.class_head = ClassificationHead(
             event_info=self.event_info,
             num_layers=self.options.Network.num_classification_layers,
             hidden_dim=self.options.Network.hidden_dim,
             dropout=self.options.Network.dropout,
-        ) if self.include_classification else None
-
+        )
+        # [4] Regression Head
         self.regression_head = RegressionHead(
             event_info=self.event_info,
             means=self.normalization_dict["regression_mean"],
@@ -139,10 +139,9 @@ class EvenetModel(nn.Module):
             hidden_dim=self.options.Network.hidden_dim,
             dropout=self.options.Network.dropout,
             device=self.device,
-        ) if self.include_regression else None
+        )
 
         # Initialize the resonance particle condition
-
         self.num_resonance_particle_feature = self.event_info.resonance_particle_properties_mean.size(0)
         self.resonance_particle_properties = (
             nn.ParameterDict({
@@ -160,6 +159,8 @@ class EvenetModel(nn.Module):
             std=self.event_info.resonance_particle_properties_std.to(self.device),
             log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool(),
         )
+
+        # [5] Assignment Head
         self.resonance_particle_embed = nn.Sequential(
             RandomDrop(self.options.Network.feature_drop, self.options.Network.num_feature_keep),
             nn.Linear(self.num_resonance_particle_feature, self.options.Network.hidden_dim),
@@ -169,7 +170,7 @@ class EvenetModel(nn.Module):
 
         # Initialize the assignment head
         self.process_names = self.event_info.process_names
-
+        # [5] Assignment Head
         self.multiprocess_assign_head = nn.ModuleDict({
             topology_name: AssignmentHead(
                 split_attention=self.options.Network.split_symmetric_attention,

@@ -16,3 +16,5 @@ hist==2.8.1
 mplhep==0.3.59
 pyarrow==19.0.1
 opt_einsum==3.4.0
+lion-pytorch==0.2.3
+transformers==4.50.3
