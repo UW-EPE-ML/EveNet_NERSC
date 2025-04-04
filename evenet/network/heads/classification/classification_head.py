@@ -154,7 +154,8 @@ class RegressionHead(nn.Module):
             normalizers[f"regression/{name}"] = Normalizer(
                 mean=mean.to(device),
                 std=std.to(device),
-                log_mask= torch.zeros_like(mean, dtype=torch.bool)
+                log_mask= torch.zeros_like(mean, dtype=torch.bool).to(device),
+                tag="regression"
             )
         self.networks = nn.ModuleDict(networks)
         self.normalizers = nn.ModuleDict(normalizers)
