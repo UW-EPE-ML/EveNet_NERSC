@@ -70,14 +70,11 @@ Network:
   transformer_dim_scale: 2.0
   transformer_type: Gated
 Training:
-  assignment_loss_scale: 1.0
   balance_losses: true
-  classification_loss_scale: 0.0
   combine_pair_loss: min
   detection_loss_scale: 0.0
   dropout: 0.0
   epochs: 100
-  feature_generation_loss_scale: 0.0
   fine_tune: false
   focal_gamma: 0.0
   generation_loss_scale: 0.0
@@ -92,5 +89,9 @@ Training:
   num_gpu: 1
   num_node: 1
   optimizer: AdamW
-  regression_loss_scale: 0.0
+
+  classification_loss_scale: 1.0
+  regression_loss_scale: 1.0
+  feature_generation_loss_scale: 0.0
+  assignment_loss_scale: 1.0
 nMaxJet: 10
