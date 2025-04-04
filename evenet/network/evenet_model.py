@@ -49,8 +49,8 @@ class EvenetModel(nn.Module):
                     [feature_info.log_scale for feature_info in self.event_info.input_features[input_name]],
                     device=self.device
                 ),
-                "mean": loaded_normalization_dict["input_mean"][input_name],
-                "std": loaded_normalization_dict["input_std"][input_name]
+                "mean": loaded_normalization_dict["input_mean"][input_name].to(self.device),
+                "std": loaded_normalization_dict["input_std"][input_name].to(self.device)
             }
 
             if input_type in input_normalizers_setting:
@@ -62,15 +62,15 @@ class EvenetModel(nn.Module):
             else:
                 input_normalizers_setting[input_type] = input_normalizers_setting_local
         self.sequential_normalizer = Normalizer(
-            log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"],
-            mean=input_normalizers_setting["SEQUENTIAL"]["mean"],
-            std=input_normalizers_setting["SEQUENTIAL"]["std"]
+            log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"].to(self.device),
+            mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
+            std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device)
         )
 
         self.global_normalizer = Normalizer(
-            log_mask=input_normalizers_setting["GLOBAL"]["log_mask"],
-            mean=input_normalizers_setting["GLOBAL"]["mean"],
-            std=input_normalizers_setting["GLOBAL"]["std"]
+            log_mask=input_normalizers_setting["GLOBAL"]["log_mask"].to(self.device),
+            mean=input_normalizers_setting["GLOBAL"]["mean"].to(self.device),
+            std=input_normalizers_setting["GLOBAL"]["std"].to(self.device)
         )
 
         self.global_input_dim = input_normalizers_setting["GLOBAL"]["log_mask"].size()[-1]

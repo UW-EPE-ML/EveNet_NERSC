@@ -151,8 +151,8 @@ class RegressionHead(nn.Module):
             mean = torch.cat([means[target].unsqueeze(-1) for target in target_list], dim=-1)
             std = torch.cat([stds[target].unsqueeze(-1) for target in target_list], dim=-1)
             normalizers[f"regression/{name}"] = Normalizer(
-                mean=mean,
-                std=std,
+                mean=mean.to(self.device),
+                std=std.to(self.device),
                 log_mask= torch.zeros_like(mean, dtype=torch.bool)
             )
         self.networks = nn.ModuleDict(networks)
