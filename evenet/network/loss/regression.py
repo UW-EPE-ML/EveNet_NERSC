@@ -19,21 +19,14 @@ def loss(predict: torch.Tensor, target: torch.Tensor, mask: torch.Tensor = None,
     loss_per_dim = F.smooth_l1_loss(predict, target, reduction='none', beta=beta)  # shape: (N, D)
 
     if mask is not None:
-        # Compute valid mask per event
-        valid = mask.sum(dim=1) > 0
+        # Apply the mask
+        masked_loss = loss_per_dim * mask
 
-        if valid.any():
-            # Only keep valid events
-            masked_loss = loss_per_dim[valid] * mask[valid]
-
-            # Normalize by number of valid features
-            valid_counts = mask[valid].sum(dim=1).clamp(min=1.0)
-            loss_per_event = masked_loss.sum(dim=1) / valid_counts
-        else:
-            # No valid regression targets in the entire batch
-            return torch.tensor(0.0, device=predict.device)
+        # Avoid division by zero in case some events have no valid entries
+        valid_counts = mask.sum(dim=1).clamp(min=1.0)
+        loss_per_event = masked_loss.sum(dim=1) / valid_counts
     else:
         # No mask, just mean across features
         loss_per_event = loss_per_dim.mean(dim=1)
 
-    return loss_per_event
+    return loss_per_event  # shape: (N,)
