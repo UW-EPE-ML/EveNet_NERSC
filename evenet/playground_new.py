@@ -22,7 +22,7 @@ shape_metadata = json.load(
 
 # Load the Parquet file locally
 df = pq.read_table(
-    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_Run_2.Dec20_run_yulei_17.parquet").to_pandas()
+    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
 
 # Optional: Subsample for speed
 df = df.head(5000)
@@ -120,7 +120,7 @@ for i, batch in enumerate(split_batches):
         if torch.isnan(c_loss).any():
             print(f"[Batch {i}] NaN in classification loss")
 
-        total_loss = c_loss.mean() + r_loss.mean() * 0.1
+        total_loss = c_loss.mean() # + r_loss.mean() * 0.1
 
         print(f"[Batch {i}] Total loss: {total_loss}", flush=True)
 

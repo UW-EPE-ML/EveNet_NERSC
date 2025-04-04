@@ -26,15 +26,18 @@ def merge_stats(stats_list):
         sum_ = agg["sum"]
         sumsq = agg["sumsq"]
 
-        # Avoid divide-by-zero by substituting 1 where count is 0 (doesn't matter because we mask later)
+        # Avoid divide-by-zero
         safe_count = np.where(count == 0, 1, count)
 
         mean = sum_ / safe_count
-        std = np.sqrt(sumsq / safe_count - mean ** 2)
+        variance = sumsq / safe_count - mean ** 2
+        variance = np.clip(variance, a_min=0.0, a_max=None)
+        std = np.sqrt(variance)
 
-        # Zero out mean/std where count == 0
+        # Set mean = 0, std = 1 for features with no data
         mean = np.where(count == 0, 0.0, mean)
-        std = np.where(count == 0, 0.0, std)
+        std = np.where(count == 0, 1.0, std)
+        std = np.where(std == 0, 1.0, std)
 
         return {'mean': mean, 'std': std}
 

@@ -35,7 +35,7 @@ options:
     regression_loss_scale: 1.0
     feature_generation_loss_scale: 0.0
     assignment_loss_scale: 1.0
-#    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_balance.pkl"
+    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_balance.pkl"
 #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
 
 event_info:
