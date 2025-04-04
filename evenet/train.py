@@ -4,6 +4,7 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 import ray
 import ray.train
 from ray.train.lightning import (
@@ -49,23 +50,23 @@ def train_func(cfg):
 
     # Fetch the Dataset shards
     train_ds = ray.train.get_dataset_shard("train")
-    # val_ds = ray.train.get_dataset_shard("validation")
+    val_ds = ray.train.get_dataset_shard("validation")
 
     train_ds_loader = train_ds.iter_torch_batches(**dataset_configs)
-    # val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
+    val_ds_loader = val_ds.iter_torch_batches(**dataset_configs)
 
     # Model
     model = EveNetEngine(global_config=global_config)
 
     # callbacks
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss",
+        monitor="val/loss",
         save_top_k=1,
         mode="min",
         filename="best-{epoch}-{val_loss:.4f}",
     )
     early_stop_callback = EarlyStopping(
-        monitor="val_loss",  # metric to monitor
+        monitor="val/loss",  # metric to monitor
         patience=5,  # epochs to wait for improvement
         mode="min",  # "min" if lower is better (e.g. for loss)
         verbose=True,  # optional: prints when triggered
@@ -80,7 +81,6 @@ def train_func(cfg):
     if os.uname().sysname == "Darwin":
         accelerator_config["accelerator"] = "cpu"
         accelerator_config["devices"] = 1
-
 
     trainer = L.Trainer(
         max_epochs=max_epochs,
@@ -101,7 +101,26 @@ def train_func(cfg):
 
     trainer = prepare_trainer(trainer)
 
-    trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=None)
+    trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=val_ds_loader)
+
+
+def register_dataset(parquet_files: list[str], process_event_batch_partial, platform_info) -> ray.data.Dataset:
+    # Create Ray datasets
+    ds = ray.data.read_parquet(
+        parquet_files,
+        override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
+        ray_remote_args={
+            "num_cpus": 0.5,
+        },
+        shuffle="files",
+    ).map_batches(
+        process_event_batch_partial,
+        # batch_format="pyarrow",
+        zero_copy_batch=True,
+        batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
+    )
+
+    return ds
 
 
 def main(args):
@@ -131,22 +150,24 @@ def main(args):
 
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
-    ds = ray.data.read_parquet(
-        parquet_files,
-        override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
-        ray_remote_args={
-            "num_cpus": 0.5,
-        }
-    )
-
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
-    ds = ds.map_batches(
-        process_event_batch_partial,
-        # batch_format="pyarrow",
-        zero_copy_batch=True,
-        batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
-    )
+    # Collect all .parquet file paths
+    parquet_files = sorted(base_dir.glob("*.parquet"))  # sort for reproducibility
+    parquet_files = list(map(str, parquet_files))  # convert to str if needed
+
+    # Shuffle the file list
+    np.random.seed(42)
+    np.random.shuffle(parquet_files)
+
+    # Split the file list
+    split_index = int(0.7 * len(parquet_files))
+    train_files = parquet_files[:split_index]
+    val_files = parquet_files[split_index:]
+
+    # Create Ray datasets
+    train_ds = register_dataset(train_files, process_event_batch_partial, platform_info)
+    valid_ds = register_dataset(val_files, process_event_batch_partial, platform_info)
 
     run_config = RunConfig(
         name="EveNet Training",
@@ -175,8 +196,8 @@ def main(args):
         scaling_config=scaling_config,
         run_config=run_config,
         datasets={
-            "train": ds,
-            # "validation": ds,
+            "train": train_ds,
+            "validation": valid_ds,
         },
     )
 
