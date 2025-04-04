@@ -107,7 +107,7 @@ for i, batch in enumerate(split_batches):
         if torch.isnan(c_loss).any():
             print(f"[Batch {i}] NaN in classification loss")
 
-        total_loss = c_loss.mean() + r_loss.mean() * 0
+        total_loss = c_loss.mean() + r_loss.mean() * 0.1
 
         print(f"[Batch {i}] Total loss: {total_loss}", flush=True)
 

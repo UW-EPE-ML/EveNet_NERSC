@@ -13,8 +13,8 @@ from multiprocessing import Pool, cpu_count
 from evenet.control.global_config import global_config
 from evenet.control.event_info import EventInfo
 from preprocessing.monitor_gen_matching import monitor_gen_matching
-from preprocessing.normalization import masked_stats, merge_stats
 from preprocessing.evenet_data_converter import EveNetDataConverter
+from preprocessing.postprocessor import PostProcessor
 
 
 def generate_assignment_names(event_info: EventInfo):
@@ -93,19 +93,20 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
     return reconstructed
 
 
-def preprocess(in_dir, store_dir, process_info, unique_id, global_cfg=None):
+def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None):
     converted_data = []
-    converted_statistics = []
+    converted_statistics = PostProcessor()
     # if hasattr(config, 'event_info'):
-    global_config.load_yaml(global_cfg)
+    if not global_config.loaded:
+        global_config.load_yaml(cfg_dir)
 
     assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
     regression_keys, regression_key_map = generate_regression_names(global_config.event_info)
 
     shape_metadata = None
 
-    for process in global_config.process_info:
-        # for process in ["QCD", "TT2L", "TT1L"]:
+    # for process in global_config.process_info:
+    for process in ["TT2L", "TT1L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -162,10 +163,12 @@ def preprocess(in_dir, store_dir, process_info, unique_id, global_cfg=None):
         converted_data.append(flattened_data)
 
         # Calculating normalization statistics
-        x_stats = masked_stats(process_data['x'].reshape(-1, process_data['x'].shape[-1]))
-        cond_stats = masked_stats(process_data['conditions'])
-        regression_stats = masked_stats(process_data['regression-data'])
-        converted_statistics.append({"x": x_stats, "conditions": cond_stats, "regression-data": regression_stats})
+        converted_statistics.add(
+            x=process_data['x'],
+            conditions=process_data['conditions'],
+            regression=process_data['regression-data'],
+            num_vectors=process_data['num_sequential_vectors'],
+        )
 
     final_table = pa.concat_tables(converted_data)
 
@@ -189,7 +192,7 @@ def process_single_run(args):
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
     print(f"[INFO] Processing {in_tag}")
-    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, global_cfg=cfg_dir)
+    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, cfg_dir=cfg_dir)
 
     return single_statistics
 
@@ -212,8 +215,11 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
         results = pool.map(process_single_run, tasks)
 
     # Merge statistics
-    merged_statistics = merge_stats([item for sublist in results for item in sublist])
-    np.savez(f"{cfg.store_dir}/normalization.npz", **merged_statistics)
+    PostProcessor.merge(
+        results,
+        regression_names=global_config.event_info.regression_names,
+        saved_results_path=cfg.store_dir,
+    )
 
 
 def main(cfg):
@@ -228,11 +234,18 @@ def main(cfg):
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
         run_parallel(cfg, cfg.preprocess_config, num_workers=60)
-        # run_parallel(cfg, cfg.preprocess_config, num_workers=10)
 
     else:
         in_tag = Path(cfg.in_dir).name
-        preprocess(cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag)
+        norm_stats = preprocess(
+            cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag,
+            cfg_dir=cfg.preprocess_config
+        )
+        PostProcessor.merge(
+            [norm_stats],
+            regression_names=global_config.event_info.regression_names,
+            saved_results_path=cfg.store_dir,
+        )
 
 
 if __name__ == '__main__':

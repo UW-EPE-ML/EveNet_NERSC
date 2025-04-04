@@ -74,6 +74,7 @@ class Config:
     def __init__(self, defaults: dict):
         self._defaults = DotDict(deepcopy(defaults))
         self._global_config = DotDict(deepcopy(defaults))
+        self.loaded = False
 
     def load_yaml(self, path: str | Path):
         path = Path(path)
@@ -109,6 +110,8 @@ class Config:
 
         if 'process_info' in self._global_config:
             self._global_config['process_info'].pop('EXCLUDE', None)
+
+        self.loaded = True
 
     def update(self, data: dict):
         self._global_config.merge(data)
