@@ -187,7 +187,7 @@ class EvenetModel(nn.Module):
                 softmax_output=True
             )
             for topology_name in self.event_info.pairing_topology_category
-        }) if self.include_assignment else None
+        })
 
         # Record attention head basic information
         self.permutation_indices = dict()
