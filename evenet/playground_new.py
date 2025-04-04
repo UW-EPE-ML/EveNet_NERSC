@@ -5,7 +5,7 @@ import pandas as pd
 
 from evenet.control.config import config
 from evenet.dataset.preprocess import process_event_batch, convert_batch_to_torch_tensor
-from evenet.network_scratch.evenet_model import EvenetModel
+from evenet.network.evenet_model import EvenetModel
 
 from preprocessing.preprocess import unflatten_dict
 

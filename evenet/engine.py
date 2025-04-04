@@ -4,7 +4,7 @@ import lightning as L
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
-from evenet.network_scratch.evenet_model import EvenetModel
+from evenet.network.evenet_model import EvenetModel
 
 
 class EveNetEngine(L.LightningModule):
@@ -25,12 +25,12 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Loss ######
         self.cls_loss = None
         if self.classification_scale > 0:
-            import evenet.network_scratch.loss.classification as cls_loss
+            import evenet.network.loss.classification as cls_loss
             self.cls_loss = cls_loss.loss
 
         self.reg_loss = None
         if self.regression_scale > 0:
-            import evenet.network_scratch.loss.regression as reg_loss
+            import evenet.network.loss.regression as reg_loss
             self.reg_loss = reg_loss.loss
 
         print(f"{self.__class__.__name__} initialized")
@@ -46,18 +46,18 @@ class EveNetEngine(L.LightningModule):
         device = self.device
 
         inputs = {
-            key: value for key, value in batch.items()
+            key: value.to(device=device) for key, value in batch.items()
             if key in self.input_keys
         }
 
         target_classification = None
         if self.classification_scale > 0:
-            target_classification = batch[self.target_classification_key]
+            target_classification = batch[self.target_classification_key].to(device=device)
 
         target_regression, target_regression_mask = None, None
         if self.regression_scale > 0:
-            target_regression = batch[self.target_regression_key]
-            target_regression_mask = batch[self.target_regression_mask_key]
+            target_regression = batch[self.target_regression_key].to(device=device)
+            target_regression_mask = batch[self.target_regression_mask_key].to(device=device)
 
         outputs = self.model.shared_step(
             batch=inputs,
@@ -131,6 +131,7 @@ class EveNetEngine(L.LightningModule):
         self.model = torch.compile(
             EvenetModel(
                 config=self.config,
+                device=self.device,
                 classification=self.classification_scale > 0,
                 regression=self.regression_scale > 0,
                 generation=False,
