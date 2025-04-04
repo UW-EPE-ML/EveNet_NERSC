@@ -81,7 +81,7 @@ Training:
   gradient_clip: 0.0
   kl_loss_scale: 0.0
   l2_penalty: 0.0
-  learning_rate: 0.0005
+  learning_rate: 0.000005
   learning_rate_cycles: 0
   learning_rate_factor: 1.0
   learning_rate_warm_up_factor: 3.0

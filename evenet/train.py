@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import ray
 import ray.train
+from ray.data import Dataset
 from ray.train.lightning import (
     prepare_trainer,
     RayDDPStrategy,
@@ -111,7 +112,7 @@ def train_func(cfg):
     trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=val_ds_loader)
 
 
-def register_dataset(parquet_files: list[str], process_event_batch_partial, platform_info) -> ray.data.Dataset:
+def register_dataset(parquet_files: list[str], process_event_batch_partial, platform_info) -> tuple[Dataset, int]:
     # Create Ray datasets
     ds = ray.data.read_parquet(
         parquet_files,
@@ -120,14 +121,18 @@ def register_dataset(parquet_files: list[str], process_event_batch_partial, plat
             "num_cpus": 0.5,
         },
         shuffle="files",
-    ).map_batches(
+    )
+
+    total_events = ds.count()
+
+    ds = ds.map_batches(
         process_event_batch_partial,
         # batch_format="pyarrow",
         zero_copy_batch=True,
         batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
     )
 
-    return ds
+    return ds, total_events
 
 
 def main(args):
@@ -151,9 +156,6 @@ def main(args):
 
     base_dir = Path(platform_info.data_parquet_dir)
 
-    parquet_files = [
-        str(base_dir / file) for file in base_dir.glob("*.parquet")
-    ]
 
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
@@ -173,10 +175,8 @@ def main(args):
     val_files = parquet_files[split_index:]
 
     # Create Ray datasets
-    train_ds = register_dataset(train_files, process_event_batch_partial, platform_info)
-    valid_ds = register_dataset(val_files, process_event_batch_partial, platform_info)
-
-    total_events = train_ds.count()
+    train_ds, total_events = register_dataset(train_files, process_event_batch_partial, platform_info)
+    valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info)
 
     run_config = RunConfig(
         name="EveNet Training",
