@@ -132,6 +132,14 @@ class EveNetEngine(L.LightningModule):
         # Implement your logic for the end of the validation epoch here
         pass
 
+    def backward(self, loss, *args, **kwargs):
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                    print(f"🚨 Gradient in {name} is NaN or Inf!")
+                    raise ValueError("Gradient check failed.")
+        super().backward(loss, *args, **kwargs)
+
     def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return {"optimizer": optimizer}
