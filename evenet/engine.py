@@ -21,6 +21,7 @@ import re
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.confusion_accumulator_train = None
         self.confusion_accumulator = None
         self.model_parts = {}
         self.model: Union[EvenetModel, None] = None
@@ -148,6 +149,11 @@ class EveNetEngine(L.LightningModule):
                     target_classification,
                     cls_output.argmax(dim=-1)
                 )
+            else:
+                self.confusion_accumulator_train.update(
+                    target_classification,
+                    cls_output.argmax(dim=-1)
+                )
 
         if self.regression_scale > 0:
             reg_output = outputs["regression"]
@@ -211,6 +217,11 @@ class EveNetEngine(L.LightningModule):
         if self.classification_scale > 0:
             self.confusion_accumulator = ConfusionMatrixAccumulator(num_classes=len(self.num_classes), normalize=True)
 
+    def on_train_epoch_start(self) -> None:
+        if self.classification_scale > 0:
+            self.confusion_accumulator_train = ConfusionMatrixAccumulator(num_classes=len(self.num_classes),
+                                                                          normalize=True)
+
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
         if self.classification_scale > 0:
@@ -223,6 +234,19 @@ class EveNetEngine(L.LightningModule):
                 self.log("conf_matrix/total", self.confusion_accumulator.total, rank_zero_only=True)
 
             self.confusion_accumulator.reset()
+
+    def on_train_epoch_end(self) -> None:
+        # Implement your logic for the end of the validation epoch here
+        if self.classification_scale > 0:
+            self.confusion_accumulator_train.reduce_across_gpus()
+            if self.global_rank == 0:
+                fig = self.confusion_accumulator_train.plot(class_names=self.num_classes)
+                self.logger.experiment.log({"train_confusion_matrix": wandb.Image(fig)})
+                plt.close(fig)
+                self.log("conf_matrix/train_valid", self.confusion_accumulator_train.valid, rank_zero_only=True)
+                self.log("conf_matrix/train_total", self.confusion_accumulator_train.total, rank_zero_only=True)
+
+            self.confusion_accumulator_train.reset()
 
         pass
 
