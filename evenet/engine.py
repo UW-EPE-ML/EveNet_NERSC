@@ -27,7 +27,7 @@ class EveNetEngine(L.LightningModule):
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
-        self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal']  # list [process_name]
+        self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal'][0]  # list [process_name]
 
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
 
