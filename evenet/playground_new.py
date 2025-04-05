@@ -120,7 +120,7 @@ wandb_enable = True
 n_epoch = 1
 df_number = 5000
 num_splits = 10
-debugger_enbale = False
+debugger_enable = True
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 
@@ -156,7 +156,7 @@ model.train()
 
 
 debugger = DebugHookManager(track_forward=True, track_backward=True, save_values=True)
-if debugger_enbale:
+if debugger_enable:
     debugger.attach_hooks(model)
 
 # Optimizer
@@ -231,6 +231,6 @@ for iepoch in range(n_epoch):
         # break
 
 
-if debugger_enbale:
+if debugger_enable:
     debugger.remove_hooks()
     debugger.dump_debug_data()
