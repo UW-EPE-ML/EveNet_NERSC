@@ -133,9 +133,12 @@ class EveNetEngine(L.LightningModule):
         loss_dict = {}
         if self.classification_scale > 0:
             cls_output = next(iter(outputs["classification"].values()))
+
+            weight = torch.tensor([3.8609, 0.4338, 3.8373, 2.3715, 1.5716, 2.8315, 20.4836, 2.5664, 0.8475])
             cls_loss = self.cls_loss(
                 cls_output,
-                target_classification
+                target_classification,
+                class_weight=weight,
             )
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
