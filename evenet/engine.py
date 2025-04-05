@@ -3,14 +3,17 @@ import re
 from functools import partial
 from typing import Any, Dict, Union
 
+import wandb
 import lightning as L
 import numpy as np
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 from lion_pytorch import Lion
+from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EvenetModel
+from evenet.network.metrics.classification import ConfusionMatrixAccumulator
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 import re
 
@@ -18,11 +21,13 @@ import re
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.confusion_accumulator = None
         self.model_parts = {}
         self.model: Union[EvenetModel, None] = None
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
+        self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal']  # list [process_name]
 
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
 
@@ -135,6 +140,12 @@ class EveNetEngine(L.LightningModule):
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
+            if self.training:
+                self.confusion_accumulator.update(
+                    target_classification,
+                    cls_output.argmax(dim=-1)
+                )
+
         if self.regression_scale > 0:
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
@@ -193,8 +204,22 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
+    def on_validation_start(self):
+        if self.classification_scale > 0:
+            self.confusion_accumulator = ConfusionMatrixAccumulator(num_classes=len(self.num_classes))
+
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
+        if self.classification_scale > 0:
+            self.confusion_accumulator.reduce_across_gpus()
+
+            if self.global_rank == 0:
+                fig = self.confusion_accumulator.plot(class_names=self.num_classes)
+                self.logger.experiment.log({"confusion_matrix": wandb.Image(fig)})
+                plt.close(fig)
+
+            self.confusion_accumulator.reset()
+
         pass
 
     def backward(self, loss, *args, **kwargs):
