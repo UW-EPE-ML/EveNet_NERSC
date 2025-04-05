@@ -216,10 +216,8 @@ class EveNetEngine(L.LightningModule):
                 fig = self.confusion_accumulator.plot(class_names=self.num_classes)
                 self.logger.experiment.log({"confusion_matrix": wandb.Image(fig)})
                 plt.close(fig)
-                self.log(**{
-                    "conf_matrix/valid": self.confusion_accumulator.valid,
-                    "conf_matrix/total": self.confusion_accumulator.total,
-                })
+                self.log("conf_matrix/valid", self.confusion_accumulator.valid, rank_zero_only=True)
+                self.log("conf_matrix/total", self.confusion_accumulator.total, rank_zero_only=True)
 
             self.confusion_accumulator.reset()
 
