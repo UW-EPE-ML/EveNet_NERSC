@@ -15,7 +15,7 @@ _DEFAULTS = {
 
         "Network": {
             # Dimensions used internally by all hidden layers / transformers.
-            "hidden_dim": 128,
+            "hidden_dim": 64,
 
             # DEPRECATED
             # Internal dimensions used during transformer and some linear layers.
@@ -33,10 +33,10 @@ _DEFAULTS = {
             # Maximum Number of double-sized embedding layers to add between the features and the encoder.
             # The size of the embedding dimension will be capped at the hidden_dim,
             # So setting this option to a very large integer will just keep embedding up to the hidden_dim.
-            "num_embedding_layers": 10,
+            "num_embedding_layers": 4,
 
             # Number of encoder layers for the central shared transformer.
-            "num_encoder_layers": 4,
+            "num_encoder_layers": 2,
 
             # Number of feed forward layers to add to branch heads.
             # Set to 0 to disable branch embedding layers.
