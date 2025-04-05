@@ -170,22 +170,22 @@ class EveNetEngine(L.LightningModule):
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
         # === Manual optimization ===
-        optimizers = list(self.optimizers())
-        for opt in optimizers:
-            opt.zero_grad()
-
-        self.backward(loss.mean())
-
-        for opt in optimizers:
-            opt.step()
-
-        # Step all schedulers
-        schedulers = self.lr_schedulers()
-        if isinstance(schedulers, list):
-            for sch in schedulers:
-                sch.step()
-        else:
-            schedulers.step()
+        # optimizers = list(self.optimizers())
+        # for opt in optimizers:
+        #     opt.zero_grad()
+        #
+        # self.backward(loss.mean())
+        #
+        # for opt in optimizers:
+        #     opt.step()
+        #
+        # # Step all schedulers
+        # schedulers = self.lr_schedulers()
+        # if isinstance(schedulers, list):
+        #     for sch in schedulers:
+        #         sch.step()
+        # else:
+        #     schedulers.step()
 
         return loss.mean()
 
@@ -231,7 +231,7 @@ class EveNetEngine(L.LightningModule):
                     raise ValueError("Gradient check failed.")
         super().backward(loss, *args, **kwargs)
 
-    def configure_optimizers(self):
+    def configure_optimizers_old(self):
         cfg = self.hyper_par_cfg
         base_lr = cfg['lr']
         lr_factor = cfg.get('lr_factor', 1.0)
@@ -274,6 +274,10 @@ class EveNetEngine(L.LightningModule):
                 # "name": f"{name}"
             })
         return optimizers, schedulers
+
+    def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return {"optimizer": optimizer}
 
     def configure_model(self) -> None:
         print(f"{self.__class__.__name__} configure model on device {self.device}")
