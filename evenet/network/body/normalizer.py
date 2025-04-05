@@ -14,8 +14,8 @@ class Normalizer(nn.Module):
         """
         # Initialize mean and std as parameters
         self.register_buffer("norm_mask", norm_mask)
-        mean = torch.where(norm_mask, mean, 0.0)
-        std  = torch.where(norm_mask, std, 1.0)
+        mean = torch.where(self.norm_mask, mean, 0.0)
+        std  = torch.where(self.norm_mask, std, 1.0)
         self.register_buffer("mean", mean)
         self.register_buffer("std", std.clamp(min=1e-6))
 
