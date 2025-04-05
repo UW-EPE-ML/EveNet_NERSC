@@ -30,14 +30,14 @@ Network:
   PET_layer_scale: true
   PET_layer_scale_init: 1.0e-05
   PET_num_heads: 4
-  PET_num_layers: 8
+  PET_num_layers: 2
   PET_talking_head: false
   diff_resnet_nlayer: 3
   diff_sub_resnet_nlayer: 2
   diff_transformer_nlayer: 2
   enable_local_embedding: true
   feature_drop: 0.0
-  hidden_dim: 128
+  hidden_dim: 64
   initial_embedding_dim: 16
   initial_embedding_skip_connections: true
   linear_activation: GELU
@@ -53,20 +53,20 @@ Network:
   num_branch_embedding_layers: 4
   num_branch_encoder_layers: 4
   num_classification_layers: 1
-  num_embedding_layers: 10
-  num_encoder_layers: 4
+  num_embedding_layers: 3
+  num_encoder_layers: 2
   num_feature_keep: 0
   num_jet_embedding_layers: 0
   num_jet_encoder_layers: 0
   combinatorial_scale: 0.0
   num_local_layer: 3
   num_regression_layers: 1
-  position_embedding_dim: 32
+  position_embedding_dim: 8
   skip_connections: true
   split_symmetric_attention: true
   time_fprojection_dim: 64
   transformer_activation: gelu
-  transformer_dim: 128
+  transformer_dim: 64
   transformer_dim_scale: 2.0
   transformer_type: Gated
 Training:
