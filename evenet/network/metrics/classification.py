@@ -16,6 +16,14 @@ class ConfusionMatrixAccumulator:
         if isinstance(y_pred, torch.Tensor):
             y_pred = y_pred.detach().cpu().numpy()
 
+        # Filter out ignored targets like -1 (often used for masking)
+        valid = y_true >= 0
+        y_true = y_true[valid]
+        y_pred = y_pred[valid]
+
+        if len(y_true) == 0:
+            return  # Skip empty updates safely
+
         cm = confusion_matrix(y_true, y_pred, labels=range(self.num_classes))
         self.matrix += cm
 
