@@ -93,7 +93,7 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
     return reconstructed
 
 
-def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None):
+def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
     converted_statistics = PostProcessor()
     # if hasattr(config, 'event_info'):
@@ -175,16 +175,20 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None):
     shuffle_indices = np.random.default_rng(42).permutation(final_table.num_rows)
     final_table = final_table.take(pa.array(shuffle_indices))
 
-    ### Save to parquet
-    pq.write_table(final_table, f"{store_dir}/data_{unique_id}.parquet")
+    if save:
+        ### Save to parquet
+        pq.write_table(final_table, f"{store_dir}/data_{unique_id}.parquet")
 
-    with open(f"{store_dir}/shape_metadata.json", "w") as f:
-        json.dump(shape_metadata, f)
+        with open(f"{store_dir}/shape_metadata.json", "w") as f:
+            json.dump(shape_metadata, f)
 
-    print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
-    print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
+        print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
+        print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
 
-    return converted_statistics
+        return converted_statistics
+
+    else:
+        return converted_statistics, final_table, meta_data
 
 
 def process_single_run(args):
@@ -192,7 +196,7 @@ def process_single_run(args):
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
     print(f"[INFO] Processing {in_tag}")
-    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, cfg_dir=cfg_dir)
+    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, cfg_dir=cfg_dir, save=True)
 
     return single_statistics
 
@@ -239,7 +243,7 @@ def main(cfg):
         in_tag = Path(cfg.in_dir).name
         norm_stats = preprocess(
             cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag,
-            cfg_dir=cfg.preprocess_config
+            cfg_dir=cfg.preprocess_config, save=True
         )
         PostProcessor.merge(
             [norm_stats],
