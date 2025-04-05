@@ -105,8 +105,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     shape_metadata = None
 
-    for process in global_config.process_info:
-    # for process in ["TT2L", "TT1L"]:
+    # for process in global_config.process_info:
+    for process in ["ttZ_FullHadronics", "ttZ_Leptonic", "ZJetsToLL"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -172,7 +172,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     final_table = pa.concat_tables(converted_data)
 
-    shuffle_indices = np.random.default_rng(42).permutation(final_table.num_rows)
+    shuffle_indices = np.random.default_rng(31).permutation(final_table.num_rows)
     final_table = final_table.take(pa.array(shuffle_indices))
 
     if save:
@@ -183,12 +183,12 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             json.dump(shape_metadata, f)
 
         print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
-        print(f"[Saving] Saving {shuffle_indices.size} rows to {store_dir}/data_{unique_id}.parquet")
+        print(f"[Saving] Saving {final_table.num_rows} rows to {store_dir}/data_{unique_id}.parquet")
 
         return converted_statistics
 
     else:
-        return converted_statistics, final_table, meta_data
+        return converted_statistics, final_table, shape_metadata
 
 
 def process_single_run(args):

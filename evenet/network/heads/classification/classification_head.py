@@ -17,7 +17,7 @@ class BranchLinear(nn.Module):
             hidden_dim: int,
             num_outputs: int = 1,
             dropout: float = 0.0,
-            batch_norm: bool = True
+            batch_norm: bool = False
     ):
         super(BranchLinear, self).__init__()
 

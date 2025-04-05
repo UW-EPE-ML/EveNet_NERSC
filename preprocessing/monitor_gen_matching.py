@@ -343,8 +343,6 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
 
         h5fr.close()
 
-        # break # TODO remove this break to process all files
-
 
     ##########################
     # Plot Basic Information #

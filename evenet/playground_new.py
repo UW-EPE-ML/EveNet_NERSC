@@ -18,6 +18,28 @@ from preprocessing.preprocess import unflatten_dict
 import torch
 import torch.nn as nn
 from collections import defaultdict
+from evenet.network.metrics.classification import ConfusionMatrixAccumulator
+from matplotlib import pyplot as plt
+
+
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 128),  # input dim 1 → hidden dim 8
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 9)  # hidden dim 8 → output dim 1
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+    def shared_step(self, x, batch_size):
+        output = self.forward(x["conditions"])
+        return {"classification": {"signal": output},
+                "regression": {"signal": output}}
 
 
 class DebugHookManager:
@@ -113,14 +135,15 @@ class DebugHookManager:
 
 
 ########################
-## Debug configuation ##
+## Debug configuration ##
 ########################
 
-wandb_enable = False
+wandb_enable = True
 n_epoch = 10
 debugger_enable = False
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
+num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
 
 shape_metadata = json.load(
     open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
@@ -128,10 +151,10 @@ shape_metadata = json.load(
 # Load the Parquet file locally
 df = pq.read_table(
     "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
-
 # Optional: Subsample for speed
 
-df_number = 5000
+df.sample(frac=1).reset_index(drop=True)
+df_number = len(df) // 2
 df = df.head(df_number)
 
 # Convert to dict-of-arrays if needed
@@ -146,21 +169,29 @@ torch_batch = convert_batch_to_torch_tensor(processed_batch)
 # with open("/Users/avencastmini/PycharmProjects/EveNet/workspace/normalization_file/PreTrain_norm.pkl", 'rb') as f:
 #     normalization_file = pickle.load(f)
 
-num_splits = df_number // 120
+num_splits = df_number // 256
 
 # Run forward
 model = EvenetModel(
     config=global_config,
     device=torch.device("cpu"),
 )
+
+# model = MLP()
+
 model.train()
+
+confusion_accumulator = ConfusionMatrixAccumulator(
+    num_classes=len(num_classes),
+    normalize=True
+)
 
 debugger = DebugHookManager(track_forward=True, track_backward=True, save_values=True)
 if debugger_enable:
     debugger.attach_hooks(model)
 
 # Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
 batch_size = len(df)
 split_batches = []
@@ -180,7 +211,7 @@ if wandb_enable:
     )
 
 for iepoch in range(n_epoch):
-    #if (n_epoch > 2): model.eval()
+    # if (n_epoch > 2): model.eval()
     for i, batch in enumerate(split_batches):
         with torch.autograd.set_detect_anomaly(True):
             for name, tensor in batch.items():
@@ -188,25 +219,39 @@ for iepoch in range(n_epoch):
                     print(f"[Epoch {iepoch} / Batch {i}] NaN found in input tensor: {name}")
 
             outputs = model.shared_step(batch, batch_size=len(batch["classification"]))
+            # outputs = model.shared_step(batch)
 
             # Regression
-            reg_output = outputs["regression"]
-            flattened = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
-            if torch.isnan(flattened).any():
-                print(f"[Epoch {iepoch} / Batch {i}] NaN in regression output")
-
-            reg_target = batch["regression-data"].float()
-            reg_mask = batch["regression-mask"].float()
-
-            r_loss = reg_loss(predict=flattened, target=reg_target, mask=reg_mask)
-            if torch.isnan(r_loss).any():
-                print(f"[Epoch {iepoch} /Batch {i}] NaN in regression loss")
+            # reg_output = outputs["regression"]
+            # flattened = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
+            # if torch.isnan(flattened).any():
+            #     print(f"[Epoch {iepoch} / Batch {i}] NaN in regression output")
+            #
+            # reg_target = batch["regression-data"].float()
+            # reg_mask = batch["regression-mask"].float()
+            #
+            # r_loss = reg_loss(predict=flattened, target=reg_target, mask=reg_mask)
+            # if torch.isnan(r_loss).any():
+            #     print(f"[Epoch {iepoch} /Batch {i}] NaN in regression loss")
 
             # Classification
             cls_output = next(iter(outputs["classification"].values()))
             cls_target = batch["classification"]
 
-            c_loss = cls_loss(predict=cls_output, target=cls_target)
+            print(cls_target[0], cls_output[0])
+            # cls_output = torch.nn.Softmax(dim=1)(cls_output)
+            preds = cls_output.argmax(dim=-1)
+
+            print("target", torch.unique(cls_target, return_counts=True))
+            print("pred", torch.unique(preds, return_counts=True))
+
+            # weight = torch.tensor([3.8609, 0.4338, 3.8373, 2.3715, 1.5716, 2.8315, 20.4836, 2.5664, 0.8475])
+            # c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=weight)
+            c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=None)
+
+            # mse_loss = torch.nn.MSELoss(reduction='none')
+            # c_loss = mse_loss(cls_output, torch.nn.functional.one_hot(cls_target, num_classes=9).float())
+            # print(f"c_loss", c_loss.item())
             if torch.isnan(c_loss).any():
                 print(f"[Epoch {iepoch} / Batch {i}] NaN in classification loss")
 
@@ -220,17 +265,28 @@ for iepoch in range(n_epoch):
             optimizer.step()
 
             print(f"[Epoch {iepoch} / Batch {i}] Done")
-
             if wandb_enable:
                 wandb.log(
                     {
                         "epoch": iepoch,
                         "total_loss": total_loss.item(),
                         "classification_loss": c_loss.mean().item(),
-                        "regression_loss": r_loss.mean().item()}
+                        # "regression_loss": r_loss.mean().item()
+                    }
                 )
-        # break
+            confusion_accumulator.update(
+                cls_target,
+                cls_output.argmax(dim=-1)
+            )
 
+    if wandb_enable:
+        fig = confusion_accumulator.plot(class_names=num_classes)
+        wandb.log({"confusion_matrix": wandb.Image(fig)})
+        plt.close(fig)
+
+    confusion_accumulator.reset()
+
+    # break
 
 if debugger_enable:
     debugger.remove_hooks()

@@ -171,7 +171,7 @@ def assign_Reco_LorentzVector(Event_dict, products, parton, candidate_name, reco
             reconstructed_momentum_dict[product_name] = ak.fill_none(
                 ak.pad_none(parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
                             1, axis=-1)[..., 0],
-                default_reco_v4)  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
+                default_reco_v4)  #  TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
             # print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
 
         if candidate_name not in reconstructed_momentum_dict:
