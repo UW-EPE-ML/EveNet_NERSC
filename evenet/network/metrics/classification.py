@@ -24,8 +24,13 @@ class ConfusionMatrixAccumulator:
         if len(y_true) == 0:
             return  # Skip empty updates safely
 
-        cm = confusion_matrix(y_true, y_pred, labels=range(self.num_classes))
-        self.matrix += cm
+        present_labels = np.unique(np.concatenate([y_true, y_pred]))
+        cm_partial = confusion_matrix(y_true, y_pred, labels=present_labels)
+
+        for i, true_label in enumerate(present_labels):
+            for j, pred_label in enumerate(present_labels):
+                if true_label < self.num_classes and pred_label < self.num_classes:
+                    self.matrix[true_label, pred_label] += cm_partial[i, j]
 
     def reset(self):
         self.matrix = np.zeros((self.num_classes, self.num_classes), dtype=np.int64)
