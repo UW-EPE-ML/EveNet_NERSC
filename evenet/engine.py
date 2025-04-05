@@ -212,7 +212,6 @@ class EveNetEngine(L.LightningModule):
         # Implement your logic for the end of the validation epoch here
         if self.classification_scale > 0:
             self.confusion_accumulator.reduce_across_gpus()
-
             if self.global_rank == 0:
                 fig = self.confusion_accumulator.plot(class_names=self.num_classes)
                 self.logger.experiment.log({"confusion_matrix": wandb.Image(fig)})
