@@ -86,7 +86,7 @@ class GRUBlock(nn.Module):
         """
 
         :param x: shape: (batch_size, num_object, input_dim)
-        :param sequence_mask: (batch_size, num_object)
+        :param sequence_mask: (batch_size, num_object, 1)
         :return:
             - output: shape (batch_size, num_object, output_dim)
             - sequence_mask: shape (batch_size, num_object)

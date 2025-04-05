@@ -119,7 +119,11 @@ class ObjectEncoder(nn.Module):
         # particle_vector: [B, D]
         # encoded_vectors: [T, B, D]
         # -----------------------------------------------------------------------------
-        combined_vectors = self.encoder(combined_vectors, combined_padding_mask, combined_sequence_mask)
+        combined_vectors = self.encoder(
+            x= combined_vectors,
+            padding_mask = combined_padding_mask,
+            sequence_mask = combined_sequence_mask
+        )
         particle_vector, encoded_vectors, condition_vectors = combined_vectors[:, 0, :], combined_vectors[:, 1: (1+num_vectors) , :], combined_vectors[:, (1 + num_vectors):, :]
 
         return encoded_vectors, condition_vectors, particle_vector

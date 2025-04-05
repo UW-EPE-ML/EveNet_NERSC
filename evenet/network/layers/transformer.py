@@ -104,7 +104,7 @@ class GTrXL(nn.Module):
 
         output = self.attention_gate(output, x)
 
-        return self.feed_forward(output, sequence_mask)
+        return self.feed_forward(x = output, sequence_mask = sequence_mask)
 
 
 class GatedTransformer(nn.Module):
@@ -143,7 +143,11 @@ class GatedTransformer(nn.Module):
         output = x
 
         for layer in self.layers:
-            output = layer(output, padding_mask, sequence_mask)
+            output = layer(
+                x = output,
+                padding_mask =  padding_mask,
+                sequence_mask = sequence_mask
+            )
 
         return output
 

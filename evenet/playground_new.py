@@ -116,10 +116,8 @@ class DebugHookManager:
 ## Debug configuation ##
 ########################
 
-wandb_enable = True
+wandb_enable = False
 n_epoch = 10
-df_number = 5000
-num_splits = 10
 debugger_enable = False
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
@@ -132,6 +130,8 @@ df = pq.read_table(
     "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
 
 # Optional: Subsample for speed
+
+df_number = 5000
 df = df.head(df_number)
 
 # Convert to dict-of-arrays if needed
@@ -146,6 +146,7 @@ torch_batch = convert_batch_to_torch_tensor(processed_batch)
 # with open("/Users/avencastmini/PycharmProjects/EveNet/workspace/normalization_file/PreTrain_norm.pkl", 'rb') as f:
 #     normalization_file = pickle.load(f)
 
+num_splits = df_number // 120
 
 # Run forward
 model = EvenetModel(
@@ -154,13 +155,12 @@ model = EvenetModel(
 )
 model.train()
 
-
 debugger = DebugHookManager(track_forward=True, track_backward=True, save_values=True)
 if debugger_enable:
     debugger.attach_hooks(model)
 
 # Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 batch_size = len(df)
 split_batches = []
@@ -180,11 +180,12 @@ if wandb_enable:
     )
 
 for iepoch in range(n_epoch):
+    #if (n_epoch > 2): model.eval()
     for i, batch in enumerate(split_batches):
         with torch.autograd.set_detect_anomaly(True):
             for name, tensor in batch.items():
                 if torch.isnan(tensor).any():
-                    print(f"[Batch {i}] NaN found in input tensor: {name}")
+                    print(f"[Epoch {iepoch} / Batch {i}] NaN found in input tensor: {name}")
 
             outputs = model.shared_step(batch, batch_size=len(batch["classification"]))
 
@@ -192,14 +193,14 @@ for iepoch in range(n_epoch):
             reg_output = outputs["regression"]
             flattened = torch.cat([v.squeeze(0) for v in reg_output.values()], dim=-1)
             if torch.isnan(flattened).any():
-                print(f"[Batch {i}] NaN in regression output")
+                print(f"[Epoch {iepoch} / Batch {i}] NaN in regression output")
 
             reg_target = batch["regression-data"].float()
             reg_mask = batch["regression-mask"].float()
 
             r_loss = reg_loss(predict=flattened, target=reg_target, mask=reg_mask)
             if torch.isnan(r_loss).any():
-                print(f"[Batch {i}] NaN in regression loss")
+                print(f"[Epoch {iepoch} /Batch {i}] NaN in regression loss")
 
             # Classification
             cls_output = next(iter(outputs["classification"].values()))
@@ -207,18 +208,18 @@ for iepoch in range(n_epoch):
 
             c_loss = cls_loss(predict=cls_output, target=cls_target)
             if torch.isnan(c_loss).any():
-                print(f"[Batch {i}] NaN in classification loss")
+                print(f"[Epoch {iepoch} / Batch {i}] NaN in classification loss")
 
             total_loss = c_loss.mean()  # + r_loss.mean() * 0.1
 
-            print(f"[Batch {i}] Total loss: {total_loss}", flush=True)
+            print(f"[Epoch {iepoch} / Batch {i}] Total loss: {total_loss}", flush=True)
 
             # Backprop
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()
 
-            print(f"[Batch {i}] Done")
+            print(f"[Epoch {iepoch} / Batch {i}] Done")
 
             if wandb_enable:
                 wandb.log(

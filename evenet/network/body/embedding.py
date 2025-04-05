@@ -60,7 +60,7 @@ class EmbeddingStack(nn.Module):
 
         current_embedding_dim = initial_embedding_dim
         for i in range(num_embedding_layers):
-            next_embedding_dim = 2 * initial_embedding_dim
+            next_embedding_dim = 2 * current_embedding_dim
             if next_embedding_dim > final_embedding_dim:
                 break
             embedding_layers.append(create_linear_block(linear_block_type=linear_block_type,
@@ -84,17 +84,20 @@ class EmbeddingStack(nn.Module):
 
         return embedding_layers
 
-    def forward(self, vectors: Tensor, sequence_mask: Tensor) -> Tensor:
+    def forward(self, vectors: Tensor, mask: Tensor) -> Tensor:
         """
         :param vectors: shape: (batch_size, num_object, input_dim)
-        :param sequence_mask: (batch_size, num_object)
+        :param mask: (batch_size, num_object, 1)
         :return:
             - output: shape (batch_size, num_object, final_embedding_dim)
 
         """
         embeddings = vectors
         for layer in self.embedding_layers:
-            embeddings = layer(embeddings, sequence_mask)
+            embeddings = layer(
+                x = embeddings,
+                sequence_mask = mask
+            )
         return embeddings
 
 
@@ -124,13 +127,16 @@ class GlobalVectorEmbedding(nn.Module):
                                               num_embedding_layers=num_embedding_layers
                                               )
 
-    def forward(self, vectors: Tensor, mask: Tensor) -> Tensor:
+    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
         # --------------------------------
         # Embed vectors into latent space.
         # output: (max_vectors, batch_size, final_embedding_dim)
         # --------------------------------
-        embeddings = vectors.contiguous()
-        encoded = self.embedding_stack(embeddings, mask)
+        embeddings = x.contiguous()
+        encoded = self.embedding_stack(
+            vectors = embeddings,
+            mask = mask
+        )
 
         # ----------------------------
         # Local Embedding (For Point-Edge Point Cloud)
@@ -199,10 +205,13 @@ class LocalEmbeddingLayer(nn.Module):
         coord_shift = 999.0 * (mask == 0).float()
         local_features = x.contiguous()
         for idx, local_embed in enumerate(self.local_embed_layer):
-            local_features = local_embed(coord_shift + points, local_features)  # [T, B, D]
-            points = local_features.contiguous()
+            local_features = local_embed(
+                points = coord_shift + points,
+                features = local_features
+            )  # [T, B, D]
+            points = local_features # tihsu TODO: add mask ?
 
-        return local_features
+        return local_features * mask.float()
 
 
 class LocalEmbeddingBlock(nn.Module):
@@ -219,8 +228,8 @@ class LocalEmbeddingBlock(nn.Module):
         )
 
     def pairwise_distance(self, points):
-        r = torch.sum(points * points, dim=2, keepdim=True)
-        m = torch.bmm(points, points.transpose(1, 2))
+        r = torch.sum(points * points, dim=2, keepdim=True) # [B, T, D]
+        m = torch.bmm(points, points.transpose(1, 2)) # [B, T, D] x [B, D, T] -> [B, T, T]
         D = r - 2 * m + r.transpose(1, 2) + 1e-5
         return D
 
@@ -239,8 +248,7 @@ class LocalEmbeddingBlock(nn.Module):
         # Gather neighbor features
         neighbors = features[
             indices[:, :, :, 0], indices[:, :, :, 1]]  # Shape: (N, P, K, C) | neighbors: torch.Size([64, 150, 10, 13])
-        knn_fts_center = features.unsqueeze(2).expand_as(
-            neighbors)  # Shape: (N, P, K, C) | knn fts center: torch.Size([64, 150, 10, 13])
+        knn_fts_center = features.unsqueeze(2).expand_as(neighbors)  # Shape: (N, P, K, C) | knn fts center: torch.Size([64, 150, 10, 13])
         local_features = torch.cat([neighbors - knn_fts_center, knn_fts_center],
                                    dim=-1)  # local_features: torch.Size([N, P, K, 26]) local_features.shape[-1] Shape : 2*C
 
@@ -314,12 +322,19 @@ class PETBody(nn.Module):
         if hasattr(self, 'local_embedding'):
             points = input_points
             local_features = input_features
-            local_features = self.local_embedding(local_features, points, mask)
+            local_features = self.local_embedding(
+                x = local_features,
+                points = points,
+                mask = mask
+            )
             encoded = local_features + encoded  # Combine with original features
 
-        skip_connection = encoded
+        skip_connection = encoded.contiguous()
         for transformer_block in self.transformer_blocks:
-            encoded = transformer_block(encoded, mask)
+            encoded = transformer_block(
+                x = encoded,
+                mask = mask
+            )
 
         return torch.add(encoded, skip_connection)
 

@@ -96,7 +96,7 @@ class ClassificationHead(nn.Module):
         super(ClassificationHead, self).__init__()
         networks = OrderedDict()
         for name in event_info.class_label['EVENT']:
-            num_classes = (np.array(event_info.class_label['EVENT'][name])).shape[-1]
+            num_classes = event_info.num_classes[name]
             networks[f"classification/{name}"] = BranchLinear(
                 num_layers=num_layers,
                 hidden_dim=hidden_dim,

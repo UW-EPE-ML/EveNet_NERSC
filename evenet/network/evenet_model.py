@@ -9,6 +9,7 @@ from evenet.network.body.embedding import GlobalVectorEmbedding, PETBody
 from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import AssignmentHead
+from evenet.network.layers.debug_layer import PointCloudTransformer
 
 from torch import Tensor, nn
 from typing import Dict
@@ -94,13 +95,20 @@ class EvenetModel(nn.Module):
             num_embedding_layers=self.options.Network.num_embedding_layers,
             dropout=self.options.Network.dropout
         )
+
+        # tihsu: debugging
+        self.point_cloud_embedding = nn.Linear(self.sequential_input_dim, self.options.Network.hidden_dim)
+        self.point_cloud_transformer = PointCloudTransformer(point_dim=self.options.Network.hidden_dim,
+                                                             embed_dim=self.options.Network.hidden_dim,
+                                                             ff_dim=self.options.Network.hidden_dim)
+        self.debug_classifier = nn.Linear(self.options.Network.hidden_dim, self.event_info.num_classes["signal"])
         # [1] Body
         self.PET_body = PETBody(
             num_feat=self.sequential_input_dim,
             num_keep=self.options.Network.num_feature_keep,
-            feature_drop=self.options.Network.PET_drop_probability,
+            feature_drop=self.options.Network.feature_drop,
             projection_dim=self.options.Network.hidden_dim,
-            local=self.options.Network.enable_local_embedding,
+            local= self.options.Network.enable_local_embedding,
             K=self.options.Network.local_Krank,
             num_local=self.options.Network.num_local_layer,
             num_layers=self.options.Network.PET_num_layers,
@@ -157,7 +165,7 @@ class EvenetModel(nn.Module):
         self.resonance_particle_properties_normalizer = Normalizer(
             mean=self.event_info.resonance_particle_properties_mean.to(self.device),
             std=self.event_info.resonance_particle_properties_std.to(self.device),
-            norm_mask=torch.ones_like(self.event_info.resonance_particle_properties_mean, device = self.device).bool(),
+            norm_mask=torch.ones_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool(),
         )
 
         # [5] Assignment Head
@@ -248,16 +256,30 @@ class EvenetModel(nn.Module):
         ## Input normalization ##
         #########################
 
-        input_point_cloud = self.sequential_normalizer(input_point_cloud, input_point_cloud_mask)
-        global_conditions = self.global_normalizer(global_conditions, global_conditions_mask)
+        input_point_cloud = self.sequential_normalizer(
+            x=input_point_cloud,
+            mask=input_point_cloud_mask
+        )
+        global_conditions = self.global_normalizer(
+            x=global_conditions,
+            mask=global_conditions_mask
+        )
 
         #############################
         ## Central embedding (PET) ##
         #############################
 
-        global_conditions = self.global_embedding(global_conditions, global_conditions_mask)
-        local_feature = input_point_cloud[..., self.local_feature_indices]
-        input_point_cloud = self.PET_body(input_point_cloud, local_feature, input_point_cloud_mask, time)
+        global_conditions = self.global_embedding(
+            x=global_conditions,
+            mask=global_conditions_mask
+        )
+
+        local_points = input_point_cloud[..., self.local_feature_indices]
+        input_point_cloud = self.PET_body(
+            input_features=input_point_cloud,
+            input_points=local_points,
+            mask=input_point_cloud_mask,
+            time=time)
 
         ######################################
         ## Embedding for deterministic task ##
@@ -267,7 +289,11 @@ class EvenetModel(nn.Module):
             encoded_vectors=input_point_cloud,
             mask=input_point_cloud_mask,
             condition_vectors=global_conditions,
-            condition_mask=global_conditions_mask)
+            condition_mask=global_conditions_mask
+        )
+
+        event_token_debug = self.point_cloud_transformer(embeddings)
+
 
         ########################################
         ## Output Head for deterministic task ##
@@ -276,7 +302,8 @@ class EvenetModel(nn.Module):
         # Classification head
         classifications = None
         if self.include_classification:
-            classifications = self.class_head(event_token)
+            # classifications = self.class_head(event_token_debug)
+            classifications = {"signal": self.debug_classifier(event_token_debug)}
         # Regression head
         regressions = None
         if self.include_regression:

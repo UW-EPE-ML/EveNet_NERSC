@@ -113,6 +113,9 @@ class EventInfo:
         self.classifications = classifications
         self.classification_names = ['/'.join([SpecialKey.Event, target]) for target in self.classifications[SpecialKey.Event]]
         self.class_label = class_label
+        self.num_classes = dict()
+        for name in class_label['EVENT']:
+            self.num_classes[name] = (np.array(class_label['EVENT'][name])).shape[-1]
 
         self.pairing_topology = OrderedDict()
         self.pairing_topology_category = OrderedDict()
