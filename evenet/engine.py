@@ -136,10 +136,6 @@ class EveNetEngine(L.LightningModule):
             loss_dict["classification_loss"] = cls_loss
 
             if not self.training:
-                print("cls_output:", cls_output.shape)
-                print("cls_output (sample):", cls_output[0])
-                print("target_classification:", target_classification.shape)
-                print("target_classification (sample):", target_classification[0])
                 print("target_classification unique values:", torch.unique(target_classification))
                 if torch.isnan(cls_output).any() or torch.isinf(cls_output).any():
                     print("🚨 NaN or Inf in classification output")
