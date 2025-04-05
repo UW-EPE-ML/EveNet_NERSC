@@ -276,7 +276,7 @@ class EvenetModel(nn.Module):
 
         # debug:
         embeddings_debug = self.point_cloud_embedding(input_point_cloud)
-        event_token_debug = self.point_cloud_transformer(embedding_debug)
+        event_token_debug = self.point_cloud_transformer(embeddings_debug)
 
         local_points = input_point_cloud[..., self.local_feature_indices]
         input_point_cloud = self.PET_body(
