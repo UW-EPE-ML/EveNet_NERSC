@@ -219,8 +219,9 @@ class EveNetEngine(L.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         if self.classification_scale > 0:
-            self.confusion_accumulator_train = ConfusionMatrixAccumulator(num_classes=len(self.num_classes),
-                                                                          normalize=True)
+            self.confusion_accumulator_train = ConfusionMatrixAccumulator(
+                num_classes=len(self.num_classes), normalize=True
+            )
 
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here

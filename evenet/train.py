@@ -99,7 +99,7 @@ def train_func(cfg):
             early_stop_callback,
             LearningRateMonitor(),
             RichModelSummary(max_depth=3),
-            EMACallback(decay=0.999),
+            # EMACallback(decay=0.999),
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
