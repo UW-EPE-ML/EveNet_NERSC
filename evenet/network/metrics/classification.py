@@ -9,6 +9,8 @@ class ConfusionMatrixAccumulator:
         self.num_classes = num_classes
         self.normalize = normalize
         self.matrix = np.zeros((num_classes, num_classes), dtype=np.int64)
+        self.valid = 0
+        self.total = 0
 
     def update(self, y_true, y_pred):
         if isinstance(y_true, torch.Tensor):
@@ -20,6 +22,9 @@ class ConfusionMatrixAccumulator:
         valid = y_true >= 0
         y_true = y_true[valid]
         y_pred = y_pred[valid]
+
+        self.valid += valid.sum()
+        self.total += len(valid)
 
         if len(y_true) == 0:
             return  # Skip empty updates safely
@@ -41,6 +46,13 @@ class ConfusionMatrixAccumulator:
             tensor = torch.tensor(self.matrix, dtype=torch.long, device="cuda")
             torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
             self.matrix = tensor.cpu().numpy()
+
+            valid_tensor = torch.tensor([self.valid], dtype=torch.long, device="cuda")
+            total_tensor = torch.tensor([self.total], dtype=torch.long, device="cuda")
+            torch.distributed.all_reduce(valid_tensor, op=torch.distributed.ReduceOp.SUM)
+            torch.distributed.all_reduce(total_tensor, op=torch.distributed.ReduceOp.SUM)
+            self.valid = valid_tensor.item()
+            self.total = total_tensor.item()
 
     def compute(self):
         """Return normalized or raw matrix"""
