@@ -135,15 +135,6 @@ class EveNetEngine(L.LightningModule):
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
-            if not self.training:
-                print("target_classification unique values:", torch.unique(target_classification))
-                if torch.isnan(cls_output).any() or torch.isinf(cls_output).any():
-                    print("🚨 NaN or Inf in classification output")
-
-                if torch.isnan(target_classification).any() or torch.isinf(target_classification).any():
-                    print("🚨 NaN or Inf in classification target")
-                print("Logits range:", cls_output.min().item(), cls_output.max().item())
-
         if self.regression_scale > 0:
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
