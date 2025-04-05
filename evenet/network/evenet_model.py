@@ -274,6 +274,10 @@ class EvenetModel(nn.Module):
             mask=global_conditions_mask
         )
 
+        # debug:
+        embeddings_debug = self.point_cloud_embedding(input_point_cloud)
+        event_token_debug = self.point_cloud_transformer(embedding_debug)
+
         local_points = input_point_cloud[..., self.local_feature_indices]
         input_point_cloud = self.PET_body(
             input_features=input_point_cloud,
@@ -291,8 +295,6 @@ class EvenetModel(nn.Module):
             condition_vectors=global_conditions,
             condition_mask=global_conditions_mask
         )
-
-        event_token_debug = self.point_cloud_transformer(embeddings)
 
 
         ########################################

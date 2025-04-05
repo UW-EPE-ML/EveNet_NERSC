@@ -271,7 +271,7 @@ _DEFAULTS = {
             "combinatorial_scale": 0.0,
 
             # Number of epochs to ramp up the learning rate up to the given value. Can be fractional.
-            "learning_rate_warm_up_factor": 3.0,
+            "learning_rate_warm_up_factor": 0.5,
 
             # Number of times to cycle the learning rate through cosine annealing with hard resets.
             # Set to 0 to disable cosine annealing and just use a decaying learning rate.

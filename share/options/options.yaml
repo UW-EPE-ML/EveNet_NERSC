@@ -36,7 +36,7 @@ Network:
   diff_sub_resnet_nlayer: 2
   diff_transformer_nlayer: 2
   enable_local_embedding: true
-  feature_drop: 0.2
+  feature_drop: 0.0
   hidden_dim: 128
   initial_embedding_dim: 16
   initial_embedding_skip_connections: true
@@ -84,7 +84,7 @@ Training:
   learning_rate: 0.000005
   learning_rate_cycles: 0
   learning_rate_factor: 1.0
-  learning_rate_warm_up_factor: 3.0
+  learning_rate_warm_up_factor: 0.5
   mask_sequence_vectors: true
   num_gpu: 1
   num_node: 1

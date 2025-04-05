@@ -208,7 +208,7 @@ class LocalEmbeddingLayer(nn.Module):
             local_features = local_embed(
                 points = coord_shift + points,
                 features = local_features
-            )  # [T, B, D]
+            )  # [B, T, D]
             points = local_features # tihsu TODO: add mask ?
 
         return local_features * mask.float()
