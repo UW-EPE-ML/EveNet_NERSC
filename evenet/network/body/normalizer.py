@@ -3,7 +3,7 @@ from torch import nn, Tensor
 
 
 class Normalizer(nn.Module):
-    def __init__(self, mean: Tensor, std: Tensor, log_mask: Tensor):
+    def __init__(self, mean: Tensor, std: Tensor, norm_mask: Tensor):
         super(Normalizer, self).__init__()
 
         """
@@ -13,9 +13,12 @@ class Normalizer(nn.Module):
             std: standard deviation for normalization . shape (num_features,)
         """
         # Initialize mean and std as parameters
-        self.register_buffer("log_mask", log_mask)
+        self.register_buffer("norm_mask", norm_mask)
+        mean = torch.where(norm_mask, mean, 0.0)
+        std  = torch.where(norm_mask, std, 1.0)
         self.register_buffer("mean", mean)
-        self.register_buffer("std", std)
+        self.register_buffer("std", std.clamp(min=1e-6))
+
         # self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0) if self.log_mask is not None else None
 
     @torch.no_grad()

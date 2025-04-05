@@ -192,7 +192,7 @@ class LocalEmbeddingLayer(nn.Module):
 
         :param x: shape: (batch_size, num_points, input_dim)
         :param points: shape: (batch_size, num_points, num_features)
-        :param mask: shape: (batch_size, num_points)
+        :param mask: shape: (batch_size, num_points, 1)
         :return:
         """
         mask = mask.to(torch.int)

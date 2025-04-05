@@ -75,7 +75,8 @@ class GTrXL(nn.Module):
         self.attention = nn.MultiheadAttention(
             embed_dim=hidden_dim,
             num_heads=num_heads,
-            dropout=dropout
+            dropout=dropout,
+            batch_first=True
         )
 
         self.feed_forward = GRUBlock(input_dim=hidden_dim,
@@ -99,7 +100,6 @@ class GTrXL(nn.Module):
             output, output, output,
             key_padding_mask=padding_mask,
             need_weights=False,
-            batch_first=True
         )
 
         output = self.attention_gate(output, x)

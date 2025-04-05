@@ -48,8 +48,8 @@ class EvenetModel(nn.Module):
         input_normalizers_setting = dict()
         for input_name, input_type in self.event_info.input_types.items():
             input_normalizers_setting_local = {
-                "log_mask": torch.tensor(
-                    [feature_info.log_scale for feature_info in self.event_info.input_features[input_name]],
+                "norm_mask": torch.tensor(
+                    [feature_info.normalize for feature_info in self.event_info.input_features[input_name]],
                     device=self.device
                 ),
                 "mean": loaded_normalization_dict["input_mean"][input_name].to(self.device),
@@ -66,19 +66,19 @@ class EvenetModel(nn.Module):
                 input_normalizers_setting[input_type] = input_normalizers_setting_local
 
         self.sequential_normalizer = Normalizer(
-            log_mask=input_normalizers_setting["SEQUENTIAL"]["log_mask"].to(self.device),
+            norm_mask=input_normalizers_setting["SEQUENTIAL"]["norm_mask"].to(self.device),
             mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
             std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device),
         )
 
         self.global_normalizer = Normalizer(
-            log_mask=input_normalizers_setting["GLOBAL"]["log_mask"].to(self.device),
+            norm_mask=input_normalizers_setting["GLOBAL"]["norm_mask"].to(self.device),
             mean=input_normalizers_setting["GLOBAL"]["mean"].to(self.device),
             std=input_normalizers_setting["GLOBAL"]["std"].to(self.device),
         )
 
-        self.global_input_dim = input_normalizers_setting["GLOBAL"]["log_mask"].size()[-1]
-        self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["log_mask"].size()[-1]
+        self.global_input_dim = input_normalizers_setting["GLOBAL"]["norm_mask"].size()[-1]
+        self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
         self.local_feature_indices = self.options.Network.local_point_index
 
         # [1] Body
@@ -118,8 +118,8 @@ class EvenetModel(nn.Module):
             position_embedding_dim=self.options.Network.position_embedding_dim,
             num_heads=self.options.Network.num_attention_heads,
             transformer_dim_scale=self.options.Network.transformer_dim_scale,
-            num_linear_layers=self.options.Network.num_jet_embedding_layers,
-            num_encoder_layers=self.options.Network.num_jet_encoder_layers,
+            num_linear_layers=self.options.Network.num_embedding_layers,
+            num_encoder_layers=self.options.Network.num_encoder_layers,
             dropout=self.options.Network.dropout,
             conditioned=False
         )
@@ -157,7 +157,7 @@ class EvenetModel(nn.Module):
         self.resonance_particle_properties_normalizer = Normalizer(
             mean=self.event_info.resonance_particle_properties_mean.to(self.device),
             std=self.event_info.resonance_particle_properties_std.to(self.device),
-            log_mask=torch.zeros_like(self.event_info.resonance_particle_properties_mean, device=self.device).bool(),
+            norm_mask=torch.ones_like(self.event_info.resonance_particle_properties_mean).bool(),
         )
 
         # [5] Assignment Head
