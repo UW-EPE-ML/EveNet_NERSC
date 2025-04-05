@@ -304,10 +304,10 @@ class EveNetEngine(L.LightningModule):
                 self.model.class_head
             ],
             "reg_head": [
-                self.model.regression_head
+                # self.model.regression_head
             ],
             "ass_head": [
-                self.model.resonance_particle_embed,
-                self.model.multiprocess_assign_head,
+                # self.model.resonance_particle_embed,
+                # self.model.multiprocess_assign_head,
             ],
         }
