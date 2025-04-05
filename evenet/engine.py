@@ -140,7 +140,7 @@ class EveNetEngine(L.LightningModule):
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
 
-            if self.training:
+            if not self.training:
                 self.confusion_accumulator.update(
                     target_classification,
                     cls_output.argmax(dim=-1)
@@ -219,7 +219,6 @@ class EveNetEngine(L.LightningModule):
                 self.log(**{
                     "conf_matrix/valid": self.confusion_accumulator.valid,
                     "conf_matrix/total": self.confusion_accumulator.total,
-                    "conf_matrix/fraction_used": self.confusion_accumulator.valid / self.confusion_accumulator.total,
                 })
 
             self.confusion_accumulator.reset()
