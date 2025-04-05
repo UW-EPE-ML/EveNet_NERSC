@@ -292,7 +292,14 @@ class PETBody(nn.Module):
         ])
 
     def forward(self, input_features: Tensor, input_points: Tensor, mask: Tensor, time=Tensor) -> Tensor:
+        """
 
+        :param input_features: input features (batch_size, num_objects, num_features)
+        :param input_points: subset of input features that used to do edge calculation (batch_size, num_objects, num_local_features)
+        :param mask:  input features mask (batch_size, num_objects, 1)
+        :param time: time input for diffusion model usage.
+        :return:
+        """
         encoded = self.random_drop(input_features)
         encoded = self.feature_embedding(encoded)
 
@@ -305,7 +312,7 @@ class PETBody(nn.Module):
         encoded = torch.add(torch.mul(encoded, (1.0 + scale)), shift)
 
         if hasattr(self, 'local_embedding'):
-            points = input_points[:, :, :2]
+            points = input_points
             local_features = input_features
             local_features = self.local_embedding(local_features, points, mask)
             encoded = local_features + encoded  # Combine with original features

@@ -96,7 +96,7 @@ class EvenetModel(nn.Module):
         )
         # [1] Body
         self.PET_body = PETBody(
-            num_feat=len(self.local_feature_indices),
+            num_feat=self.sequential_input_dim,
             num_keep=self.options.Network.num_feature_keep,
             feature_drop=self.options.Network.PET_drop_probability,
             projection_dim=self.options.Network.hidden_dim,
@@ -257,7 +257,7 @@ class EvenetModel(nn.Module):
 
         global_conditions = self.global_embedding(global_conditions, global_conditions_mask)
         local_feature = input_point_cloud[..., self.local_feature_indices]
-        input_point_cloud = self.PET_body(local_feature, input_point_cloud, input_point_cloud_mask, time)
+        input_point_cloud = self.PET_body(input_point_cloud, local_feature, input_point_cloud_mask, time)
 
         ######################################
         ## Embedding for deterministic task ##

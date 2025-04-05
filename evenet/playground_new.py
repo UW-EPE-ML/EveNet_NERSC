@@ -117,10 +117,10 @@ class DebugHookManager:
 ########################
 
 wandb_enable = True
-n_epoch = 1
+n_epoch = 10
 df_number = 5000
 num_splits = 10
-debugger_enable = True
+debugger_enable = False
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 
