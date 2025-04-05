@@ -157,7 +157,7 @@ class EvenetModel(nn.Module):
         self.resonance_particle_properties_normalizer = Normalizer(
             mean=self.event_info.resonance_particle_properties_mean.to(self.device),
             std=self.event_info.resonance_particle_properties_std.to(self.device),
-            norm_mask=torch.ones_like(self.event_info.resonance_particle_properties_mean).bool(),
+            norm_mask=torch.ones_like(self.event_info.resonance_particle_properties_mean, device = self.device).bool(),
         )
 
         # [5] Assignment Head
