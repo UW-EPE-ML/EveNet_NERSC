@@ -258,7 +258,7 @@ _DEFAULTS = {
             "optimizer": "AdamW",
 
             # Optimizer learning rate.
-            "learning_rate": 0.001,
+            "learning_rate": 0.00003125,
 
             # Optimizer setting for fine tune
             "learning_rate_factor": 1.0,
