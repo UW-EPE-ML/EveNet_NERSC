@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from decimal import Decimal, getcontext
 
 
 def masked_stats(arr):
@@ -11,6 +12,7 @@ def masked_stats(arr):
     sumsq = (values ** 2).sum(axis=0)
 
     return {"sum": sum_, "sumsq": sumsq, "count": count}
+
 
 def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
     """
@@ -31,7 +33,7 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
         raise ValueError("Total number of samples is zero. Check input frequencies.")
 
     beta = 1 - (1 / N)
-    
+
     with np.errstate(divide='ignore', invalid='ignore'):
         # Avoid direct power to prevent underflow
         log_beta = np.log(beta)
@@ -44,11 +46,51 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
 
     return weights
 
+
+def compute_effective_counts_from_freq_decimal(freqs: list[float], precision: int = 50) -> np.ndarray:
+    """
+    Compute class-balanced weights based on effective number of samples using decimal for stability.
+
+    Args:
+        freqs (list[float]): List of sample counts per class.
+        precision (int): Number of decimal places to use.
+
+    Returns:
+        list[float]: Class weights normalized to sum ≈ number of classes.
+    """
+    getcontext().prec = precision
+    freqs = [Decimal(f) for f in freqs]
+    N = sum(freqs)
+
+    if N == 0:
+        raise ValueError("Total number of samples is zero. Check input frequencies.")
+
+    beta = Decimal(1) - Decimal(1) / N
+
+    effective_num = []
+    for f in freqs:
+        if f == 0:
+            effective_num.append(Decimal('Infinity'))  # or float('inf')
+        else:
+            numerator = Decimal(1) - beta ** f
+            denominator = Decimal(1) - beta
+            effective = numerator / denominator
+            effective_num.append(effective)
+
+    weights = [Decimal(1) / e if e != 0 else Decimal(0) for e in effective_num]
+    total = sum(weights)
+    normalized = [(w * len(freqs)) / total for w in weights]
+
+    return np.array([float(w) for w in normalized], dtype=np.float32)
+
+
 def compute_classification_balance(class_counts: np.ndarray) -> np.ndarray:
     """
     Wrapper to compute effective class weights from raw class frequency counts.
     """
-    return compute_effective_counts_from_freq(class_counts)
+    # return compute_effective_counts_from_freq(class_counts)
+    return compute_effective_counts_from_freq_decimal(class_counts.tolist(), precision=50)
+
 
 def merge_stats(stats_list):
     def merge_two(a, b):
