@@ -12,6 +12,37 @@ def masked_stats(arr):
 
     return {"sum": sum_, "sumsq": sumsq, "count": count}
 
+def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
+    """
+    Compute class-balanced weights based on effective number of samples.
+    Ref: https://arxiv.org/pdf/1901.05555.pdf
+
+    Args:
+        freqs (np.ndarray): Array of sample counts per class. Index is class label.
+
+    Returns:
+        np.ndarray: Class weights normalized so that sum ≈ number of classes.
+    """
+    freqs = freqs.astype(np.float32)
+    N = freqs.sum()
+    if N == 0:
+        raise ValueError("Total number of samples is zero. Check input frequencies.")
+
+    beta = 1 - (1 / N)
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        effective_num = (1 - np.power(beta, freqs)) / (1 - beta)
+        weights = 1.0 / effective_num
+        weights[np.isinf(weights)] = 0.0  # Handle divide-by-zero for zero-frequency classes
+        weights = weights * len(freqs) / weights.sum()  # Normalize to total class count
+
+    return weights
+
+def compute_classification_balance(class_counts: np.ndarray) -> np.ndarray:
+    """
+    Wrapper to compute effective class weights from raw class frequency counts.
+    """
+    return compute_effective_counts_from_freq(class_counts)
 
 def merge_stats(stats_list):
     def merge_two(a, b):
@@ -46,7 +77,7 @@ def merge_stats(stats_list):
         "x": None,
         "conditions": None,
         "regression": None,
-        'input_num': None
+        "input_num": None,
     }
 
     for s in stats_list:
@@ -56,12 +87,16 @@ def merge_stats(stats_list):
             else:
                 total[key] = merge_two(total[key], s[key])
 
+    total['class_counts'] = np.sum([s["class_counts"] for s in stats_list], axis=0)
+
     # Final result
     result = {
         "x": compute_mean_std(total["x"]),
         "conditions": compute_mean_std(total["conditions"]),
         "regression": compute_mean_std(total["regression"]),
         "input_num": compute_mean_std(total["input_num"]),
+        "class_counts": total["class_counts"],
+        "class_balance": compute_classification_balance(total["class_counts"]),
     }
     return result
 
@@ -70,7 +105,7 @@ class PostProcessor:
     def __init__(self):
         self.stats = []
 
-    def add(self, x, conditions, regression, num_vectors):
+    def add(self, x, conditions, regression, num_vectors, class_counts):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]))
         cond_stats = masked_stats(conditions)
         regression_stats = masked_stats(regression)
@@ -80,6 +115,7 @@ class PostProcessor:
             "conditions": cond_stats,
             "regression": regression_stats,
             "input_num": num_vectors_stats,
+            "class_counts": class_counts,
         })
 
     @classmethod
@@ -89,7 +125,10 @@ class PostProcessor:
             regression_names,
             saved_results_path=None,
     ):
-        combined = [item for a in instances for item in a.stats]
+        # Filter out None instances, when a run dir does not contain any data 
+        # for the desired physics processes
+        valid_instances = [inst for inst in instances if inst is not None]
+        combined = [item for a in valid_instances for item in a.stats]
         merged_stats = merge_stats(combined)
 
         saved_results = {
@@ -115,6 +154,8 @@ class PostProcessor:
                 k: torch.tensor(merged_stats["regression"]["std"][i], dtype=torch.float32)
                 for i, k in enumerate(regression_names)
             },
+            'class_counts': torch.tensor(merged_stats["class_counts"], dtype=torch.float32),
+            'class_balance': torch.tensor(merged_stats["class_balance"], dtype=torch.float32),
         }
 
         if saved_results_path:

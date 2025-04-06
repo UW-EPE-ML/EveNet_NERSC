@@ -25,14 +25,14 @@ Each Run folder (e.g., Run_2.Dec20) contains sub-run folders (run_1, run_2, …)
 
 ## 🛠 What the Script Does
 
-For every sub-run folder:
-	1.	Merges all .h5 process files into a single structured data dictionary.
-	2.	Converts structured data into a 2D pyarrow Table.
-	3.	Saves the output as:
-	•	data_<unique_id>.parquet (flattened table)
-	•	shape_metadata.json (used for reconstruction)
-	4.	Computes normalization statistics (mean, std) across all data.
-	5.	Merges statistics from all sub-runs and saves a single .pt normalization file.
+For every sub-run folder:    
+1.	Merges all .h5 process files into a single structured data dictionary.  
+2.	Converts structured data into a 2D pyarrow Table.  
+3.	Saves the output as:  
+    - data_<unique_id>.parquet (flattened table)  
+    - shape_metadata.json (used for reconstruction)  
+4.	Computes normalization statistics (mean, std) across all data.  
+5.	Merges statistics from all sub-runs and saves a single .pt normalization file.  
 
 
 ## 🚀 Run on NERSC
@@ -45,8 +45,10 @@ For every sub-run folder:
 - **Example Command**
     ```bash
     pretrain_dir="/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/data"
-    output_dir="/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250403"
+    output_dir="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/"
     
+    # in case of `ModuleNotFoundError: No module named 'evenet'`
+    # use as module `python3 -m preprocessing.preprocess`
     python3 EveNet/preprocessing/preprocess.py EveNet/share/preprocess_pretrain.yaml \
         --pretrain_dirs \
             ${pretrain_dir}/Run_2.Dec20 \
