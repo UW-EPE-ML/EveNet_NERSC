@@ -165,6 +165,7 @@ class ClassificationMetrics:
             plt.title(f"{title}: Softmax Score Distribution (Train vs Val)")
             plt.xlabel("Softmax Score")
             plt.ylabel("Density")
+            plt.yscale("log")
             plt.legend()
             plt.tight_layout()
 
