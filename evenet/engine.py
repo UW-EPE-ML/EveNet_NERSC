@@ -342,6 +342,8 @@ class EveNetEngine(L.LightningModule):
             )
         )
 
+        self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
+
         # Define Freezing
         self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
         self.model.freeze_module("Regression", self.regression_cfg.get("freeze", {}))
