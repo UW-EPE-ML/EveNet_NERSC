@@ -116,6 +116,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         )
 
         if matched_data is None:
+            print(f"[WARNING] No matched data for process {process} in dir {in_dir}")
             continue
 
         converter = EveNetDataConverter(
@@ -169,7 +170,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             regression=process_data['regression-data'],
             num_vectors=process_data['num_sequential_vectors'],
         )
-
+        
+    if len(converted_data) == 0:
+        print(f"[WARNING] No data found for any of the processes in {in_dir}")
+        return None
+    
     final_table = pa.concat_tables(converted_data)
 
     shuffle_indices = np.random.default_rng(31).permutation(final_table.num_rows)
@@ -192,6 +197,9 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
 
 def process_single_run(args):
+    """
+    Process a single run, e.g. Run_2.Dec20/run_yulei_13.
+    """
     pretrain_dir, run_folder_name, store_dir, process_info, cfg_dir = args
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
@@ -245,6 +253,10 @@ def main(cfg):
             cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag,
             cfg_dir=cfg.preprocess_config, save=True
         )
+        if norm_stats is None:
+            print(f"[WARNING] No data found for {cfg.in_dir}. Skipping this run.")
+            return
+        
         PostProcessor.merge(
             [norm_stats],
             regression_names=global_config.event_info.regression_names,

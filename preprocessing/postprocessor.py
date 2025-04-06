@@ -89,7 +89,10 @@ class PostProcessor:
             regression_names,
             saved_results_path=None,
     ):
-        combined = [item for a in instances for item in a.stats]
+        # Filter out None instances, when a run dir does not contain any data 
+        # for the desired physics processes
+        valid_instances = [inst for inst in instances if inst is not None]
+        combined = [item for a in valid_instances for item in a.stats]
         merged_stats = merge_stats(combined)
 
         saved_results = {
