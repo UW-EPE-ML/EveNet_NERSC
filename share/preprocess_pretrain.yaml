@@ -1,17 +1,17 @@
 process_info:
-  include: process_info/pretrain.yaml
+  default: process_info/pretrain.yaml
 
   # overwrites
   # ...
 
 event_info:
-  include: event_info/multi_process.yaml
+  default: event_info/multi_process.yaml
 
   # overwrites
   # ...
 
 resonance:
-  include: resonance/standard_model.yaml
+  default: resonance/standard_model.yaml
 
   # overwrites
   # ...
