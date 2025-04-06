@@ -18,7 +18,7 @@ from preprocessing.preprocess import unflatten_dict
 import torch
 import torch.nn as nn
 from collections import defaultdict
-from evenet.network.metrics.classification import ConfusionMatrixAccumulator
+from evenet.network.metrics.classification import ClassificationMetrics
 from matplotlib import pyplot as plt
 
 
@@ -187,7 +187,7 @@ model.freeze_module("Regression", global_config.options.Training.Components.Regr
 
 model.train()
 
-confusion_accumulator = ConfusionMatrixAccumulator(
+confusion_accumulator = ClassificationMetrics(
     num_classes=len(num_classes),
     normalize=True,
     device=torch.device("cpu"),
@@ -287,7 +287,7 @@ for iepoch in range(n_epoch):
             )
 
     if wandb_enable:
-        fig = confusion_accumulator.plot(class_names=num_classes)
+        fig = confusion_accumulator.plot_cm(class_names=num_classes)
         wandb.log({"confusion_matrix": wandb.Image(fig)})
         plt.close(fig)
 

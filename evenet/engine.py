@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
-from evenet.network.metrics.classification import ConfusionMatrixAccumulator
+from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 import re
 
@@ -21,8 +21,8 @@ import re
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
-        self.confusion_accumulator_train = None
-        self.confusion_accumulator = None
+        self.classification_metrics_train = None
+        self.classification_metrics_valid = None
         self.model_parts = {}
         self.model: EveNetModel = None
         self.config = global_config
@@ -152,14 +152,14 @@ class EveNetEngine(L.LightningModule):
             loss_dict["classification_loss"] = cls_loss
 
             if not self.training:
-                self.confusion_accumulator.update(
-                    target_classification,
-                    cls_output.argmax(dim=-1)
+                self.classification_metrics_valid.update(
+                    y_true=target_classification,
+                    y_pred_raw=cls_output
                 )
             else:
-                self.confusion_accumulator_train.update(
-                    target_classification,
-                    cls_output.argmax(dim=-1)
+                self.classification_metrics_train.update(
+                    y_true=target_classification,
+                    y_pred_raw=cls_output
                 )
 
         if self.regression_cfg.include:
@@ -185,6 +185,8 @@ class EveNetEngine(L.LightningModule):
         for name, val in loss_dict.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
+        # Yulei TODO: currently one backward pass for all optimizers
+        #       this is not optimal for large models, considering to split loss for each optimizer
         # === Manual optimization ===
         optimizers = list(self.optimizers())
         for opt in optimizers:
@@ -222,14 +224,14 @@ class EveNetEngine(L.LightningModule):
 
     def on_validation_start(self):
         if self.classification_cfg.include:
-            self.confusion_accumulator = ConfusionMatrixAccumulator(
+            self.classification_metrics_valid = ClassificationMetrics(
                 num_classes=len(self.num_classes), normalize=True,
                 device=self.device,
             )
 
     def on_train_epoch_start(self) -> None:
         if self.classification_cfg.include:
-            self.confusion_accumulator_train = ConfusionMatrixAccumulator(
+            self.classification_metrics_train = ClassificationMetrics(
                 num_classes=len(self.num_classes), normalize=True,
                 device=self.device,
             )
@@ -237,24 +239,36 @@ class EveNetEngine(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
         if self.classification_cfg.include:
-            self.confusion_accumulator.reduce_across_gpus()
+            self.classification_metrics_valid.reduce_across_gpus()
             if self.global_rank == 0:
-                fig = self.confusion_accumulator.plot(class_names=self.num_classes)
-                self.logger.experiment.log({"classification/valid_CM": wandb.Image(fig)})
-                plt.close(fig)
+                fig_cm = self.classification_metrics_valid.plot_cm(class_names=self.num_classes)
+                self.logger.experiment.log({"classification/valid_CM": wandb.Image(fig_cm)})
+                plt.close(fig_cm)
 
-            self.confusion_accumulator.reset()
+                fig_logits = self.classification_metrics_valid.plot_logits(
+                    class_names=self.num_classes,
+                    train_hist_store=self.classification_metrics_train.hist_store if self.classification_metrics_train else None,
+                )
+                for i, class_name in enumerate(self.num_classes):
+                    self.logger.experiment.log({
+                        f"classification/valid_logits_{class_name}": wandb.Image(fig_logits[i])
+                    })
+                    plt.close(fig_logits[i])
+
+            self.classification_metrics_valid.reset(cm=True, logits=True)
+            if self.classification_metrics_train:
+                self.classification_metrics_train.reset(cm=True, logits=True)
 
     def on_train_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
         if self.classification_cfg.include:
-            self.confusion_accumulator_train.reduce_across_gpus()
+            self.classification_metrics_train.reduce_across_gpus()
             if self.global_rank == 0:
-                fig = self.confusion_accumulator_train.plot(class_names=self.num_classes)
-                self.logger.experiment.log({"classification/train_CM": wandb.Image(fig)})
-                plt.close(fig)
+                fig_cm = self.classification_metrics_train.plot_cm(class_names=self.num_classes)
+                self.logger.experiment.log({"classification/train_CM": wandb.Image(fig_cm)})
+                plt.close(fig_cm)
 
-            self.confusion_accumulator_train.reset()
+            self.classification_metrics_train.reset(cm=True, logits=False)
 
         pass
 
@@ -338,7 +352,7 @@ class EveNetEngine(L.LightningModule):
             )
         )
 
-        self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
+        # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
 
         # Define Freezing
         self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))

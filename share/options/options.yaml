@@ -1,10 +1,10 @@
 Training:
   epochs: 100
 
-  learning_rate: &lr 0.000005
+  learning_rate: &lr 0.0000075
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
-  weight_decay: 1e-2
+  weight_decay: 1e-3
   decoupled_weight_decay: true
 
   classification_loss_scale: 1.0
