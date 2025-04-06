@@ -15,18 +15,10 @@ def loss(predict, target, class_weight=None, reduction='none'):
     Returns:
         Tensor: (N,) if reduction='none', else scalar
     """
-    # return F.cross_entropy(
-    #     input=predict,
-    #     target=target,
-    #     weight=class_weight,
-    #     reduction=reduction
-    # )
-    l = torch.nn.CrossEntropyLoss(
-        # weight=class_weight,
-        reduction=reduction
-    )
-
-    return l(
+    return F.cross_entropy(
         input=predict,
         target=target,
+        weight=class_weight,
+        reduction=reduction,
+        ignore_index=-1,
     )

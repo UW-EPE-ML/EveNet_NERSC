@@ -188,7 +188,7 @@ def main(args):
     valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info)
 
     run_config = RunConfig(
-        name="EveNet Training",
+        name="EveNet-Training",
     )
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
