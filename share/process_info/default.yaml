@@ -197,3 +197,49 @@ WZ_3L:
   diagram:
     W: *W_lep
     Z: *Z_lep
+
+haa_ma20:
+  category: haa
+  process_id: 9
+  diagram:
+    H:
+      a1: *a_had
+      a2: *a_had
+      SYMMETRY: [ a1, a2 ]
+  store_full_name: true
+
+haa_ma30:
+  category: haa
+  process_id: 9
+  diagram:
+    H:
+      a1: *a_had
+      a2: *a_had
+      SYMMETRY: [ a1, a2 ]
+  store_full_name: true
+
+haa_ma40:
+  category: haa
+  process_id: 9
+  diagram:
+    H:
+      a1: *a_had
+      a2: *a_had
+      SYMMETRY: [ a1, a2 ]
+  store_full_name: true
+
+haa_ma60:
+  category: haa
+  process_id: 9
+  diagram:
+    H:
+      a1: *a_had
+      a2: *a_had
+      SYMMETRY: [ a1, a2 ]
+  store_full_name: true
+
+Zjets_m300:
+  category: ZJets
+  process_id: 5
+  diagram:
+    Z: *Z_had
