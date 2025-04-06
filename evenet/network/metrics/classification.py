@@ -164,6 +164,7 @@ class ClassificationMetrics:
                         linestyle='-' if cls == true_cls else '--',
                         marker='o' if cls == true_cls else 'x',
                         linewitdh=2 if cls == true_cls else 1,
+                        markersize=4 if cls == true_cls else 2,
                     )
 
             title = f"True Class {class_names[true_cls] if class_names else true_cls}"
