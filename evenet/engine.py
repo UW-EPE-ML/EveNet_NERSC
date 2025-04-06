@@ -98,6 +98,8 @@ class EveNetEngine(L.LightningModule):
             'epoch': global_config.options.Training.epochs,
             'lr_factor': global_config.options.Training.learning_rate_factor,
             'warm_up_factor': global_config.options.Training.learning_rate_warm_up_factor,
+            'weight_decay': global_config.options.Training.weight_decay,
+            'decoupled_weight_decay': global_config.options.Training.decoupled_weight_decay,
         }
         self.automatic_optimization = False
 
@@ -238,10 +240,8 @@ class EveNetEngine(L.LightningModule):
             self.confusion_accumulator.reduce_across_gpus()
             if self.global_rank == 0:
                 fig = self.confusion_accumulator.plot(class_names=self.num_classes)
-                self.logger.experiment.log({"confusion_matrix": wandb.Image(fig)})
+                self.logger.experiment.log({"classification/valid_CM": wandb.Image(fig)})
                 plt.close(fig)
-                self.log("conf_matrix/valid", self.confusion_accumulator.valid, rank_zero_only=True)
-                self.log("conf_matrix/total", self.confusion_accumulator.total, rank_zero_only=True)
 
             self.confusion_accumulator.reset()
 
@@ -251,10 +251,8 @@ class EveNetEngine(L.LightningModule):
             self.confusion_accumulator_train.reduce_across_gpus()
             if self.global_rank == 0:
                 fig = self.confusion_accumulator_train.plot(class_names=self.num_classes)
-                self.logger.experiment.log({"train_confusion_matrix": wandb.Image(fig)})
+                self.logger.experiment.log({"classification/train_CM": wandb.Image(fig)})
                 plt.close(fig)
-                self.log("conf_matrix/train_valid", self.confusion_accumulator_train.valid, rank_zero_only=True)
-                self.log("conf_matrix/train_total", self.confusion_accumulator_train.total, rank_zero_only=True)
 
             self.confusion_accumulator_train.reset()
 
@@ -286,7 +284,11 @@ class EveNetEngine(L.LightningModule):
 
         def create_optim_schedule(p, base_lr):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
-            optimizer = Lion(p, lr=scaled_lr, betas=betas)
+            optimizer = Lion(
+                p,
+                lr=scaled_lr,
+                betas=betas
+            )
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=warmup_steps,
@@ -317,13 +319,7 @@ class EveNetEngine(L.LightningModule):
                 "name": f"lr-{name}"
             })
 
-        print('Optimizers:', optimizers)
-        print('Schedulers:', schedulers)
         return optimizers, schedulers
-
-    # def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
-    #     optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-    #     return {"optimizer": optimizer}
 
     def configure_model(self) -> None:
         print(f"{self.__class__.__name__} configure model on device {self.device}")
