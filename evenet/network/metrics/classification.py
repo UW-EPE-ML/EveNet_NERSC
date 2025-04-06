@@ -163,7 +163,7 @@ class ClassificationMetrics:
                         bin_centers, val_density, color=color, label=label,
                         linestyle='-' if cls == true_cls else '--',
                         marker='o' if cls == true_cls else 'x',
-                        linewitdh=2 if cls == true_cls else 1,
+                        linewidth=2 if cls == true_cls else 1,
                         markersize=4 if cls == true_cls else 2,
                     )
 
