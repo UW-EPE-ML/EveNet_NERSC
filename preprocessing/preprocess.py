@@ -252,7 +252,7 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        run_parallel(cfg, cfg.preprocess_config, num_workers=60)
+        run_parallel(cfg, cfg.preprocess_config, num_workers=cpu_count - 1)
 
     else:
         in_tag = Path(cfg.in_dir).name
