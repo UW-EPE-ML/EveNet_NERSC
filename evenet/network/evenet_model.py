@@ -16,7 +16,7 @@ from typing import Dict
 import re
 
 
-class EvenetModel(nn.Module):
+class EveNetModel(nn.Module):
     def __init__(
             self,
             config: DotDict,
@@ -25,6 +25,7 @@ class EvenetModel(nn.Module):
             regression: bool = True,
             generation: bool = False,
             assignment: bool = False,
+            normalization_dict: dict = None,
     ):
         super().__init__()
         # # Initialize the model with the given configuration
@@ -37,9 +38,7 @@ class EvenetModel(nn.Module):
         self.include_assignment = assignment
         self.device = device
 
-        loaded_normalization_dict = torch.load(self.options.Dataset.normalization_file)
-
-        self.normalization_dict = loaded_normalization_dict
+        self.normalization_dict = normalization_dict
 
         # Initialize the normalization layer
         input_normalizers_setting = dict()
@@ -49,8 +48,8 @@ class EvenetModel(nn.Module):
                     [feature_info.normalize for feature_info in self.event_info.input_features[input_name]],
                     device=self.device
                 ),
-                "mean": loaded_normalization_dict["input_mean"][input_name].to(self.device),
-                "std": loaded_normalization_dict["input_std"][input_name].to(self.device)
+                "mean": normalization_dict["input_mean"][input_name].to(self.device),
+                "std": normalization_dict["input_std"][input_name].to(self.device)
             }
 
             if input_type in input_normalizers_setting:

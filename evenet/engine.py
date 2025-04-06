@@ -12,7 +12,7 @@ from lion_pytorch import Lion
 from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
-from evenet.network.evenet_model import EvenetModel
+from evenet.network.evenet_model import EveNetModel
 from evenet.network.metrics.classification import ConfusionMatrixAccumulator
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 import re
@@ -24,7 +24,7 @@ class EveNetEngine(L.LightningModule):
         self.confusion_accumulator_train = None
         self.confusion_accumulator = None
         self.model_parts = {}
-        self.model: Union[EvenetModel, None] = None
+        self.model: Union[EveNetModel, None] = None
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
@@ -99,6 +99,10 @@ class EveNetEngine(L.LightningModule):
         }
         self.automatic_optimization = False
 
+        ###### Initialize Normalizations and Balance #####
+        self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
+        self.class_weight = self.normalization_dict['class_balance']
+
         print(f"{self.__class__.__name__} initialized")
 
     def forward(self, x):
@@ -135,11 +139,10 @@ class EveNetEngine(L.LightningModule):
         if self.classification_scale > 0:
             cls_output = next(iter(outputs["classification"].values()))
 
-            weight = torch.tensor([3.8609, 0.4338, 3.8373, 2.3715, 1.5716, 2.8315, 20.4836, 2.5664, 0.8475])
             cls_loss = self.cls_loss(
                 cls_output,
                 target_classification,
-                class_weight=weight,
+                class_weight=self.class_weight,
             )
             loss = loss + cls_loss * self.classification_scale
             loss_dict["classification_loss"] = cls_loss
@@ -215,12 +218,16 @@ class EveNetEngine(L.LightningModule):
 
     def on_validation_start(self):
         if self.classification_scale > 0:
-            self.confusion_accumulator = ConfusionMatrixAccumulator(num_classes=len(self.num_classes), normalize=True)
+            self.confusion_accumulator = ConfusionMatrixAccumulator(
+                num_classes=len(self.num_classes), normalize=True,
+                device=self.device,
+            )
 
     def on_train_epoch_start(self) -> None:
         if self.classification_scale > 0:
             self.confusion_accumulator_train = ConfusionMatrixAccumulator(
-                num_classes=len(self.num_classes), normalize=True
+                num_classes=len(self.num_classes), normalize=True,
+                device=self.device,
             )
 
     def on_validation_epoch_end(self) -> None:
@@ -313,13 +320,14 @@ class EveNetEngine(L.LightningModule):
             return
         # compile model here
         self.model = torch.compile(
-            EvenetModel(
+            EveNetModel(
                 config=self.config,
                 device=self.device,
                 classification=self.classification_scale > 0,
                 regression=self.regression_scale > 0,
                 generation=False,
                 assignment=False,
+                normalization_dict=self.normalization_dict,
             )
         )
 

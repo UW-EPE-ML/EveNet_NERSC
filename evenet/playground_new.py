@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch, convert_batch_to_torch_tensor
-from evenet.network.evenet_model import EvenetModel
+from evenet.network.evenet_model import EveNetModel
 
 from evenet.network.loss.classification import loss as cls_loss
 from evenet.network.loss.regression import loss as reg_loss
@@ -148,6 +148,8 @@ num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
 shape_metadata = json.load(
     open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
 
+normalization_dict = torch.load("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt")
+
 # Load the Parquet file locally
 df = pq.read_table(
     "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
@@ -172,9 +174,10 @@ torch_batch = convert_batch_to_torch_tensor(processed_batch)
 num_splits = df_number // 256
 
 # Run forward
-model = EvenetModel(
+model = EveNetModel(
     config=global_config,
     device=torch.device("cpu"),
+    normalization_dict=normalization_dict,
 )
 
 # model = MLP()
@@ -183,7 +186,8 @@ model.train()
 
 confusion_accumulator = ConfusionMatrixAccumulator(
     num_classes=len(num_classes),
-    normalize=True
+    normalize=True,
+    device=torch.device("cpu"),
 )
 
 debugger = DebugHookManager(track_forward=True, track_backward=True, save_values=True)
@@ -245,9 +249,9 @@ for iepoch in range(n_epoch):
             print("target", torch.unique(cls_target, return_counts=True))
             print("pred", torch.unique(preds, return_counts=True))
 
-            # weight = torch.tensor([3.8609, 0.4338, 3.8373, 2.3715, 1.5716, 2.8315, 20.4836, 2.5664, 0.8475])
-            # c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=weight)
-            c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=None)
+
+            c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=normalization_dict['class_balance'])
+            # c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=None)
 
             # mse_loss = torch.nn.MSELoss(reduction='none')
             # c_loss = mse_loss(cls_output, torch.nn.functional.one_hot(cls_target, num_classes=9).float())

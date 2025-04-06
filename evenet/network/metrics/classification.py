@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 
 class ConfusionMatrixAccumulator:
-    def __init__(self, num_classes, normalize=False):
+    def __init__(self, num_classes, device, normalize=False):
+        self.device = device
         self.num_classes = num_classes
         self.normalize = normalize
         self.matrix = np.zeros((num_classes, num_classes), dtype=np.int64)
@@ -43,12 +44,12 @@ class ConfusionMatrixAccumulator:
     def reduce_across_gpus(self):
         """All-reduce across DDP workers"""
         if torch.distributed.is_initialized():
-            tensor = torch.tensor(self.matrix, dtype=torch.long, device="cuda")
+            tensor = torch.tensor(self.matrix, dtype=torch.long, device=self.device)
             torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
             self.matrix = tensor.cpu().numpy()
 
-            valid_tensor = torch.tensor([self.valid], dtype=torch.long, device="cuda")
-            total_tensor = torch.tensor([self.total], dtype=torch.long, device="cuda")
+            valid_tensor = torch.tensor([self.valid], dtype=torch.long, device=self.device)
+            total_tensor = torch.tensor([self.total], dtype=torch.long, device=self.device)
             torch.distributed.all_reduce(valid_tensor, op=torch.distributed.ReduceOp.SUM)
             torch.distributed.all_reduce(total_tensor, op=torch.distributed.ReduceOp.SUM)
             self.valid = valid_tensor.item()
