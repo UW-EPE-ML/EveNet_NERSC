@@ -103,7 +103,7 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict['class_balance']
+        self.class_weight = self.normalization_dict['class_balance'].to(device=self.device)
 
         print(f"{self.__class__.__name__} initialized")
 
