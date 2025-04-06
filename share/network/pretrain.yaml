@@ -34,7 +34,7 @@ Body:
     mode: "train"
 
   ObjectEncoder:
-    hidden_dim: 64
+    hidden_dim: 128
     position_embedding_dim: 4
     num_attention_heads: 4
     transformer_dim_scale: 2.0
@@ -45,7 +45,7 @@ Body:
 
 Classification:
   num_classification_layers: 1
-  hidden_dim: 64
+  hidden_dim: 128
   dropout: 0.0
 
 
