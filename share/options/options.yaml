@@ -1,7 +1,7 @@
 Training:
   epochs: 100
 
-  learning_rate: &lr 0.000005
+  learning_rate: &lr 0.00005
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 0.5
   classification_loss_scale: 1.0

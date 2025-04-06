@@ -222,6 +222,8 @@ def main(args):
 
     result = trainer.fit()
 
+    print(result)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="EveNet Training Program")

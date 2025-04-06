@@ -23,8 +23,8 @@ Body:
     local_point_index:
       - 2
       - 3
-    num_local_layer: 3
-    num_layers: 4
+    num_local_layer: 4
+    num_layers: 8
     drop_probability: 0.0
     talking_head: false
     layer_scale: true
@@ -38,7 +38,7 @@ Body:
     position_embedding_dim: 4
     num_attention_heads: 4
     transformer_dim_scale: 2.0
-    num_embedding_layers: 3
+    num_embedding_layers: 2
     num_encoder_layers: 2
     dropout: 0.0
 
