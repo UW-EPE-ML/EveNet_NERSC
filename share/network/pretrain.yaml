@@ -12,7 +12,7 @@ Body:
     normalization: LayerNorm
     linear_activation: GELU
     num_embedding_layers: 3
-    dropout: 0.0
+    dropout: 0.1
 
   PET:
     num_feature_keep: 0
@@ -29,9 +29,9 @@ Body:
     talking_head: false
     layer_scale: true
     layer_scale_init: 1.0e-05
-    dropout: 0.0
     num_heads: 4
     mode: "train"
+    dropout: 0.1
 
   ObjectEncoder:
     hidden_dim: 128
@@ -40,7 +40,7 @@ Body:
     transformer_dim_scale: 2.0
     num_embedding_layers: 2
     num_encoder_layers: 2
-    dropout: 0.0
+    dropout: 0.2
 
 
 Classification:
@@ -51,14 +51,14 @@ Classification:
 
 Regression:
   num_regression_layers: 1
-  hidden_dim: 64
+  hidden_dim: 128
   dropout: 0.0
 
 
 Assignment:
   feature_drop: 0.0
   num_feature_keep: 0
-  hidden_dim: 64
+  hidden_dim: 128
   split_symmetric_attention: true
   position_embedding_dim: 8
   num_attention_heads: 4
