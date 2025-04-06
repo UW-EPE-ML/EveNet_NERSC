@@ -31,9 +31,12 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
     beta = 1 - (1 / N)
     
     with np.errstate(divide='ignore', invalid='ignore'):
-        effective_num = (1 - np.power(beta, freqs)) / (1 - beta)
+        # Avoid direct power to prevent underflow
+        log_beta = np.log(beta)
+        effective_num = (1.0 - np.exp(freqs * log_beta)) / (1.0 - beta)
+
         weights = 1.0 / effective_num
-        weights[np.isinf(weights)] = 0.0  # Handle divide-by-zero for zero-frequency classes
+        weights[~np.isfinite(weights)] = 0.0  # fix nan/inf
         weights = weights * len(freqs) / weights.sum()  # Normalize to total class count
 
     return weights
