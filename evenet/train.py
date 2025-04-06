@@ -222,6 +222,7 @@ def main(args):
 
     result = trainer.fit()
 
+    print('finished!')
     print(result)
 
 
