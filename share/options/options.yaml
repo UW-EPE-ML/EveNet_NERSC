@@ -49,7 +49,7 @@ Training:
       learning_rate: *lr
       optimizer_group: "regression"
       loss_scale: 1.0 # loss coefficient
-      include: false # whether to build in network
+      include: true # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
