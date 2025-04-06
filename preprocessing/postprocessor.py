@@ -23,7 +23,7 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Class weights normalized so that sum ≈ number of classes.
     """
-    freqs = freqs.astype(np.float32)
+    freqs = freqs.astype(np.longdouble)
     N = freqs.sum()
     if N == 0:
         raise ValueError("Total number of samples is zero. Check input frequencies.")
@@ -33,7 +33,8 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
     with np.errstate(divide='ignore', invalid='ignore'):
         # Avoid direct power to prevent underflow
         log_beta = np.log(beta)
-        effective_num = (1.0 - np.exp(freqs * log_beta)) / (1.0 - beta)
+        power_term = np.exp(freqs * log_beta)
+        effective_num = (1.0 - power_term) / (1.0 - beta)
 
         weights = 1.0 / effective_num
         weights[~np.isfinite(weights)] = 0.0  # fix nan/inf
