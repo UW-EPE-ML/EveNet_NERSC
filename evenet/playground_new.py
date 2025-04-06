@@ -180,6 +180,9 @@ model = EveNetModel(
     normalization_dict=normalization_dict,
 )
 
+model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
+model.freeze_module("Regression", global_config.options.Training.Components.Regression.get("freeze", {}))
+
 # model = MLP()
 
 model.train()

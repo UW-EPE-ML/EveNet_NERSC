@@ -24,20 +24,24 @@ class EveNetEngine(L.LightningModule):
         self.confusion_accumulator_train = None
         self.confusion_accumulator = None
         self.model_parts = {}
-        self.model: Union[EveNetModel, None] = None
+        self.model: EveNetModel = None
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
         self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal'][0]  # list [process_name]
 
+        ###### Initialize Keys for Data Inputs #####
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
-
-        self.classification_scale = global_config.options.Training.classification_loss_scale
         self.target_classification_key = 'classification'
-
-        self.regression_scale = global_config.options.Training.regression_loss_scale
         self.target_regression_key = 'regression-data'
         self.target_regression_mask_key = 'regression-mask'
+
+        ###### Initialize Model Components Configs #####
+        self.component_cfg = global_config.options.Training.Components
+
+        self.classification_cfg = self.component_cfg.Classification
+        self.regression_cfg = self.component_cfg.Regression
+        self.assignment_cfg = self.component_cfg.Assignment
 
         ###### Initialize Assignment Necessaries ######
         print("configure permutation indices")
@@ -67,20 +71,19 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Loss ######
         self.cls_loss = None
-
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             import evenet.network.loss.classification as cls_loss
             self.cls_loss = cls_loss.loss
             print(f"{self.__class__.__name__} classification loss initialized")
 
         self.reg_loss = None
-        if self.regression_scale > 0:
+        if self.regression_cfg.include:
             import evenet.network.loss.regression as reg_loss
             self.reg_loss = reg_loss.loss
             print(f"{self.__class__.__name__} regression loss initialized")
 
         self.assignment_loss = None
-        # if self.assignment_scale > 0:
+        # if self.assignment_cfg.include:
         #     import evenet.network.loss.assignment as ass_loss
         #     assignment_loss_partial = partial(
         #         ass_loss.loss,
@@ -92,7 +95,6 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
             'batch_size': global_config.platform.batch_size,
-            'lr': global_config.options.Training.learning_rate,
             'epoch': global_config.options.Training.epochs,
             'lr_factor': global_config.options.Training.learning_rate_factor,
             'warm_up_factor': global_config.options.Training.learning_rate_warm_up_factor,
@@ -121,11 +123,11 @@ class EveNetEngine(L.LightningModule):
         }
 
         target_classification = None
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             target_classification = batch[self.target_classification_key].to(device=device)
 
         target_regression, target_regression_mask = None, None
-        if self.regression_scale > 0:
+        if self.regression_cfg.include:
             target_regression = batch[self.target_regression_key].to(device=device)
             target_regression_mask = batch[self.target_regression_mask_key].to(device=device)
 
@@ -136,7 +138,7 @@ class EveNetEngine(L.LightningModule):
 
         loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
         loss_dict = {}
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             cls_output = next(iter(outputs["classification"].values()))
 
             cls_loss = self.cls_loss(
@@ -144,7 +146,7 @@ class EveNetEngine(L.LightningModule):
                 target_classification,
                 class_weight=self.class_weight,
             )
-            loss = loss + cls_loss * self.classification_scale
+            loss = loss + cls_loss * self.classification_cfg.loss_scale
             loss_dict["classification_loss"] = cls_loss
 
             if not self.training:
@@ -158,7 +160,7 @@ class EveNetEngine(L.LightningModule):
                     cls_output.argmax(dim=-1)
                 )
 
-        if self.regression_scale > 0:
+        if self.regression_cfg.include:
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
             reg_loss = self.reg_loss(
@@ -166,7 +168,7 @@ class EveNetEngine(L.LightningModule):
                 target_regression.float(),
                 target_regression_mask.float(),
             )
-            loss = loss + reg_loss * self.regression_scale
+            loss = loss + reg_loss * self.regression_cfg.loss_scale
             loss_dict["regression_loss"] = reg_loss
 
         return loss, loss_dict
@@ -217,14 +219,14 @@ class EveNetEngine(L.LightningModule):
         return loss.mean()
 
     def on_validation_start(self):
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             self.confusion_accumulator = ConfusionMatrixAccumulator(
                 num_classes=len(self.num_classes), normalize=True,
                 device=self.device,
             )
 
     def on_train_epoch_start(self) -> None:
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             self.confusion_accumulator_train = ConfusionMatrixAccumulator(
                 num_classes=len(self.num_classes), normalize=True,
                 device=self.device,
@@ -232,7 +234,7 @@ class EveNetEngine(L.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             self.confusion_accumulator.reduce_across_gpus()
             if self.global_rank == 0:
                 fig = self.confusion_accumulator.plot(class_names=self.num_classes)
@@ -245,7 +247,7 @@ class EveNetEngine(L.LightningModule):
 
     def on_train_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
-        if self.classification_scale > 0:
+        if self.classification_cfg.include:
             self.confusion_accumulator_train.reduce_across_gpus()
             if self.global_rank == 0:
                 fig = self.confusion_accumulator_train.plot(class_names=self.num_classes)
@@ -268,7 +270,6 @@ class EveNetEngine(L.LightningModule):
 
     def configure_optimizers(self):
         cfg = self.hyper_par_cfg
-        base_lr = cfg['lr']
         lr_factor = cfg.get('lr_factor', 1.0)
         batch_size = cfg['batch_size']
         epochs = cfg['epoch']
@@ -281,11 +282,10 @@ class EveNetEngine(L.LightningModule):
         warmup_steps = warm_up_factor * steps_per_epoch
         total_steps = epochs * steps_per_epoch
 
-        # Scaled learning rate
-        scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
         betas = (0.95, 0.99)
 
-        def create_optim_schedule(p):
+        def create_optim_schedule(p, base_lr):
+            scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
             optimizer = Lion(p, lr=scaled_lr, betas=betas)
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
@@ -297,17 +297,28 @@ class EveNetEngine(L.LightningModule):
 
         optimizers, schedulers = [], []
         for name, modules in self.model_parts.items():
+            print(f"Configuring optimizer/scheduler for {name} with modules: {modules['modules']}")
+
             if not modules:
                 continue
-            params = [p for m in modules for p in m.parameters()]
-            opt, sch = create_optim_schedule(params)
+            valid_modules = [getattr(self.model, m) for m in modules['modules'] if m is not None]
+            params = [p for m in valid_modules for p in m.parameters()]
+
+            if len(params) == 0:
+                print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
+                continue
+
+            opt, sch = create_optim_schedule(params, base_lr=modules['lr'])
             optimizers.append(opt)
             schedulers.append({
                 "scheduler": sch,
                 "interval": "step",
                 "frequency": 1,
-                # "name": f"{name}"
+                "name": f"lr-{name}"
             })
+
+        print('Optimizers:', optimizers)
+        print('Schedulers:', schedulers)
         return optimizers, schedulers
 
     # def configure_optimizers(self) -> Dict[str, torch.optim.Optimizer]:
@@ -323,31 +334,38 @@ class EveNetEngine(L.LightningModule):
             EveNetModel(
                 config=self.config,
                 device=self.device,
-                classification=self.classification_scale > 0,
-                regression=self.regression_scale > 0,
+                classification=self.classification_cfg.include,
+                regression=self.regression_cfg.include,
                 generation=False,
                 assignment=False,
                 normalization_dict=self.normalization_dict,
             )
         )
 
+        # Define Freezing
+        self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
+        self.model.freeze_module("Regression", self.regression_cfg.get("freeze", {}))
+        self.model.freeze_module("Assignment", self.assignment_cfg.get("freeze", {}))
+
         # Define model part groups
-        self.model_parts = {
-            "body": [
-                self.model.global_embedding,
-                self.model.PET_body
-            ],
-            "object_encoder": [
-                self.model.object_encoder
-            ],
-            "cls_head": [
-                self.model.class_head
-            ],
-            "reg_head": [
-                # self.model.regression_head
-            ],
-            "ass_head": [
-                # self.model.resonance_particle_embed,
-                # self.model.multiprocess_assign_head,
-            ],
-        }
+        self.model_parts = {}
+
+        for key, cfg in self.component_cfg.items():
+            group = cfg.get("optimizer_group", None)
+            if not group:
+                continue
+
+            module_attr = getattr(self.model, key, None)
+            if not module_attr:
+                print(f"⚠️ Warning: No module set for '{key}'. Skipping.")
+                continue
+
+            # Add to group
+            if group not in self.model_parts:
+                self.model_parts[group] = {
+                    'lr': cfg['learning_rate'],
+                    'modules': [],
+                }
+            self.model_parts[group]['modules'].append(key)
+
+        print("model parts: ", self.model_parts)

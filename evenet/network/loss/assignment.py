@@ -142,7 +142,6 @@ def loss(assignments: List[Tensor],
          assignment_loss_scale: float,
          detection_loss_scale: float
          ):
-
     symmetric_losses = symmetric_loss(assignments,
                                       detections,
                                       targets,

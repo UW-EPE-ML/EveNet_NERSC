@@ -1,8 +1,13 @@
 import os
 import argparse
+import sys
 from copy import deepcopy
 from functools import partial
+from io import StringIO
 from pathlib import Path
+
+import wandb
+from rich.console import Console
 
 import numpy as np
 import ray
@@ -44,7 +49,10 @@ def train_func(cfg):
             name=wandb_config.get("run_name", None),
             tags=wandb_config.get("tags", []),
             entity=wandb_config.get("entity", None),
+            config=global_config.to_logger()
         )
+        # wandb_logger.experiment.config.update()
+        # wandb.config.update()
 
     dataset_configs = {
         'batch_size': batch_size,
@@ -148,6 +156,8 @@ def main(args):
     }
 
     global_config.load_yaml(args.config)
+    global_config.display()
+
     platform_info = global_config.platform
 
     ray.init(
@@ -155,7 +165,6 @@ def main(args):
     )
 
     base_dir = Path(platform_info.data_parquet_dir)
-
 
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
@@ -170,7 +179,7 @@ def main(args):
     np.random.shuffle(parquet_files)
 
     # Split the file list
-    split_index = int(0.7 * len(parquet_files))
+    split_index = int(global_config.options.Dataset.train_validation_split * len(parquet_files))
     train_files = parquet_files[:split_index]
     val_files = parquet_files[split_index:]
 

@@ -1,6 +1,5 @@
 from torch import nn, Tensor
 from typing import Dict
-from evenet.control.event_info import EventInfo
 from evenet.network.layers.linear_block import create_linear_block
 from evenet.network.body.normalizer import Normalizer
 from collections import OrderedDict
@@ -88,15 +87,16 @@ class BranchLinear(nn.Module):
 class ClassificationHead(nn.Module):
     def __init__(
             self,
-            event_info: EventInfo,
+            class_label,
+            event_num_classes,
             num_layers: int,
             hidden_dim: int,
             dropout: float = 0.0,
     ):
         super(ClassificationHead, self).__init__()
         networks = OrderedDict()
-        for name in event_info.class_label['EVENT']:
-            num_classes = event_info.num_classes[name]
+        for name in class_label:
+            num_classes = event_num_classes[name]
             networks[f"classification/{name}"] = BranchLinear(
                 num_layers=num_layers,
                 hidden_dim=hidden_dim,
@@ -121,7 +121,8 @@ class ClassificationHead(nn.Module):
 class RegressionHead(nn.Module):
     def __init__(
             self,
-            event_info: EventInfo,
+            regressions_target,
+            regression_names,
             means: Dict[str, Tensor],
             stds: Dict[str, Tensor],
             num_layers: int,
@@ -133,9 +134,9 @@ class RegressionHead(nn.Module):
         networks = OrderedDict()
         normalizers = OrderedDict()
         self.regressions_target = OrderedDict()
-        for name in event_info.regressions:
+        for name in regressions_target:
             target_list = []
-            for target in event_info.regression_names:
+            for target in regression_names:
                 # regression_names Format : "process_name/target_name"
                 process_name = target.split("/")[0]
                 if process_name == name:

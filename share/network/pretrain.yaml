@@ -1,0 +1,70 @@
+##############################################################################
+# IMPORTANT NOTE:
+# Please do not remove any existing fields in this file.
+##############################################################################
+
+Body:
+  GlobalEmbedding:
+    linear_block_type: GRU
+    transformer_dim_scale: 2.0
+    initial_embedding_dim: 16
+    hidden_dim: 128
+    normalization: LayerNorm
+    linear_activation: GELU
+    num_embedding_layers: 3
+    dropout: 0.0
+
+  PET:
+    num_feature_keep: 0
+    feature_drop: 0.0
+    hidden_dim: 128
+    enable_local_embedding: true
+    local_Krank: 2
+    local_point_index:
+      - 2
+      - 3
+    num_local_layer: 3
+    num_layers: 4
+    drop_probability: 0.0
+    talking_head: false
+    layer_scale: true
+    layer_scale_init: 1.0e-05
+    dropout: 0.0
+    num_heads: 4
+    mode: "train"
+
+  ObjectEncoder:
+    hidden_dim: 64
+    position_embedding_dim: 4
+    num_attention_heads: 4
+    transformer_dim_scale: 2.0
+    num_embedding_layers: 3
+    num_encoder_layers: 2
+    dropout: 0.0
+
+
+Classification:
+  num_classification_layers: 1
+  hidden_dim: 64
+  dropout: 0.0
+
+
+Regression:
+  num_regression_layers: 1
+  hidden_dim: 64
+  dropout: 0.0
+
+
+Assignment:
+  feature_drop: 0.0
+  num_feature_keep: 0
+  hidden_dim: 64
+  split_symmetric_attention: true
+  position_embedding_dim: 8
+  num_attention_heads: 4
+  transformer_dim_scale: 2.0
+  num_jet_embedding_layers: 0
+  num_jet_encoder_layers: 0
+  num_detection_layers: 0
+  dropout: 0.0
+  combinatorial_scale: 0.0

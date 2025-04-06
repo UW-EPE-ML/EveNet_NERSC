@@ -22,7 +22,7 @@ class EveNetModel(nn.Module):
             config: DotDict,
             device,
             classification: bool = True,
-            regression: bool = True,
+            regression: bool = False,
             generation: bool = False,
             assignment: bool = False,
             normalization_dict: dict = None,
@@ -30,6 +30,7 @@ class EveNetModel(nn.Module):
         super().__init__()
         # # Initialize the model with the given configuration
         self.options = config.options
+        self.network_cfg = config.network
         self.event_info = config.event_info
         # # self.save_hyperparameters(self.options)
         self.include_classification = classification
@@ -75,83 +76,94 @@ class EveNetModel(nn.Module):
 
         self.global_input_dim = input_normalizers_setting["GLOBAL"]["norm_mask"].size()[-1]
         self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
-        self.local_feature_indices = self.options.Network.local_point_index
+        self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
 
         # [1] Body
-        self.global_embedding = GlobalVectorEmbedding(
-            linear_block_type=self.options.Network.linear_block_type,
+        global_embedding_cfg = self.network_cfg.Body.GlobalEmbedding
+        self.GlobalEmbedding = GlobalVectorEmbedding(
+            linear_block_type=global_embedding_cfg.linear_block_type,
             input_dim=self.global_input_dim,
-            hidden_dim_scale=self.options.Network.transformer_dim_scale,
-            initial_embedding_dim=self.options.Network.initial_embedding_dim,
-            final_embedding_dim=self.options.Network.hidden_dim,
-            normalization_type=self.options.Network.normalization,
-            activation_type=self.options.Network.linear_activation,
+            hidden_dim_scale=global_embedding_cfg.transformer_dim_scale,
+            initial_embedding_dim=global_embedding_cfg.initial_embedding_dim,
+            final_embedding_dim=global_embedding_cfg.hidden_dim,
+            normalization_type=global_embedding_cfg.normalization,
+            activation_type=global_embedding_cfg.linear_activation,
             skip_connection=False,
-            num_embedding_layers=self.options.Network.num_embedding_layers,
-            dropout=self.options.Network.dropout
+            num_embedding_layers=global_embedding_cfg.num_embedding_layers,
+            dropout=global_embedding_cfg.dropout
         )
 
         # tihsu: debugging
         # self.global_embedding_debug = nn.Sequential(
-        #     nn.Linear(self.options.Network.hidden_dim, self.options.Network.hidden_dim),
+        #     nn.Linear(self.network_cfg.hidden_dim, self.network_cfg.hidden_dim),
         #     nn.ReLU(),
-        #     nn.Linear(self.options.Network.hidden_dim, self.options.Network.hidden_dim),
+        #     nn.Linear(self.network_cfg.hidden_dim, self.network_cfg.hidden_dim),
         #     nn.ReLU()
         #     )
-        self.point_cloud_transformer_debug = PointCloudTransformer(
-            point_dim=self.options.Network.hidden_dim,
-            embed_dim=self.options.Network.hidden_dim,
-            ff_dim=self.options.Network.hidden_dim
+        # self.point_cloud_transformer_debug = PointCloudTransformer(
+        #     point_dim=self.network_cfg.hidden_dim,
+        #     embed_dim=self.network_cfg.hidden_dim,
+        #     ff_dim=self.network_cfg.hidden_dim
+        # )
+
+        # self.debug_classifier = nn.Linear(self.network_cfg.hidden_dim, self.event_info.num_classes["signal"])
+        # [1] Body
+        pet_config = self.network_cfg.Body.PET
+        self.PET = PETBody(
+            num_feat=self.sequential_input_dim,
+            num_keep=pet_config.num_feature_keep,
+            feature_drop=pet_config.feature_drop,
+            projection_dim=pet_config.hidden_dim,
+            local=pet_config.enable_local_embedding,
+            K=pet_config.local_Krank,
+            num_local=pet_config.num_local_layer,
+            num_layers=pet_config.num_layers,
+            num_heads=pet_config.num_heads,
+            drop_probability=pet_config.drop_probability,
+            talking_head=pet_config.talking_head,
+            layer_scale=pet_config.layer_scale,
+            layer_scale_init=pet_config.layer_scale_init,
+            dropout=pet_config.dropout,
+            mode=pet_config.mode,
         )
 
-        # self.debug_classifier = nn.Linear(self.options.Network.hidden_dim, self.event_info.num_classes["signal"])
-        # [1] Body
-        self.PET_body = PETBody(
-            num_feat=self.sequential_input_dim,
-            num_keep=self.options.Network.num_feature_keep,
-            feature_drop=self.options.Network.feature_drop,
-            projection_dim=self.options.Network.hidden_dim,
-            local=self.options.Network.enable_local_embedding,
-            K=self.options.Network.local_Krank,
-            num_local=self.options.Network.num_local_layer,
-            num_layers=self.options.Network.PET_num_layers,
-            num_heads=self.options.Network.PET_num_heads,
-            drop_probability=self.options.Network.PET_drop_probability,
-            talking_head=self.options.Network.PET_talking_head,
-            layer_scale=self.options.Network.PET_layer_scale,
-            layer_scale_init=self.options.Network.PET_layer_scale_init,
-            dropout=self.options.Network.dropout,
-            mode="train"
-        )
         # [2] Classification + Regression + Assignment Body
-        self.object_encoder = ObjectEncoder(
-            hidden_dim=self.options.Network.hidden_dim,
-            position_embedding_dim=self.options.Network.position_embedding_dim,
-            num_heads=self.options.Network.num_attention_heads,
-            transformer_dim_scale=self.options.Network.transformer_dim_scale,
-            num_linear_layers=self.options.Network.num_embedding_layers,
-            num_encoder_layers=self.options.Network.num_encoder_layers,
-            dropout=self.options.Network.dropout,
+        obj_encoder_cfg = self.network_cfg.Body.ObjectEncoder
+        self.ObjectEncoder = ObjectEncoder(
+            hidden_dim=obj_encoder_cfg.hidden_dim,
+            position_embedding_dim=obj_encoder_cfg.position_embedding_dim,
+            num_heads=obj_encoder_cfg.num_attention_heads,
+            transformer_dim_scale=obj_encoder_cfg.transformer_dim_scale,
+            num_linear_layers=obj_encoder_cfg.num_embedding_layers,
+            num_encoder_layers=obj_encoder_cfg.num_encoder_layers,
+            dropout=obj_encoder_cfg.dropout,
             conditioned=False
         )
+
         # [3] Classification Head
-        self.class_head = ClassificationHead(
-            event_info=self.event_info,
-            num_layers=self.options.Network.num_classification_layers,
-            hidden_dim=self.options.Network.hidden_dim,
-            dropout=self.options.Network.dropout,
-        )
-        # # [4] Regression Head
-        # self.regression_head = RegressionHead(
-        #     event_info=self.event_info,
-        #     means=self.normalization_dict["regression_mean"],
-        #     stds=self.normalization_dict["regression_std"],
-        #     num_layers=self.options.Network.num_regression_layers,
-        #     hidden_dim=self.options.Network.hidden_dim,
-        #     dropout=self.options.Network.dropout,
-        #     device=self.device,
-        # )
-        #
+        if self.include_classification:
+            cls_cfg = self.network_cfg.Classification
+            self.Classification = ClassificationHead(
+                class_label=self.event_info.class_label["EVENT"],
+                event_num_classes=self.event_info.num_classes,
+                num_layers=cls_cfg.num_classification_layers,
+                hidden_dim=cls_cfg.hidden_dim,
+                dropout=cls_cfg.dropout,
+            )
+        # [4] Regression Head
+        if self.include_regression:
+            reg_cfg = self.network_cfg.Regression
+            self.Regression = RegressionHead(
+                regressions_target=self.event_info.regressions,
+                regression_names=self.event_info.regression_names,
+                means=self.normalization_dict["regression_mean"],
+                stds=self.normalization_dict["regression_std"],
+                num_layers=reg_cfg.num_regression_layers,
+                hidden_dim=reg_cfg.hidden_dim,
+                dropout=reg_cfg.dropout,
+                device=self.device,
+            )
+
         # # Initialize the resonance particle condition
         # self.num_resonance_particle_feature = self.event_info.resonance_particle_properties_mean.size(0)
         # self.resonance_particle_properties = (
@@ -173,10 +185,10 @@ class EveNetModel(nn.Module):
         #
         # # [5] Assignment Head
         # self.resonance_particle_embed = nn.Sequential(
-        #     RandomDrop(self.options.Network.feature_drop, self.options.Network.num_feature_keep),
-        #     nn.Linear(self.num_resonance_particle_feature, self.options.Network.hidden_dim),
+        #     RandomDrop(self.network_cfg.Assignment.feature_drop, self.network_cfg.Assignment.num_feature_keep),
+        #     nn.Linear(self.num_resonance_particle_feature, self.network_cfg.Assignment.hidden_dim),
         #     nn.GELU(),
-        #     nn.Linear(self.options.Network.hidden_dim, self.options.Network.hidden_dim)
+        #     nn.Linear(self.network_cfg.Assignment.hidden_dim, self.network_cfg.Assignment.hidden_dim)
         # )
         #
         # # Initialize the assignment head
@@ -184,16 +196,16 @@ class EveNetModel(nn.Module):
         # # [5] Assignment Head
         # self.multiprocess_assign_head = nn.ModuleDict({
         #     topology_name: AssignmentHead(
-        #         split_attention=self.options.Network.split_symmetric_attention,
-        #         hidden_dim=self.options.Network.hidden_dim,
-        #         position_embedding_dim=self.options.Network.position_embedding_dim,
-        #         num_heads=self.options.Network.num_attention_heads,
-        #         transformer_dim_scale=self.options.Network.transformer_dim_scale,
-        #         num_linear_layers=self.options.Network.num_jet_embedding_layers,
-        #         num_encoder_layers=self.options.Network.num_jet_encoder_layers,
-        #         num_detection_layers=self.options.Network.num_detection_layers,
-        #         dropout=self.options.Network.dropout,
-        #         combinatorial_scale=self.options.Network.combinatorial_scale,
+        #         split_attention=self.network_cfg.Assignment.split_symmetric_attention,
+        #         hidden_dim=self.network_cfg.Assignment.hidden_dim,
+        #         position_embedding_dim=self.network_cfg.Assignment.position_embedding_dim,
+        #         num_heads=self.network_cfg.Assignment.num_attention_heads,
+        #         transformer_dim_scale=self.network_cfg.Assignment.transformer_dim_scale,
+        #         num_linear_layers=self.network_cfg.Assignment.num_jet_embedding_layers,
+        #         num_encoder_layers=self.network_cfg.Assignment.num_jet_encoder_layers,
+        #         num_detection_layers=self.network_cfg.Assignment.num_detection_layers,
+        #         dropout=self.network_cfg.Assignment.dropout,
+        #         combinatorial_scale=self.network_cfg.Assignment.combinatorial_scale,
         #         product_names=self.event_info.pairing_topology_category[topology_name]["product_particles"].names,
         #         product_symmetries=self.event_info.pairing_topology_category[topology_name]["product_symmetry"],
         #         softmax_output=True
@@ -272,7 +284,7 @@ class EveNetModel(nn.Module):
         ## Central embedding (PET) ##
         #############################
 
-        global_conditions = self.global_embedding(
+        global_conditions = self.GlobalEmbedding(
             x=global_conditions,
             mask=global_conditions_mask
         )
@@ -287,11 +299,12 @@ class EveNetModel(nn.Module):
         # # event_token_debug = self.point_cloud_transformer(embeddings_debug)
 
         local_points = input_point_cloud[..., self.local_feature_indices]
-        input_point_cloud = self.PET_body(
+        input_point_cloud = self.PET(
             input_features=input_point_cloud,
             input_points=local_points,
             mask=input_point_cloud_mask,
-            time=time)
+            time=time
+        )
 
         # event_token_debug = self.point_cloud_transformer_debug(input_point_cloud + global_conditions)
 
@@ -299,7 +312,7 @@ class EveNetModel(nn.Module):
         ## Embedding for deterministic task ##
         ######################################
 
-        embeddings, embedded_global_conditions, event_token = self.object_encoder(
+        embeddings, embedded_global_conditions, event_token = self.ObjectEncoder(
             encoded_vectors=input_point_cloud,
             mask=input_point_cloud_mask,
             condition_vectors=global_conditions,
@@ -315,15 +328,15 @@ class EveNetModel(nn.Module):
         # Classification head
         classifications = None
         if self.include_classification:
-            classifications = self.class_head(event_token)
+            classifications = self.Classification(event_token)
             # classifications = {"signal": self.debug_classifier(event_token_debug)}
         # Regression head
         regressions = None
-        # if self.include_regression:
-        #     regressions = self.regression_head(event_token)
-        #
-        # # Assignment head
-        # # Create output lists for each particle in event.
+        if self.include_regression:
+            regressions = self.Regression(event_token)
+
+        # Assignment head
+        # Create output lists for each particle in event.
         assignments = dict()
         detections = dict()
         #
@@ -374,3 +387,47 @@ class EveNetModel(nn.Module):
         time = batch['x'].new_ones((batch_size,))
         output = self.forward(batch, time)
         return output
+
+    def freeze_module(self, logical_name: str, cfg: dict):
+        """
+        Freeze parameters of a head using main_modules_name lookup and freeze config.
+
+        Parameters
+        ----------
+        logical_name : str
+            Logical name used in main_modules_name dict (e.g., "classification_head").
+        cfg : dict
+            Configuration dict under that head (from config.Classification etc).
+        """
+        head_module = getattr(self, logical_name, None)
+        if head_module is None:
+            print(f"[Warning] Attribute '{logical_name}' not found")
+            return
+
+        freeze_type = cfg.get("type", "none")
+        components = cfg.get("partial_freeze_components", [])
+
+        if freeze_type == "none":
+            return
+
+        elif freeze_type == "full":
+            for param in head_module.parameters():
+                param.requires_grad = False
+
+        elif freeze_type == "partial":
+            for name, module in head_module.named_modules():
+                if name in components:
+                    for param in module.parameters():
+                        param.requires_grad = False
+
+        elif freeze_type == "random":
+            import random
+            freeze_fraction = cfg.get("freeze_fraction", 0.5)
+            all_params = list(head_module.parameters())
+            num_to_freeze = int(len(all_params) * freeze_fraction)
+            to_freeze = random.sample(all_params, num_to_freeze)
+            for param in to_freeze:
+                param.requires_grad = False
+
+        else:
+            raise ValueError(f"Unsupported freeze type: {freeze_type}")

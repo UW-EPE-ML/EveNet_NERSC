@@ -95,8 +95,8 @@ class EmbeddingStack(nn.Module):
         embeddings = vectors
         for layer in self.embedding_layers:
             embeddings = layer(
-                x = embeddings,
-                sequence_mask = mask
+                x=embeddings,
+                sequence_mask=mask
             )
         return embeddings
 
@@ -134,8 +134,8 @@ class GlobalVectorEmbedding(nn.Module):
         # --------------------------------
         embeddings = x.contiguous()
         encoded = self.embedding_stack(
-            vectors = embeddings,
-            mask = mask
+            vectors=embeddings,
+            mask=mask
         )
 
         # ----------------------------
@@ -206,10 +206,10 @@ class LocalEmbeddingLayer(nn.Module):
         local_features = x.contiguous()
         for idx, local_embed in enumerate(self.local_embed_layer):
             local_features = local_embed(
-                points = coord_shift + points,
-                features = local_features
+                points=coord_shift + points,
+                features=local_features
             )  # [B, T, D]
-            points = local_features # tihsu TODO: add mask ?
+            points = local_features  # tihsu TODO: add mask ?
 
         return local_features * mask.float()
 
@@ -228,8 +228,8 @@ class LocalEmbeddingBlock(nn.Module):
         )
 
     def pairwise_distance(self, points):
-        r = torch.sum(points * points, dim=2, keepdim=True) # [B, T, D]
-        m = torch.bmm(points, points.transpose(1, 2)) # [B, T, D] x [B, D, T] -> [B, T, T]
+        r = torch.sum(points * points, dim=2, keepdim=True)  # [B, T, D]
+        m = torch.bmm(points, points.transpose(1, 2))  # [B, T, D] x [B, D, T] -> [B, T, T]
         D = r - 2 * m + r.transpose(1, 2) + 1e-5
         return D
 
@@ -248,7 +248,8 @@ class LocalEmbeddingBlock(nn.Module):
         # Gather neighbor features
         neighbors = features[
             indices[:, :, :, 0], indices[:, :, :, 1]]  # Shape: (N, P, K, C) | neighbors: torch.Size([64, 150, 10, 13])
-        knn_fts_center = features.unsqueeze(2).expand_as(neighbors)  # Shape: (N, P, K, C) | knn fts center: torch.Size([64, 150, 10, 13])
+        knn_fts_center = features.unsqueeze(2).expand_as(
+            neighbors)  # Shape: (N, P, K, C) | knn fts center: torch.Size([64, 150, 10, 13])
         local_features = torch.cat([neighbors - knn_fts_center, knn_fts_center],
                                    dim=-1)  # local_features: torch.Size([N, P, K, 26]) local_features.shape[-1] Shape : 2*C
 
@@ -323,17 +324,17 @@ class PETBody(nn.Module):
             points = input_points
             local_features = input_features
             local_features = self.local_embedding(
-                x = local_features,
-                points = points,
-                mask = mask
+                x=local_features,
+                points=points,
+                mask=mask
             )
             encoded = local_features + encoded  # Combine with original features
 
         skip_connection = encoded.contiguous()
         for transformer_block in self.transformer_blocks:
             encoded = transformer_block(
-                x = encoded,
-                mask = mask
+                x=encoded,
+                mask=mask
             )
 
         return torch.add(encoded, skip_connection)
@@ -353,9 +354,11 @@ class PositionEmbedding(nn.Module):
 
 
 class CombinedEmbedding(nn.Module):
-    def __init__(self,
-                 hidden_dim,
-                 position_embedding_dim):
+    def __init__(
+            self,
+            hidden_dim,
+            position_embedding_dim
+    ):
         super(CombinedEmbedding, self).__init__()
         self.hidden_dim = hidden_dim
         self.position_embedding_dim = position_embedding_dim
