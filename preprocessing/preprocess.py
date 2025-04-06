@@ -102,6 +102,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
     regression_keys, regression_key_map = generate_regression_names(global_config.event_info)
+    unique_process_ids = sorted(set(v['process_id'] for v in global_config.process_info.values()))
 
     shape_metadata = None
 
@@ -153,6 +154,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         }
 
         flattened_data, meta_data = flatten_dict(process_data)
+        # Count the number of unique processes
+        # class_counts = np.bincount(process_data['classification'], minlength=len(unique_process_ids))
+        # Or simply use the process ID and set the length of the array to the number of unique processes
+        class_counts = np.zeros(len(unique_process_ids), dtype=np.int32)
+        class_counts[process_info[process]['process_id']] = len(process_data['classification'])
 
         if shape_metadata is None:
             shape_metadata = meta_data
@@ -169,6 +175,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             conditions=process_data['conditions'],
             regression=process_data['regression-data'],
             num_vectors=process_data['num_sequential_vectors'],
+            class_counts=class_counts,
         )
         
     if len(converted_data) == 0:
