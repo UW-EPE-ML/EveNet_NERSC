@@ -103,7 +103,7 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict['class_balance'].to(device=self.device)
+        self.class_weight = self.normalization_dict['class_balance']
 
         print(f"{self.__class__.__name__} initialized")
 
@@ -144,7 +144,7 @@ class EveNetEngine(L.LightningModule):
             cls_loss = self.cls_loss(
                 cls_output,
                 target_classification,
-                class_weight=self.class_weight,
+                class_weight=self.class_weight.to(device=device),
             )
             loss = loss + cls_loss * self.classification_cfg.loss_scale
             loss_dict["classification_loss"] = cls_loss
