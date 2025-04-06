@@ -23,6 +23,8 @@ def compute_effective_counts_from_freq(freqs: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Class weights normalized so that sum ≈ number of classes.
     """
+    # TODO: check numerical stability
+
     freqs = freqs.astype(np.longdouble)
     N = freqs.sum()
     if N == 0:
