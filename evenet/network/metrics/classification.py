@@ -147,10 +147,10 @@ class ClassificationMetrics:
                     label = f"{class_names[cls]} (True, Train)" if cls == true_cls else f"{class_names[cls]} (Train)"
 
                     if cls == true_cls:
-                        plt.bar(bin_centers, train_density, width=bin_widths, color=color, alpha=0.75, label=None,
+                        plt.bar(bin_centers, train_density, width=bin_widths, color=color, alpha=0.85, label=None,
                                 edgecolor='black')
                     else:
-                        plt.bar(bin_centers, train_density, width=bin_widths, color=color, alpha=0.4,
+                        plt.bar(bin_centers, train_density, width=bin_widths, color=color, alpha=0.7,
                                 label=None, edgecolor=color, fill=False)
 
                 # Plot validation histogram (lines with markers)
@@ -159,7 +159,12 @@ class ClassificationMetrics:
                     val_density = val_counts / (np.sum(val_counts) * bin_widths)
                     color = colors[cls % len(colors)]
                     label = f"{class_names[cls]} (True)" if cls == true_cls else f"{class_names[cls]}"
-                    plt.plot(bin_centers, val_density, marker='o', linestyle='-', color=color, label=label)
+                    plt.plot(
+                        bin_centers, val_density, color=color, label=label,
+                        linestyle='-' if cls == true_cls else '--',
+                        marker='o' if cls == true_cls else 'x',
+                        linewitdh=2 if cls == true_cls else 1,
+                    )
 
             title = f"True Class {class_names[true_cls] if class_names else true_cls}"
             plt.title(f"{title}: Softmax Score Distribution (Train vs Val)")
