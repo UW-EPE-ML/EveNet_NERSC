@@ -1,7 +1,9 @@
+from typing import Callable
 from collections import defaultdict
 
 import numpy as np
 import torch
+import wandb
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -9,6 +11,7 @@ import torch.nn.functional as F
 
 class ClassificationMetrics:
     def __init__(self, num_classes, device, normalize=False, num_bins=50):
+        self.train_hist_store = None
         self.device = device
         self.num_classes = num_classes
         self.normalize = normalize
@@ -20,12 +23,10 @@ class ClassificationMetrics:
         self.bins = np.linspace(0, 1, num_bins + 1)
         self.hist_store = np.zeros((self.num_classes, self.num_classes, num_bins), dtype=np.int64)
 
-    def update(self, y_true, y_pred_raw):
-        if isinstance(y_true, torch.Tensor):
-            y_true = y_true.detach().cpu().numpy()
-        if isinstance(y_pred_raw, torch.Tensor):
-            y_pred = y_pred_raw.argmax(dim=-1).detach().cpu().numpy()
-            logits = y_pred_raw.detach().cpu()
+    def update(self, y_true: torch.Tensor, y_pred_raw: torch.Tensor):
+        y_true = y_true.detach().cpu().numpy()
+        y_pred = y_pred_raw.argmax(dim=-1).detach().cpu().numpy()
+        logits = y_pred_raw.detach().cpu()
 
         # Filter out ignored targets like -1 (often used for masking)
         valid = y_true >= 0
@@ -93,6 +94,9 @@ class ClassificationMetrics:
             cm = np.nan_to_num(cm / row_sums)
         return cm
 
+    def assign_train_result(self, train_hist_store=None):
+        self.train_hist_store = train_hist_store
+
     def plot_cm(self, class_names=None, cmap="Blues", normalize=True):
         cm = self.compute() if normalize else self.matrix
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -119,12 +123,11 @@ class ClassificationMetrics:
         fig.tight_layout()
         return fig
 
-    def plot_logits(self, class_names, train_hist_store=None):
+    def plot_logits(self, class_names):
         results = {}
 
         # Use training store if provided, else default to self.hist_store
-        if train_hist_store is None:
-            train_hist_store = self.hist_store
+        train_hist_store = self.train_hist_store if self.train_hist_store is not None else self.hist_store
 
         # Custom color palette (max 10 classes)
         colors = [
@@ -163,8 +166,8 @@ class ClassificationMetrics:
                         bin_centers, val_density, color=color, label=label,
                         linestyle='-' if cls == true_cls else '--',
                         marker='o' if cls == true_cls else 'x',
-                        linewidth=2 if cls == true_cls else 1,
-                        markersize=4 if cls == true_cls else 2,
+                        linewidth=3 if cls == true_cls else 2,
+                        markersize=6 if cls == true_cls else 4,
                     )
 
             title = f"True Class {class_names[true_cls] if class_names else true_cls}"
@@ -178,3 +181,63 @@ class ClassificationMetrics:
             results[true_cls] = fig
 
         return results
+
+
+def shared_step(
+        target_classification: torch.Tensor,
+        cls_output: torch.Tensor,
+        cls_loss_fn: Callable,
+        class_weight: torch.Tensor,
+        loss_dict: dict,
+        loss_scale: float,
+        metrics: ClassificationMetrics,
+        device: torch.device,
+):
+    cls_loss = cls_loss_fn(
+        cls_output,
+        target_classification,
+        class_weight=class_weight.to(device=device),
+    )
+    loss = cls_loss * loss_scale
+    loss_dict["classification_loss"] = cls_loss
+
+    metrics.update(
+        y_true=target_classification,
+        y_pred_raw=cls_output
+    )
+
+    return loss
+
+
+def shared_epoch_end(
+        global_rank,
+        metrics_valid: ClassificationMetrics,
+        metrics_train: ClassificationMetrics,
+        num_classes: list[str],
+
+        logger,
+):
+    metrics_valid.reduce_across_gpus()
+    if metrics_train:
+        metrics_train.reduce_across_gpus()
+
+    if global_rank == 0:
+        metrics_valid.assign_train_result(
+            train_hist_store=metrics_train.hist_store if metrics_train else None,
+        )
+
+        fig_cm = metrics_valid.plot_cm(class_names=num_classes)
+        logger.log({"classification/CM": wandb.Image(fig_cm)})
+        plt.close(fig_cm)
+
+        fig_logits = metrics_valid.plot_logits(class_names=num_classes)
+        for i, class_name in enumerate(num_classes):
+            logger.log({
+                f"classification/logits_{class_name}": wandb.Image(fig_logits[i])
+            })
+            plt.close(fig_logits[i])
+
+    metrics_valid.reset(cm=True, logits=True)
+    if metrics_train:
+        metrics_train.reset(cm=True, logits=True)
+

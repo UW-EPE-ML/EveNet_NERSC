@@ -14,6 +14,7 @@ from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
 from evenet.network.metrics.classification import ClassificationMetrics
+from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 import re
 
@@ -24,7 +25,7 @@ class EveNetEngine(L.LightningModule):
         self.classification_metrics_train = None
         self.classification_metrics_valid = None
         self.model_parts = {}
-        self.model: EveNetModel = None
+        self.model: Union[EveNetModel, None] = None
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
@@ -106,7 +107,6 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
         self.class_weight = self.normalization_dict['class_balance']
-
         print(f"{self.__class__.__name__} initialized")
 
     def forward(self, x):
@@ -124,15 +124,6 @@ class EveNetEngine(L.LightningModule):
             if key in self.input_keys
         }
 
-        target_classification = None
-        if self.classification_cfg.include:
-            target_classification = batch[self.target_classification_key].to(device=device)
-
-        target_regression, target_regression_mask = None, None
-        if self.regression_cfg.include:
-            target_regression = batch[self.target_regression_key].to(device=device)
-            target_regression_mask = batch[self.target_regression_mask_key].to(device=device)
-
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,
@@ -141,28 +132,22 @@ class EveNetEngine(L.LightningModule):
         loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
         loss_dict = {}
         if self.classification_cfg.include:
-            cls_output = next(iter(outputs["classification"].values()))
-
-            cls_loss = self.cls_loss(
-                cls_output,
-                target_classification,
+            scaled_cls_loss = cls_step(
+                target_classification=batch[self.target_classification_key].to(device=device),
+                cls_output=next(iter(outputs["classification"].values())),
+                cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
+                loss_dict=loss_dict,
+                loss_scale=self.classification_cfg.loss_scale,
+                metrics=self.classification_metrics_train if self.training else self.classification_metrics_valid,
+                device=device,
             )
-            loss = loss + cls_loss * self.classification_cfg.loss_scale
-            loss_dict["classification_loss"] = cls_loss
 
-            if not self.training:
-                self.classification_metrics_valid.update(
-                    y_true=target_classification,
-                    y_pred_raw=cls_output
-                )
-            else:
-                self.classification_metrics_train.update(
-                    y_true=target_classification,
-                    y_pred_raw=cls_output
-                )
+            loss = loss + scaled_cls_loss
 
         if self.regression_cfg.include:
+            target_regression = batch[self.target_regression_key].to(device=device)
+            target_regression_mask = batch[self.target_regression_mask_key].to(device=device)
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
             reg_loss = self.reg_loss(
@@ -237,39 +222,18 @@ class EveNetEngine(L.LightningModule):
             )
 
     def on_validation_epoch_end(self) -> None:
-        # Implement your logic for the end of the validation epoch here
         if self.classification_cfg.include:
-            self.classification_metrics_valid.reduce_across_gpus()
-            if self.global_rank == 0:
-                fig_cm = self.classification_metrics_valid.plot_cm(class_names=self.num_classes)
-                self.logger.experiment.log({"classification/valid_CM": wandb.Image(fig_cm)})
-                plt.close(fig_cm)
+            cls_end(
+                global_rank=self.global_rank,
+                metrics_valid=self.classification_metrics_valid,
+                metrics_train=self.classification_metrics_train,
+                num_classes=self.num_classes,
+                logger=self.logger.experiment,
+            )
 
-                fig_logits = self.classification_metrics_valid.plot_logits(
-                    class_names=self.num_classes,
-                    train_hist_store=self.classification_metrics_train.hist_store if self.classification_metrics_train else None,
-                )
-                for i, class_name in enumerate(self.num_classes):
-                    self.logger.experiment.log({
-                        f"classification/valid_logits_{class_name}": wandb.Image(fig_logits[i])
-                    })
-                    plt.close(fig_logits[i])
-
-            self.classification_metrics_valid.reset(cm=True, logits=True)
-            if self.classification_metrics_train:
-                self.classification_metrics_train.reset(cm=True, logits=True)
 
     def on_train_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here
-        if self.classification_cfg.include:
-            self.classification_metrics_train.reduce_across_gpus()
-            if self.global_rank == 0:
-                fig_cm = self.classification_metrics_train.plot_cm(class_names=self.num_classes)
-                self.logger.experiment.log({"classification/train_CM": wandb.Image(fig_cm)})
-                plt.close(fig_cm)
-
-            self.classification_metrics_train.reset(cm=True, logits=False)
-
         pass
 
     def backward(self, loss, *args, **kwargs):
