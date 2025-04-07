@@ -109,6 +109,9 @@ class EveNetEngine(L.LightningModule):
         self.class_weight = self.normalization_dict['class_balance']
         print(f"{self.__class__.__name__} initialized")
 
+        ###### Last ######
+        # self.save_hyperparameters()
+
     def forward(self, x):
         return self.model(x)
 

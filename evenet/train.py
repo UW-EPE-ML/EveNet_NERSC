@@ -117,7 +117,17 @@ def train_func(cfg):
 
     trainer = prepare_trainer(trainer)
 
-    trainer.fit(model, train_dataloaders=train_ds_loader, val_dataloaders=val_ds_loader)
+    ckpt_path = None
+    if global_config.options.Training.model_checkpoint_load_path is not None:
+        ckpt_path = global_config.options.Training.model_checkpoint_load_path
+        print(f"Loading checkpoint from {ckpt_path}")
+
+    trainer.fit(
+        model,
+        train_dataloaders=train_ds_loader,
+        val_dataloaders=val_ds_loader,
+        ckpt_path=ckpt_path,
+    )
 
 
 def register_dataset(parquet_files: list[str], process_event_batch_partial, platform_info) -> tuple[Dataset, int]:
