@@ -101,12 +101,17 @@ class ClassificationMetrics:
         self.train_matrix = train_matrix
 
     def plot_cm(self, class_names, normalize=True):
-        # Define the start and end hex colors
-        start_hex = "#FDDCE4"  # light pink
-        end_hex = "#6453A1"  # dark purple
+        # --- Teal-Navy gradient colormap ---
+        gradient_colors = ("#D1FAE5", "#1E3A8A")
+        cmap = mcolors.LinearSegmentedColormap.from_list("teal_navy", gradient_colors)
 
-        # Create a custom colormap
-        custom_cmap = mcolors.LinearSegmentedColormap.from_list("custom_gradient", [start_hex, end_hex])
+        # --- Text colors for contrast ---
+        text_colors = {
+            "train_light": "#1E6B74",
+            "train_dark": "#70E1E1",
+            "valid_light": "#832424",
+            "valid_dark": "#FFB4A2"
+        }
 
         cm_valid = self.compute(self.matrix) if normalize else self.matrix
 
@@ -116,7 +121,7 @@ class ClassificationMetrics:
             cm_train = self.compute(self.train_matrix) if normalize else self.train_matrix
 
         fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(cm_valid, interpolation="nearest", cmap=custom_cmap)
+        im = ax.imshow(cm_valid, interpolation="nearest", cmap=cmap)
         plt.colorbar(im, ax=ax)
 
         tick_marks = np.arange(self.num_classes)
@@ -126,24 +131,27 @@ class ClassificationMetrics:
         ax.set_yticklabels(class_names or tick_marks)
 
         fmt = ".2f" if normalize else "d"
-        thresh = cm_valid.max() / 2.0
 
         for i in range(self.num_classes):
             for j in range(self.num_classes):
-                y_offset = 0.12 if cm_train is not None else 0.0
+
+                cell_val = cm_valid[i, j]
+                bg_val = cell_val / cm_valid.max()  # normalized background for contrast logic
+
+                # Choose adaptive colors
+                train_color = text_colors["train_dark"] if bg_val > 0.5 else text_colors["train_light"]
+                valid_color = text_colors["valid_dark"] if bg_val > 0.5 else text_colors["valid_light"]
+
+                y_offset = 0.15 if cm_train is not None else 0.0
+
                 if cm_train is not None:
                     ax.text(j, i - y_offset, format(cm_train[i, j], fmt),
-                            ha="center", va="center", fontsize=12,
-                            color="#D4352D",
-                            )
+                            ha="center", va="center", color=train_color, fontsize=11)
                     ax.text(j, i + y_offset, format(cm_valid[i, j], fmt),
-                            ha="center", va="center", fontsize=12,
-                            color="#98C897",
-                            )
+                            ha="center", va="center", color=valid_color, fontsize=11)
                 else:
                     ax.text(j, i, format(cm_valid[i, j], fmt),
-                            ha="center", va="center",
-                            color=start_hex if cm_valid[i, j] > thresh else end_hex)
+                            ha="center", va="center", color=valid_color, fontsize=11)
 
         ax.set_xlabel("Predicted label")
         ax.set_ylabel("True label")
