@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 class ClassificationMetrics:
     def __init__(self, num_classes, device, normalize=False, num_bins=50):
+        self.train_matrix = None
         self.train_hist_store = None
         self.device = device
         self.num_classes = num_classes
@@ -86,33 +87,25 @@ class ClassificationMetrics:
             torch.distributed.all_reduce(hist_store, op=torch.distributed.ReduceOp.SUM)
             self.hist_store = hist_store.cpu().numpy()
 
-    def compute(self):
+    def compute(self, matrix=None):
         """Return normalized or raw matrix"""
-        cm = self.matrix.astype(np.float64)
+        cm = matrix.astype(np.float64)
         if self.normalize:
             row_sums = cm.sum(axis=1, keepdims=True)
             cm = np.nan_to_num(cm / row_sums)
         return cm
 
-    def assign_train_result(self, train_hist_store=None):
+    def assign_train_result(self, train_hist_store=None, train_matrix=None):
         self.train_hist_store = train_hist_store
+        self.train_matrix = train_matrix
 
     def plot_cm(self, class_names, cmap="Blues", normalize=True):
-        import matplotlib.pyplot as plt
-        import numpy as np
-        from sklearn.metrics import confusion_matrix
-
-        cm_valid = self.compute() if normalize else self.matrix
+        cm_valid = self.compute(self.matrix) if normalize else self.matrix
 
         # Optional: Compute train confusion matrix
         cm_train = None
-        if self.train_hist_store is not None:
-            train_preds = self.train_hist_store["preds"]
-            train_labels = self.train_hist_store["targets"]
-            cm_train = confusion_matrix(
-                train_labels, train_preds,
-                normalize="true" if normalize else None
-            )
+        if self.train_matrix is not None:
+            cm_train = self.compute(self.train_matrix) if normalize else self.train_matrix
 
         fig, ax = plt.subplots(figsize=(10, 8))
         im = ax.imshow(cm_valid, interpolation="nearest", cmap=cmap)
@@ -247,6 +240,8 @@ def shared_epoch_end(
     if global_rank == 0:
         metrics_valid.assign_train_result(
             train_hist_store=metrics_train.hist_store if metrics_train else None,
+            train_pred=metrics_train.train_pred if metrics_train else None,
+            train_labels=metrics_train.train_labels if metrics_train else None,
         )
 
         fig_cm = metrics_valid.plot_cm(class_names=num_classes)
