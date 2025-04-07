@@ -138,7 +138,7 @@ class DebugHookManager:
 ## Debug configuration ##
 ########################
 
-wandb_enable = True
+wandb_enable = False
 n_epoch = 10
 debugger_enable = False
 

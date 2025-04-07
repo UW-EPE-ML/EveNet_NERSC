@@ -15,8 +15,8 @@ from transformers import get_cosine_schedule_with_warmup
 from evenet.network.evenet_model import EveNetModel
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
-from evenet.utilities.group_theory import complete_indices, symmetry_group
-import re
+from evenet.network.metrics.assigment import get_assignment_necessaries as get_ass
+from evenet.network.metrics.assigment import shared_step as ass_step
 
 
 class EveNetEngine(L.LightningModule):
@@ -45,30 +45,13 @@ class EveNetEngine(L.LightningModule):
         self.assignment_cfg = self.component_cfg.Assignment
 
         ###### Initialize Assignment Necessaries ######
-        print("configure permutation indices")
-        self.permutation_indices = dict()
-        self.num_targets = dict()
-        # event_info = global_config.event_info
-        # for process in event_info.process_names:
-        #     self.permutation_indices[process] = []
-        #     self.num_targets[process] = []
-        #     for event_particle_name, product_symmetry in event_info.product_symmetries[process].items():
-        #         topology_name = ''.join(event_info.product_particles[process][event_particle_name].names)
-        #         topology_name = f"{event_particle_name}/{topology_name}"
-        #         topology_name = re.sub(r'\d+', '', topology_name)
-        #         permutation_indices = complete_indices(
-        #             event_info.pairing_topology_category[topology_name]["product_symmetry"].degree,
-        #             event_info.pairing_topology_category[topology_name]["product_symmetry"].permutations
-        #         )
-        #         permutation_group = symmetry_group(permutation_indices)
-        #         self.permutation_indices[process].append(
-        #             permutation_indices
-        #         )
-        #         self.num_targets[process].append(len(permutation_group))
-        #
-        # for process, event_permutation_group in event_info.event_permutation_group.items():
-        #     event_permutation_group = np.array(event_permutation_group)
-        #     self.event_permutation_tensor[process] = torch.tensor(event_permutation_group, device=self.device)
+        self.ass_loss_args = None
+        if self.assignment_cfg.include:
+            print("configure permutation indices")
+            self.permutation_indices = dict()
+            self.num_targets = dict()
+
+            self.ass_loss_args = get_ass(global_config.event_info)
 
         ###### Initialize Loss ######
         self.cls_loss = None
@@ -83,15 +66,15 @@ class EveNetEngine(L.LightningModule):
             self.reg_loss = reg_loss.loss
             print(f"{self.__class__.__name__} regression loss initialized")
 
-        self.assignment_loss = None
-        # if self.assignment_cfg.include:
-        #     import evenet.network.loss.assignment as ass_loss
-        #     assignment_loss_partial = partial(
-        #         ass_loss.loss,
-        #         permutation_indices=permutation_indices,
-        #         num_targets=num_targets
-        #     )
-        #     self.assignment_loss = assignment_loss_partial
+        self.ass_loss = None
+        if self.assignment_cfg.include:
+            import evenet.network.loss.assignment as ass_loss
+            assignment_loss_partial = partial(
+                ass_loss.loss,
+                focal_gamma=0.1,
+                **self.ass_loss_args
+            )
+            self.ass_loss = assignment_loss_partial
 
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
@@ -107,6 +90,7 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
         self.class_weight = self.normalization_dict['class_balance']
+        self.assignment_weight = self.normalization_dict['particle_balance']
         print(f"{self.__class__.__name__} initialized")
 
         ###### Last ######
@@ -160,6 +144,18 @@ class EveNetEngine(L.LightningModule):
             )
             loss = loss + reg_loss * self.regression_cfg.loss_scale
             loss_dict["regression_loss"] = reg_loss
+
+        if self.assigment_cfg.include:
+            ass_targets = batch["assignments-indices"].to(device=device)
+            ass_targets_mask = batch["assignments-mask"].to(device=device)
+            scaled_ass_loss = ass_step(
+                ass_loss_fn=self.ass_loss,
+                process_names=self.config.event_info.process_names,
+                assignments=outputs["assignments"],
+                detections=outputs["detections"],
+                targets=ass_targets,
+                targets_mask=ass_targets_mask,
+            )
 
         return loss, loss_dict
 
@@ -233,7 +229,6 @@ class EveNetEngine(L.LightningModule):
                 num_classes=self.num_classes,
                 logger=self.logger.experiment,
             )
-
 
     def on_train_epoch_end(self) -> None:
         # Implement your logic for the end of the validation epoch here

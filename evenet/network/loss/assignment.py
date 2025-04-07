@@ -1,5 +1,3 @@
-from evenet.control import event_info
-from evenet.control.event_info import EventInfo
 from collections import OrderedDict
 import torch
 import numpy as np
@@ -68,25 +66,24 @@ def particle_symmetric_loss(assignment: Tensor,
     ))
 
 
-def compute_symmetric_losses(assignments: List[Tensor],
-                             detections: List[Tensor],
-                             targets: List[Tensor],
-                             process: str,
-                             event_permutation_tensor: Dict,
-                             focal_gamma: float,
-                             assignment_loss_scale: float,
-                             detection_loss_scale: float) -> Tensor:
-    symmetric_losses = []
-    for permutation in event_permutation_tensor[process].cpu().numpy():
-        current_permutation_loss = tuple(
-            particle_symmetric_loss(assignment, detection, target, mask, focal_gamma, assignment_loss_scale,
-                                    detection_loss_scale)
-            for assignment, detection, (target, mask)
-            in zip(assignments, detections, targets[permutation])
-        )
-        symmetric_losses.append(torch.stack(current_permutation_loss))
-    return torch.stack(symmetric_losses)
 
+def compute_symmetric_losses(
+        assignments: List[Tensor],
+        targets: List[Tensor],
+        targets_mask: List[Tensor],
+        focal_gamma: float
+) -> Tensor:
+    # For current encoder structure, the event permutation is already embedded in the model structure, so no need for
+    # specific event permutation here.
+
+    # for permutation in event_permutation_tensor[process]:
+
+    current_permutation_loss = tuple(
+        assignment_cross_entropy_loss(assignment, target, mask, focal_gamma)
+        for assignment, target, mask
+        in zip(assignments, targets, targets_mask)
+    )
+    return torch.stack(current_permutation_loss)  # [num_particles, B]
 
 def combine_symmetric_losses(symmetric_losses: Tensor,
                              combine_pair_loss: str):
@@ -103,32 +100,24 @@ def combine_symmetric_losses(symmetric_losses: Tensor,
 
     return combined_loss, index
 
-
-def symmetric_loss(assignments: List[Tensor],
-                   detections: List[Tensor],
-                   targets: List[Tensor],
-                   process: str,
-                   combine_pair_loss: str,
-                   num_targets: Dict,
-                   event_permutation_tensor: Dict,
-                   focal_gamma: float,
-                   assignment_loss_scale: float,
-                   detection_loss_scale: float
-                   ) -> Tuple[Tensor, Tensor]:
-    symmetric_losses_summary = OrderedDict()
-    assignments = [prediction + torch.log(torch.scalar_tensor(num_target))
-                   for prediction, num_target in zip(assignments, num_targets[process])]
-    targets = numpy_tensor_array(targets)
-
-    symmetric_losses = compute_symmetric_losses(assignments,
-                                                detections,
-                                                targets,
-                                                process,
-                                                event_permutation_tensor,
-                                                focal_gamma,
-                                                assignment_loss_scale,
-                                                detection_loss_scale)
-    return combine_symmetric_losses(symmetric_losses, combine_pair_loss)
+def symmetric_loss(
+        assignments: List[Tensor],
+        targets: List[Tensor],
+        targets_mask: List[Tensor],
+        num_targets: List[int],
+        focal_gamma: float,
+) -> Tuple[Tensor, Tensor]:
+    assignments = [
+        prediction + torch.log(torch.scalar_tensor(num_target))
+        for prediction, num_target in zip(assignments, num_targets)
+    ]
+    symmetric_losses = compute_symmetric_losses(
+        assignments,
+        targets,
+        targets_mask,
+        focal_gamma
+    )
+    return symmetric_losses
 
 
 def loss(assignments: List[Tensor],

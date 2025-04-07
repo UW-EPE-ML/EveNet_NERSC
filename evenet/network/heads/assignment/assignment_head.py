@@ -10,24 +10,28 @@ from evenet.network.heads.assignment.symmetric_attention import SymmetricAttenti
 from evenet.network.heads.classification.classification_head import BranchLinear
 from evenet.utilities.masked_softmax_no_gradient import masked_log_softmax
 
+
 class AssignmentHead(nn.Module):
     WEIGHTS_INDEX_NAMES = "ijklmn"
     DEFAULT_JET_COUNT = 16
 
-    def __init__(self,
-                 split_attention: bool,
-                 hidden_dim: int,
-                 position_embedding_dim: int,
-                 num_heads: int,
-                 transformer_dim_scale: float,
-                 num_linear_layers: int,
-                 num_encoder_layers: int,
-                 num_detection_layers: int,
-                 dropout: float,
-                 combinatorial_scale: float,
-                 product_names: List[str],
-                 product_symmetries: Symmetries,
-                 softmax_output: bool = True):
+    def __init__(
+            self,
+            split_attention: bool,
+            hidden_dim: int,
+            position_embedding_dim: int,
+            num_heads: int,
+            transformer_dim_scale: float,
+            num_linear_layers: int,
+            num_encoder_layers: int,
+            num_detection_layers: int,
+            dropout: float,
+            combinatorial_scale: float,
+            product_names: List[str],
+            product_symmetries: Symmetries,
+            detection_output_dim: int = 1,
+            softmax_output: bool = True
+    ):
         super(AssignmentHead, self).__init__()
 
         self.degree = product_symmetries.degree
@@ -60,12 +64,12 @@ class AssignmentHead(nn.Module):
         )
 
         self.detection_classifier = BranchLinear(
-                num_layers=num_detection_layers,
-                hidden_dim=hidden_dim,
-                num_outputs=1,
-                dropout=dropout,
-                batch_norm=True
-            )
+            num_layers=num_detection_layers,
+            hidden_dim=hidden_dim,
+            num_outputs=detection_output_dim,
+            dropout=dropout,
+            batch_norm=True
+        )
 
         self.num_targets = len(self.attention.permutation_group)
         self.permutation_indices = self.attention.permutation_indices
@@ -74,12 +78,12 @@ class AssignmentHead(nn.Module):
         self.diagonal_mask_operation = self.create_diagonal_mask_operation()
         self.diagonal_mask = {}
 
-
     def create_padding_mask_operation(self):
         weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]
         operands = ','.join(map(lambda x: 'b' + x, weights_index_names))
         expression = f"{operands}->b{weights_index_names}"
         return expression
+
     def create_diagonal_mask_operation(self):
             weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]
             operands = ','.join(map(lambda x: 'b' + x, weights_index_names))
@@ -147,7 +151,11 @@ class AssignmentHead(nn.Module):
         # particle_vectors : (batch_size, num_vectors, hidden_dim)
         # ------------------------------------------------------
 
-        encoded_vectors, encoded_global_cond, particle_vector = self.encoder(point_cloud, point_cloud_mask, global_condition, global_condition_mask, cond_vector)
+        encoded_vectors, encoded_global_cond, particle_vector = self.encoder(
+            point_cloud, point_cloud_mask,
+            global_condition, global_condition_mask,
+            cond_vector
+        )
 
         # -----------------------------------------------
         # Run the encoded vectors through the classifier.
@@ -171,10 +179,10 @@ class AssignmentHead(nn.Module):
         # assignment_mask : [TS, TS, ...]
         # --------------------------------------------------------------------
         assignment, daughter_vectors = self.attention(
-            x = sequential_particle_vectors,
-            x_mask = sequential_sequence_mask,
-            condition = global_condition,
-            condition_mask = global_condition_mask
+            x=sequential_particle_vectors,
+            x_mask=sequential_sequence_mask,
+            condition=global_condition,
+            condition_mask=global_condition_mask
         )
 
         assignment_mask = self.create_output_mask(assignment, sequential_sequence_mask)
