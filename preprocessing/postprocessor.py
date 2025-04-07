@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from decimal import Decimal, getcontext
+from collections import OrderedDict
 
 
 def masked_stats(arr):
@@ -148,10 +149,96 @@ def merge_stats(stats_list):
     }
     return result
 
+def merge_assignment_masks(list_of_assignment_masks):
+    # assignment_mask: dict[str -> list[dict[str -> np.ndarray]]]
+    merged = {}
+
+    all_processes = list_of_assignment_masks[0].keys()
+
+    for process in all_processes:
+        collected_dicts = []
+        for am in list_of_assignment_masks:
+            if process in am:
+                collected_dicts.extend(am[process])
+
+        # merge list of dicts → dict of concatenated arrays
+        if not collected_dicts:
+            merged[process] = {}
+            continue
+
+        keys = collected_dicts[0].keys()
+        temp = {k: [] for k in keys}
+        for d in collected_dicts:
+            for k in keys:
+                temp[k].append(d[k])
+        merged[process] = {k: np.concatenate(v, axis=0) for k, v in temp.items()}
+
+    return merged
+
+def compute_particle_balance(merged_assignment_masks, event_equivalence_classes):
+    particle_balance = OrderedDict()
+    common_processes = set(merged_assignment_masks.keys()) & set(event_equivalence_classes.keys())
+    for process in common_processes:
+        assignment_masks = merged_assignment_masks[process]
+
+        if not assignment_masks:
+            print(f"[compute_particle_balance] Skipping process '{process}' (empty assignment masks)")
+            continue
+
+        # Check that all values are torch/numpy arrays with matching length
+        keys = list(assignment_masks.keys())
+        lengths = [len(v) for v in assignment_masks.values()]
+        if len(set(lengths)) != 1:
+            raise ValueError(f"[{process}] Inconsistent mask lengths: {dict(zip(keys, lengths))}")
+
+        # Build tensor: shape (num_targets, num_events)
+        try:
+            masks = torch.stack([torch.tensor(assignment_masks[k], dtype=torch.bool) for k in keys])
+        except Exception as e:
+            raise RuntimeError(f"[{process}] Failed to stack assignment masks: {e}")
+
+        num_targets = len(keys)
+        num_events = masks.shape[1]
+        full_targets = frozenset(range(num_targets))
+
+        # Start computing equivalence class weights
+        eq_class_counts = {}
+
+        for eq_class in event_equivalence_classes[process]:
+            eq_class_count = 0
+            for positive_target in eq_class:
+                negative_target = full_targets - positive_target
+
+                positive_target = masks[list(positive_target), :].all(0)
+                negative_target = masks[list(negative_target), :].any(0)
+                targets = positive_target & ~negative_target
+
+                eq_class_count += targets.sum().item()
+            eq_class_counts[eq_class] = eq_class_count + 1
+
+        # Compute class-balanced weights
+        beta = 1 - (10 ** -np.log10(num_events))
+        eq_class_weights = {key: (1 - beta) / (1 - (beta ** value)) for key, value in eq_class_counts.items()}
+        target_weights = {target: weight for eq_class, weight in eq_class_weights.items() for target in eq_class}
+
+        # Create bitmask index tensor and weight tensor
+        index_tensor = 2 ** torch.arange(num_targets)
+        target_weights_tensor = torch.zeros(2 ** num_targets)
+
+        norm = sum(eq_class_weights.values())
+        for target, weight in target_weights.items():
+            index = index_tensor[list(target)].sum()
+            target_weights_tensor[index] = len(eq_class_weights) * weight / norm
+
+        particle_balance[process] = (index_tensor, target_weights_tensor)
+
+    return particle_balance
 
 class PostProcessor:
-    def __init__(self):
+    def __init__(self, global_config):
         self.stats = []
+        self.assignment_mask = {p: [] for p in global_config.process_info}
+        self.event_equivalence_classes = global_config.event_info.event_equivalence_classes
 
     def add(self, x, conditions, regression, num_vectors, class_counts):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]))
@@ -166,6 +253,9 @@ class PostProcessor:
             "class_counts": class_counts,
         })
 
+    def add_assignment_mask(self, process, dict_particle):
+        self.assignment_mask[process].append(dict_particle)
+
     @classmethod
     def merge(
             cls,
@@ -178,6 +268,10 @@ class PostProcessor:
         valid_instances = [inst for inst in instances if inst is not None]
         combined = [item for a in valid_instances for item in a.stats]
         merged_stats = merge_stats(combined)
+
+        all_assignment_masks = [inst.assignment_mask for inst in valid_instances]
+        merged_assignment_masks = merge_assignment_masks(all_assignment_masks)
+        particle_balance = compute_particle_balance(merged_assignment_masks, instances[0].event_equivalence_classes)
 
         saved_results = {
             'input_mean': {
@@ -204,6 +298,7 @@ class PostProcessor:
             },
             'class_counts': torch.tensor(merged_stats["class_counts"], dtype=torch.float32),
             'class_balance': torch.tensor(merged_stats["class_balance"], dtype=torch.float32),
+            'particle_balance': particle_balance,
         }
 
         if saved_results_path:

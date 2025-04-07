@@ -95,11 +95,12 @@ def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter
 
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
-    converted_statistics = PostProcessor()
+
     # if hasattr(config, 'event_info'):
     if not global_config.loaded:
         global_config.load_yaml(cfg_dir)
 
+    converted_statistics = PostProcessor(global_config)
     assignment_keys, assignment_key_map = generate_assignment_names(global_config.event_info)
     regression_keys, regression_key_map = generate_regression_names(global_config.event_info)
     unique_process_ids = sorted(set(v['process_id'] for v in global_config.process_info.values()))
@@ -160,6 +161,12 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         class_counts = np.zeros(len(unique_process_ids), dtype=np.int32)
         class_counts[process_info[process]['process_id']] = len(process_data['classification'])
 
+        assignment_mask_per_process = {}
+        assignment_idx = {key:i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
+        for key, i in assignment_idx.items():
+            particle = key.split('/')[2]
+            assignment_mask_per_process[particle] = assignments['assignments-mask'][:, i]
+
         if shape_metadata is None:
             shape_metadata = meta_data
         else:
@@ -177,6 +184,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             num_vectors=process_data['num_sequential_vectors'],
             class_counts=class_counts,
         )
+        # Add assignment mask
+        converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
         
     if len(converted_data) == 0:
         print(f"[WARNING] No data found for any of the processes in {in_dir}")
@@ -252,7 +261,7 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        run_parallel(cfg, cfg.preprocess_config, num_workers=cpu_count - 1)
+        run_parallel(cfg, cfg.preprocess_config, num_workers=cpu_count() - 1)
 
     else:
         in_tag = Path(cfg.in_dir).name
