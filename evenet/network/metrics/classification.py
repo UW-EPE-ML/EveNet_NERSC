@@ -1,11 +1,12 @@
 from typing import Callable
-from collections import defaultdict
 
 import numpy as np
 import torch
 import wandb
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
 import torch.nn.functional as F
 
 
@@ -99,7 +100,14 @@ class ClassificationMetrics:
         self.train_hist_store = train_hist_store
         self.train_matrix = train_matrix
 
-    def plot_cm(self, class_names, cmap="Blues", normalize=True):
+    def plot_cm(self, class_names, normalize=True):
+        # Define the start and end hex colors
+        start_hex = "#FDDCE4"  # light pink
+        end_hex = "#6453A1"  # dark purple
+
+        # Create a custom colormap
+        custom_cmap = mcolors.LinearSegmentedColormap.from_list("custom_gradient", [start_hex, end_hex])
+
         cm_valid = self.compute(self.matrix) if normalize else self.matrix
 
         # Optional: Compute train confusion matrix
@@ -108,7 +116,7 @@ class ClassificationMetrics:
             cm_train = self.compute(self.train_matrix) if normalize else self.train_matrix
 
         fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(cm_valid, interpolation="nearest", cmap=cmap)
+        im = ax.imshow(cm_valid, interpolation="nearest", cmap=custom_cmap)
         plt.colorbar(im, ax=ax)
 
         tick_marks = np.arange(self.num_classes)
@@ -122,16 +130,20 @@ class ClassificationMetrics:
 
         for i in range(self.num_classes):
             for j in range(self.num_classes):
-                y_offset = 0.15 if cm_train is not None else 0.0
+                y_offset = 0.12 if cm_train is not None else 0.0
                 if cm_train is not None:
                     ax.text(j, i - y_offset, format(cm_train[i, j], fmt),
-                            ha="center", va="center", color="red", fontsize=9)
+                            ha="center", va="center", fontsize=12,
+                            color="#D4352D",
+                            )
                     ax.text(j, i + y_offset, format(cm_valid[i, j], fmt),
-                            ha="center", va="center", color="black", fontsize=9)
+                            ha="center", va="center", fontsize=12,
+                            color="#98C897",
+                            )
                 else:
                     ax.text(j, i, format(cm_valid[i, j], fmt),
                             ha="center", va="center",
-                            color="white" if cm_valid[i, j] > thresh else "black")
+                            color=start_hex if cm_valid[i, j] > thresh else end_hex)
 
         ax.set_xlabel("Predicted label")
         ax.set_ylabel("True label")
