@@ -149,6 +149,7 @@ def merge_stats(stats_list):
     }
     return result
 
+
 def merge_assignment_masks(list_of_assignment_masks):
     # assignment_mask: dict[str -> list[dict[str -> np.ndarray]]]
     merged = {}
@@ -175,9 +176,16 @@ def merge_assignment_masks(list_of_assignment_masks):
 
     return merged
 
-def compute_particle_balance(merged_assignment_masks, event_equivalence_classes):
+
+def compute_particle_balance(merged_assignment_masks, event_equivalence_classes, precision: int = 50):
+    getcontext().prec = precision
+
     particle_balance = OrderedDict()
-    common_processes = set(merged_assignment_masks.keys()) & set(event_equivalence_classes.keys())
+    common_processes = [
+        key for key in event_equivalence_classes.keys()
+        if key in merged_assignment_masks
+    ]
+    
     for process in common_processes:
         assignment_masks = merged_assignment_masks[process]
 
@@ -217,15 +225,22 @@ def compute_particle_balance(merged_assignment_masks, event_equivalence_classes)
             eq_class_counts[eq_class] = eq_class_count + 1
 
         # Compute class-balanced weights
-        beta = 1 - (10 ** -np.log10(num_events))
-        eq_class_weights = {key: (1 - beta) / (1 - (beta ** value)) for key, value in eq_class_counts.items()}
-        target_weights = {target: weight for eq_class, weight in eq_class_weights.items() for target in eq_class}
-
-        # Create bitmask index tensor and weight tensor
+        # Ensure num_events is passed in as int or string (not float!)
+        num_events = Decimal(str(num_events))
+        beta = Decimal('1') - (Decimal('10') ** (-num_events.log10()))
+        eq_class_weights = {
+            key: (Decimal('1') - beta) / (Decimal('1') - beta ** Decimal(value))
+            for key, value in eq_class_counts.items()
+        }
+        target_weights = {
+            target: float(weight)  # Convert back to float if needed later
+            for eq_class, weight in eq_class_weights.items()
+            for target in eq_class
+        }
         index_tensor = 2 ** torch.arange(num_targets)
         target_weights_tensor = torch.zeros(2 ** num_targets)
 
-        norm = sum(eq_class_weights.values())
+        norm = float(sum(eq_class_weights.values()))
         for target, weight in target_weights.items():
             index = index_tensor[list(target)].sum()
             target_weights_tensor[index] = len(eq_class_weights) * weight / norm
@@ -233,6 +248,7 @@ def compute_particle_balance(merged_assignment_masks, event_equivalence_classes)
         particle_balance[process] = (index_tensor, target_weights_tensor)
 
     return particle_balance
+
 
 class PostProcessor:
     def __init__(self, global_config):
