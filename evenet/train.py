@@ -78,7 +78,7 @@ def train_func(cfg):
         mode="min",
         verbose=True,
         dirpath=global_config.options.Training.model_checkpoint_save_path,
-        filename="best-{epoch}-{val_loss:.4f}",
+        filename="best_{epoch}",
     )
     early_stop_callback = EarlyStopping(
         monitor="val/loss",
