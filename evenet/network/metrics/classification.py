@@ -102,7 +102,7 @@ class ClassificationMetrics:
 
     def plot_cm(self, class_names, normalize=True):
         # --- Teal-Navy gradient colormap ---
-        gradient_colors = ("#D1FAE5", "#1E3A8A")
+        gradient_colors = ('#f0f9fa', "#4ca1af")
         cmap = mcolors.LinearSegmentedColormap.from_list("teal_navy", gradient_colors)
 
         # --- Text colors for contrast ---
