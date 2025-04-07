@@ -240,8 +240,7 @@ def shared_epoch_end(
     if global_rank == 0:
         metrics_valid.assign_train_result(
             train_hist_store=metrics_train.hist_store if metrics_train else None,
-            train_pred=metrics_train.train_pred if metrics_train else None,
-            train_labels=metrics_train.train_labels if metrics_train else None,
+            train_matrix=metrics_train.matrix if metrics_train else None,
         )
 
         fig_cm = metrics_valid.plot_cm(class_names=num_classes)
