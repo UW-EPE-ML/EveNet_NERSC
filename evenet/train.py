@@ -40,19 +40,17 @@ def train_func(cfg):
     max_epochs = cfg['epochs']
     prefetch_batches = cfg['prefetch_batches']
     total_events = cfg['total_events']
+    world_rank = ray.train.get_context().get_world_rank()
 
     wandb_config = cfg.get("wandb", {})
-    wandb_logger = None
-    if ray.train.get_context().get_world_rank() == 0:
-        wandb_logger = WandbLogger(
-            project=wandb_config.get("project", "EveNet"),
-            name=wandb_config.get("run_name", None),
-            tags=wandb_config.get("tags", []),
-            entity=wandb_config.get("entity", None),
-            config=global_config.to_logger()
-        )
-        # wandb_logger.experiment.config.update()
-        # wandb.config.update()
+    wandb_logger = WandbLogger(
+        project=wandb_config.get("project", "EveNet"),
+        name=wandb_config.get("run_name", None),
+        tags=wandb_config.get("tags", []),
+        entity=wandb_config.get("entity", None),
+        config=global_config.to_logger()
+    )
+    # wandb_logger.experiment.config.update()
 
     dataset_configs = {
         'batch_size': batch_size,
@@ -78,10 +76,12 @@ def train_func(cfg):
         monitor="val/loss",
         save_top_k=1,
         mode="min",
+        verbose=True,
+        dirpath=global_config.options.Training.model_checkpoint_save_path,
         filename="best-{epoch}-{val_loss:.4f}",
     )
     early_stop_callback = EarlyStopping(
-        monitor="val/loss",  # metric to monitor
+        monitor="val/loss",
         patience=5,  # epochs to wait for improvement
         mode="min",  # "min" if lower is better (e.g. for loss)
         verbose=True,  # optional: prints when triggered
@@ -102,16 +102,16 @@ def train_func(cfg):
         strategy=RayDDPStrategy(find_unused_parameters=True),
         plugins=[RayLightningEnvironment()],
         callbacks=[
-            # RayTrainReportCallback(),
+            RayTrainReportCallback(),
             checkpoint_callback,
             early_stop_callback,
             LearningRateMonitor(),
             RichModelSummary(max_depth=3),
-            # EMACallback(decay=0.999),
         ],
         enable_progress_bar=True,
         logger=wandb_logger,
         # val_check_interval=10,
+        num_sanity_val_steps=0,
         **accelerator_config,
     )
 

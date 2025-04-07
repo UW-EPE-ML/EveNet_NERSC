@@ -8,7 +8,6 @@ platform:
   batch_size: 4096
   prefetch_batches: 5
 
-
 wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
@@ -21,6 +20,7 @@ options:
   # overwrites
   Training:
     epochs: 15
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
 
     Components:
       Regression:
