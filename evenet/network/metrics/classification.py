@@ -97,29 +97,52 @@ class ClassificationMetrics:
     def assign_train_result(self, train_hist_store=None):
         self.train_hist_store = train_hist_store
 
-    def plot_cm(self, class_names=None, cmap="Blues", normalize=True):
-        cm = self.compute() if normalize else self.matrix
+    def plot_cm(self, class_names, cmap="Blues", normalize=True):
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from sklearn.metrics import confusion_matrix
+
+        cm_valid = self.compute() if normalize else self.matrix
+
+        # Optional: Compute train confusion matrix
+        cm_train = None
+        if self.train_hist_store is not None:
+            train_preds = self.train_hist_store["preds"]
+            train_labels = self.train_hist_store["targets"]
+            cm_train = confusion_matrix(
+                train_labels, train_preds,
+                normalize="true" if normalize else None
+            )
+
         fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(cm, interpolation="nearest", cmap=cmap)
+        im = ax.imshow(cm_valid, interpolation="nearest", cmap=cmap)
         plt.colorbar(im, ax=ax)
 
         tick_marks = np.arange(self.num_classes)
         ax.set_xticks(tick_marks)
         ax.set_yticks(tick_marks)
-        ax.set_xticklabels(class_names or tick_marks, rotation=45)
+        ax.set_xticklabels(class_names or tick_marks, rotation=45, ha="right")
         ax.set_yticklabels(class_names or tick_marks)
 
         fmt = ".2f" if normalize else "d"
-        thresh = cm.max() / 2.0
+        thresh = cm_valid.max() / 2.0
+
         for i in range(self.num_classes):
             for j in range(self.num_classes):
-                ax.text(j, i, format(cm[i, j], fmt),
-                        ha="center", va="center",
-                        color="white" if cm[i, j] > thresh else "black")
+                y_offset = 0.15 if cm_train is not None else 0.0
+                if cm_train is not None:
+                    ax.text(j, i - y_offset, format(cm_train[i, j], fmt),
+                            ha="center", va="center", color="red", fontsize=9)
+                    ax.text(j, i + y_offset, format(cm_valid[i, j], fmt),
+                            ha="center", va="center", color="black", fontsize=9)
+                else:
+                    ax.text(j, i, format(cm_valid[i, j], fmt),
+                            ha="center", va="center",
+                            color="white" if cm_valid[i, j] > thresh else "black")
 
         ax.set_xlabel("Predicted label")
         ax.set_ylabel("True label")
-        ax.set_title("Confusion Matrix")
+        ax.set_title("Confusion Matrix (Train in Red, Valid in Black)")
         fig.tight_layout()
         return fig
 
@@ -240,4 +263,3 @@ def shared_epoch_end(
     metrics_valid.reset(cm=True, logits=True)
     if metrics_train:
         metrics_train.reset(cm=True, logits=True)
-
