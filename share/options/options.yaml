@@ -2,7 +2,7 @@ Training:
   epochs: 100
 
   model_checkpoint_save_path: "."
-  model_checkpoint_load_path: none
+  model_checkpoint_load_path: null
 
 
   learning_rate: &lr 0.0000075
