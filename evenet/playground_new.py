@@ -14,6 +14,8 @@ from evenet.network.loss.classification import loss as cls_loss
 from evenet.network.loss.regression import loss as reg_loss
 from evenet.network.loss.assignment import loss as ass_loss
 
+from evenet.network.metrics.assigment import predict
+
 from preprocessing.preprocess import unflatten_dict
 
 import torch
@@ -141,7 +143,7 @@ class DebugHookManager:
 
 wandb_enable = False
 n_epoch = 10
-debugger_enable = True
+debugger_enable = False
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
@@ -203,7 +205,7 @@ torch_batch = convert_batch_to_torch_tensor(processed_batch)
 # with open("/Users/avencastmini/PycharmProjects/EveNet/workspace/normalization_file/PreTrain_norm.pkl", 'rb') as f:
 #     normalization_file = pickle.load(f)
 
-num_splits = df_number // 256
+num_splits = df_number // 128
 
 # Run forward
 model = EveNetModel(
@@ -308,12 +310,27 @@ for iepoch in range(n_epoch):
                     event_permutations = event_permutation,
                     focal_gamma =  0.1,
             )
+
+            assignment_predict = dict()
             for process in global_config.event_info.process_names:
 
                 total_loss += symmetric_losses["assignment"][process]
                 total_loss += symmetric_losses["detection"][process]
 
+                assignment_predict[process] = predict(
+                    assignments = outputs["assignments"][process],
+                    detections=outputs["detections"][process],
+                    product_symbolic_groups=event_info.product_symbolic_groups[process],
+                    event_permutations=event_info.event_permutation[process],
+                )
 
+
+            # black_list = ["WJetsToQQ", "ZJetsToLL"]
+            # process_name = global_config.event_info.process_names[i]
+            # if process_name in black_list:
+            #     process_name = global_config.event_info.process_names[i+1]
+            # total_loss += symmetric_losses["assignment"][process_name]
+            # print(f"{process_name}: {symmetric_losses["assignment"][process_name]}")
 
             print(f"[Epoch {iepoch} / Batch {i}] Total loss: {total_loss}", flush=True)
 
@@ -335,8 +352,8 @@ for iepoch in range(n_epoch):
                 for process in global_config.event_info.process_names:
                     wandb.log(
                         {
-                            f"assignment_loss/{process}": symmetric_losses[process]["assignment"].item(),
-                            f"detection_loss/{process}": symmetric_losses[process]["detection"].item()
+                            f"assignment_loss/{process}": symmetric_losses["assignment"][process].item(),
+                            f"detection_loss/{process}": symmetric_losses["detection"][process].item()
                         }
                     )
             confusion_accumulator.update(

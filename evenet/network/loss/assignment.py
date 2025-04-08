@@ -28,6 +28,31 @@ from typing import List, Tuple, Dict
 #
 #     return combined_loss, index
 
+def convert_target_assignment_array(
+        targets: List[Tensor],
+        targets_mask: List[Tensor],
+        event_particles: Dict,
+        num_targets: Dict
+):
+    """
+    Convert target assignment array to a dict of tensors list.
+    """
+    target_assignment = OrderedDict()
+    target_assignment_mask = OrderedDict()
+
+    index_global = 0
+    for process in event_particles.keys():
+        target_assignment[process] = []
+        target_assignment_mask[process] = []
+        local_index = 0
+        for event_particle in event_particles[process]:
+            target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
+            target_assignment_mask[process].append(targets_mask[:, index_global])
+            index_global += 1
+            local_index += 1
+
+    return target_assignment, target_assignment_mask
+
 
 def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, target_mask: Tensor, gamma: float) -> Tensor:
     batch_size = prediction.shape[0]
@@ -49,14 +74,15 @@ def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, targe
     ravel_prediction = prediction.reshape(batch_size, -1).contiguous()
 
     log_probability = ravel_prediction.gather(-1, ravel_target.view(-1, 1)).squeeze()
-    log_probability = log_probability.masked_fill(~target_mask, 0.0)
+    log_probability = log_probability.masked_fill(~target_mask, 0.0) # 1e-6
 
     # focal_scale = (1 - torch.exp(log_probability)) ** gamma
 
     p = torch.exp(log_probability)
     # Compute focal scale only where valid
+    focal_base = (1 - p).clamp(min=1e-6)
     focal_scale = torch.zeros_like(p)
-    focal_scale[target_mask] = (1 - p[target_mask]) ** gamma
+    focal_scale[target_mask] = focal_base[target_mask] ** gamma
 
     return -log_probability * focal_scale
 
@@ -109,6 +135,10 @@ def loss_single_process(
         event_permutations: Tuple[List],
         focal_gamma: float
 ):
+    ####################
+    ## Detection Loss ##
+    ####################
+
     detections = detections
     detections_target = targets_mask
     detection_losses = []
@@ -127,6 +157,10 @@ def loss_single_process(
 
     detection_loss = torch.mean(torch.stack(detection_losses))  # TODO: Check balance and masking
 
+    #####################
+    ## Assignment Loss ##
+    #####################
+
     symmetric_losses = symmetric_loss(
         assignments,
         targets,
@@ -135,13 +169,13 @@ def loss_single_process(
         focal_gamma
     )
 
-    valid_assignments = torch.sum(torch.stack(targets_mask).float()).clamp(min=1.0)
+    valid_assignments = torch.sum(torch.stack(targets_mask).float())
 
-    if valid_assignments.sum() > 0:
-        assignment_loss = torch.sum(torch.nan_to_num(symmetric_losses, 0) * torch.stack(
-            targets_mask).float()) / valid_assignments  # TODO: Check balance and masking
+    if valid_assignments > 0:
+        assignment_loss = symmetric_losses * torch.stack(targets_mask).float()
+        assignment_loss = torch.sum(assignment_loss) / valid_assignments.clamp(min=1.0)  # TODO: Check balance and masking
     else:
-        assignment_loss = torch.zeros(0, device=valid_assignments.device, requires_grad=True)
+        assignment_loss = torch.zeros_like(valid_assignments, requires_grad=True)
 
     return assignment_loss, detection_loss
 
@@ -149,32 +183,6 @@ def loss_single_process(
 ###################
 ## Main Function ##
 ###################
-
-def convert_target_assignment_array(
-        targets: List[Tensor],
-        targets_mask: List[Tensor],
-        event_particles: Dict,
-        num_targets: Dict
-):
-    """
-    Convert target assignment array to a dict of tensors list.
-    """
-    target_assignment = OrderedDict()
-    target_assignment_mask = OrderedDict()
-
-    index_global = 0
-    for process in event_particles.keys():
-        target_assignment[process] = []
-        target_assignment_mask[process] = []
-        local_index = 0
-        for event_particle in event_particles[process]:
-            target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
-            target_assignment_mask[process].append(targets_mask[:, index_global])
-            index_global += 1
-            local_index += 1
-
-    return target_assignment, target_assignment_mask
-
 
 def loss(
         assignments: Dict[str, List[Tensor]],

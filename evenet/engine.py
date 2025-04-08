@@ -36,6 +36,8 @@ class EveNetEngine(L.LightningModule):
         self.target_classification_key = 'classification'
         self.target_regression_key = 'regression-data'
         self.target_regression_mask_key = 'regression-mask'
+        self.target_assignment_key = 'assignments-indices'
+        self.target_assignment_mask_key = 'assignments-mask'
 
         ###### Initialize Model Components Configs #####
         self.component_cfg = global_config.options.Training.Components
@@ -45,13 +47,13 @@ class EveNetEngine(L.LightningModule):
         self.assignment_cfg = self.component_cfg.Assignment
 
         ###### Initialize Assignment Necessaries ######
-        self.ass_loss_args = None
+        self.ass_args = None
         if self.assignment_cfg.include:
             print("configure permutation indices")
             self.permutation_indices = dict()
             self.num_targets = dict()
 
-            self.ass_loss_args = get_ass(global_config.event_info)
+            self.ass_args = get_ass(global_config.event_info)
 
         ###### Initialize Loss ######
         self.cls_loss = None
@@ -72,9 +74,10 @@ class EveNetEngine(L.LightningModule):
             assignment_loss_partial = partial(
                 ass_loss.loss,
                 focal_gamma=0.1,
-                **self.ass_loss_args
+                **self.ass_args['loss']
             )
             self.ass_loss = assignment_loss_partial
+            print(f"{self.__class__.__name__} assignment loss initialized")
 
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
@@ -91,7 +94,8 @@ class EveNetEngine(L.LightningModule):
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
         self.class_weight = self.normalization_dict['class_balance']
         self.assignment_weight = self.normalization_dict['particle_balance']
-        print(f"{self.__class__.__name__} initialized")
+
+        print(f"{self.__class__.__name__} normalization dicts initialized")
 
         ###### Last ######
         # self.save_hyperparameters()
@@ -145,25 +149,33 @@ class EveNetEngine(L.LightningModule):
             loss = loss + reg_loss * self.regression_cfg.loss_scale
             loss_dict["regression_loss"] = reg_loss
 
-        if self.assigment_cfg.include:
-            ass_targets = batch["assignments-indices"].to(device=device)
-            ass_targets_mask = batch["assignments-mask"].to(device=device)
-            scaled_ass_loss = ass_step(
+        ass_predicts = None
+        if self.assignment_cfg.include:
+            ass_targets = batch[self.target_assignment_key].to(device=device)
+            ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
+            scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
+                loss_dict=loss_dict,
+                loss_scale=self.assignment_cfg.loss_scale,
                 process_names=self.config.event_info.process_names,
                 assignments=outputs["assignments"],
                 detections=outputs["detections"],
                 targets=ass_targets,
                 targets_mask=ass_targets_mask,
+                batch_size=batch_size,
+                device=device,
+                **self.ass_args['step']
             )
 
-        return loss, loss_dict
+            loss = loss + scaled_ass_loss
+
+        return loss, loss_dict, ass_predicts
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         step = self.global_step
         epoch = self.current_epoch
 
-        loss, loss_dict = self.shared_step(*args, **kwargs)
+        loss, loss_dict, _ = self.shared_step(*args, **kwargs)
 
         self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
         for name, val in loss_dict.items():
@@ -197,7 +209,7 @@ class EveNetEngine(L.LightningModule):
         epoch = self.current_epoch
         # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
 
-        loss, loss_dict = self.shared_step(*args, **kwargs)
+        loss, loss_dict, _ = self.shared_step(*args, **kwargs)
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 

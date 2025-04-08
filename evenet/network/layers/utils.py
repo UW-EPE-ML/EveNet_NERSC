@@ -92,3 +92,17 @@ class LayerScale(nn.Module):
             return x * self.gamma * mask
         else:
             return x * self.gamma
+
+
+def get_sinusoidal_positional_encoding(T, D, device='cpu'):
+    """
+    Returns a (T, D) tensor of sinusoidal positional encodings.
+    """
+    position = torch.arange(T, dtype=torch.float, device=device).unsqueeze(1)  # (T, 1)
+    div_term = torch.exp(torch.arange(0, D, 2, dtype=torch.float, device=device) * (-math.log(10000.0) / D))
+
+    pe = torch.zeros(T, D, device=device)
+    pe[:, 0::2] = torch.sin(position * div_term)  # even indices
+    pe[:, 1::2] = torch.cos(position * div_term)  # odd indices
+
+    return pe  # shape: (T, D)

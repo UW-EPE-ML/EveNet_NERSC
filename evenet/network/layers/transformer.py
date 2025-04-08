@@ -3,7 +3,7 @@ from torch import Tensor
 
 from evenet.network.layers.utils import TalkingHeadAttention, StochasticDepth, LayerScale
 from evenet.network.layers.linear_block import GRUGate, GRUBlock
-
+from evenet.network.layers.activation import create_residual_connection
 
 class TransformerBlockModule(nn.Module):
     def __init__(self, projection_dim, num_heads, dropout, talking_head, layer_scale, layer_scale_init,
@@ -176,3 +176,55 @@ def create_transformer(
             transformer_dim_scale=transformer_dim_scale,
             dropout=dropout
         )
+
+class ClassifierTransformerBlockModule(nn.Module):
+    def __init__(self,
+                 input_dim: int,
+                 projection_dim: int,
+                 num_heads: int,
+                 dropout: float):
+        super().__init__()
+        self.projection_dim = projection_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+
+        self.bridge_class_token = create_residual_connection(
+            skip_connection=True,
+            input_dim = input_dim,
+            output_dim = projection_dim
+        )
+
+        self.norm1 = nn.LayerNorm(projection_dim)
+        self.norm2 = nn.LayerNorm(projection_dim)
+        self.norm3 = nn.LayerNorm(projection_dim)
+
+        self.attn = nn.MultiheadAttention(projection_dim, num_heads, dropout, batch_first=True)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(projection_dim, 2 * projection_dim),
+            nn.GELU(approximate='none'),
+            nn.Dropout(dropout),
+            nn.Linear(2 * projection_dim, input_dim),
+        )
+    def forward(self, x, class_token, mask=None):
+        """
+
+        :param x: point_cloud (batch_size, num_objects, projection_dim)
+        :param class_token: (batch_size, input_dim)
+        :param mask: (batch_size, num_objects, 1)
+        :return:
+        """
+        class_token = self.bridge_class_token(class_token)
+        x1 = self.norm1(x)
+        query = class_token.unsqueeze(1) # Only use the class token as query
+        padding_mask = ~(mask.unsqueeze(2).bool()) if mask is not None else None
+        updates, _ = self.attn(query, x1, x1, key_padding_mask=padding_mask) # [batch_size, 1, projection_dim]
+        updates = self.norm2(updates)
+
+        x2 = updates + query
+        x3 = self.norm3(x2)
+        cls_token = self.mlp(x3)
+
+        return cls_token.squeeze(1)
+
+

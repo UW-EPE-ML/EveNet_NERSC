@@ -76,7 +76,6 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
                 conditioned=False)
                 for _ in range(degree)]
         )
-        # TODO: Make ObjectEncoder be able to handle zero layers.
 
         self.linear_layers = nn.ModuleList(
             [nn.Linear(hidden_dim, self.attention_dim) for _ in range(degree)]

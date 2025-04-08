@@ -26,6 +26,9 @@ options:
     Components:
       Regression:
         include: false
+
+      Assigment:
+        include: true
   Dataset:
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250406/normalization.pt"
 

@@ -68,3 +68,5 @@ Assignment:
   num_detection_layers: 0
   dropout: 0.0
   combinatorial_scale: 0.0
+  encode_event_token: true
+  activation: GELU

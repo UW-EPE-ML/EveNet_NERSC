@@ -8,7 +8,15 @@ from evenet.dataset.types import Symmetries
 from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.assignment.symmetric_attention import SymmetricAttentionSplit, SymmetricAttentionFull
 from evenet.network.heads.classification.classification_head import BranchLinear
+from evenet.network.layers.transformer import ClassifierTransformerBlockModule
+
 from evenet.utilities.masked_softmax_no_gradient import masked_log_softmax
+from evenet.network.body.normalizer import Normalizer
+from evenet.network.layers.utils import RandomDrop
+from evenet.network.layers.activation import create_activation, create_residual_connection
+from typing import Dict
+import re
+from collections import OrderedDict
 
 
 class AssignmentHead(nn.Module):
@@ -18,6 +26,7 @@ class AssignmentHead(nn.Module):
     def __init__(
             self,
             split_attention: bool,
+            input_dim: int,
             hidden_dim: int,
             position_embedding_dim: int,
             num_heads: int,
@@ -40,6 +49,16 @@ class AssignmentHead(nn.Module):
         self.softmax_output = softmax_output
 
         self.combinatorial_scale = combinatorial_scale
+        self.point_cloud_bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=input_dim,
+            output_dim=hidden_dim,
+        )
+        self.global_cond_bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=input_dim,
+            output_dim=hidden_dim,
+        )
 
         self.encoder = ObjectEncoder(
             hidden_dim=hidden_dim,
@@ -152,6 +171,9 @@ class AssignmentHead(nn.Module):
         # particle_vectors : (batch_size, num_vectors, hidden_dim)
         # ------------------------------------------------------
 
+        point_cloud = self.point_cloud_bridge(point_cloud) * point_cloud_mask
+        global_condition = self.global_cond_bridge(global_condition) * global_condition_mask
+
         encoded_vectors, encoded_global_cond, particle_vector = self.encoder(
             point_cloud, point_cloud_mask,
             global_condition, global_condition_mask,
@@ -210,3 +232,205 @@ class AssignmentHead(nn.Module):
             # output = output + offset
 
         return assignment, detection, assignment_mask, particle_vector, daughter_vectors
+
+
+class SharedAssignmentHead(nn.Module):
+    def __init__(
+            self,
+            resonance_particle_properties_mean: Tensor,
+            resonance_particle_properties_std: Tensor,
+            pairing_topology: Dict,
+            process_names: List[str],
+            pairing_topology_category: Dict,
+            event_particles: Dict,
+            event_permutation: Dict,
+            product_particles: Dict,
+            product_symmetries: Dict,
+            feature_drop: float,
+            num_feature_keep: int,
+            input_dim: int,
+            hidden_dim: int,
+            position_embedding_dim: int,
+            num_attention_heads: int,
+            transformer_dim_scale: float,
+            num_jet_embedding_layers: int,
+            num_jet_encoder_layers: int,
+            num_detection_layers: int,
+            num_max_event_particles: int,
+            dropout: float,
+            combinatorial_scale: float,
+            split_attention: bool,
+            encode_event_token: bool,
+            activation: str,
+            device: str,
+    ):
+        super(SharedAssignmentHead, self).__init__()
+        # Initialize the resonance particle condition
+
+        self.device = device
+        self.pairing_topology = pairing_topology
+        self.pairing_topology_category = pairing_topology_category
+        self.event_permutation = event_permutation
+        self.event_particles = event_particles
+        self.product_symmetries = product_symmetries
+        self.product_particles = product_particles
+
+        self.process_names = process_names
+
+        self.hidden_dim = hidden_dim
+
+        # Resonance structure conditioner
+        self.resonance_particle_properties_mean = resonance_particle_properties_mean
+        self.resonance_particle_properties_std = resonance_particle_properties_std
+        self.num_resonance_particle_feature = self.resonance_particle_properties_mean.size(0)
+        self.resonance_particle_properties = (
+            nn.ParameterDict({
+                topology_name:
+                    nn.Parameter(
+                        pairing_topology[topology_name][
+                            "resonance_particle_properties"].to(self.device),
+                        requires_grad=False)
+                for topology_name in self.pairing_topology}
+            )
+        )
+        self.resonance_particle_properties_normalizer = Normalizer(
+            mean=resonance_particle_properties_mean.to(self.device),
+            std=resonance_particle_properties_std.to(self.device),
+            norm_mask=torch.ones_like(resonance_particle_properties_mean, device=self.device).bool(),
+        )
+
+        self.resonance_particle_embed = nn.Sequential(
+            RandomDrop(feature_drop, num_feature_keep),
+            nn.Linear(self.num_resonance_particle_feature, self.hidden_dim),
+            create_activation(activation, self.hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+
+        # [5] Assignment Head
+        self.multiprocess_assign_head = nn.ModuleDict({
+            topology_name: AssignmentHead(
+                split_attention=split_attention,
+                input_dim=input_dim,
+                hidden_dim=hidden_dim,
+                position_embedding_dim=position_embedding_dim,
+                num_heads=num_attention_heads,
+                transformer_dim_scale=transformer_dim_scale,
+                num_linear_layers=num_jet_embedding_layers,
+                num_encoder_layers=num_jet_encoder_layers,
+                num_detection_layers=num_detection_layers,
+                dropout=dropout,
+                combinatorial_scale=combinatorial_scale,
+                product_names=pairing_topology_category[topology_name]["product_particles"].names,
+                product_symmetries=pairing_topology_category[topology_name]["product_symmetry"],
+                softmax_output=True,
+                detection_output_dim=num_max_event_particles + 1,
+            )
+            for topology_name in pairing_topology_category
+        })
+
+        # [event_token]
+        self.encode_event_token = encode_event_token
+        if encode_event_token:
+            self.position_token = nn.Parameter(
+                torch.randn(1, len(pairing_topology), position_embedding_dim)
+            )
+            self.mlp_for_event_point_cloud = nn.Linear(hidden_dim + position_embedding_dim, hidden_dim)
+            self.class_transformer = ClassifierTransformerBlockModule(
+                input_dim=input_dim,
+                projection_dim=hidden_dim,
+                num_heads=num_attention_heads,
+                dropout=dropout
+            )
+
+    def forward(self,
+                x: Tensor,
+                x_mask: Tensor,
+                global_condition: Tensor,
+                global_condition_mask: Tensor,
+                event_token=None,
+                return_type: str = "process_base"):
+        """
+
+        :param x: (batch_size, num_vectors, hidden_dim)
+        :param x_mask: (batch_size, num_vectors, 1)
+        :param global_condition: (batch_size, num_global_condition, hidden_dim)
+        :param global_condition_mask: (batch_size, num_global_condition, 1)
+        :param return_type: str
+
+        :return:
+        - return_type == "process_base":
+            Assignment: Dict[process] = {
+                List of assignments for each event particles result, shape: List([B, T, T, ...])
+            }
+            Detection: Dict[process] = {
+                List of detections for each event particles result , shape: List([B, num_max_event_particles])
+            }
+        - if self.output_event_token:
+            event_token: Transformer based encoded event token,
+        - else:
+            event_token: remain the same.
+        """
+
+        # Pass the shared hidden state to every decoder branch
+        branch_decoder_result = dict()
+        batch_size = x.shape[0]
+        event_particle_vector_arrays = []
+        for topology_name in self.pairing_topology:
+            # Condition embedding for each assignment head
+            topology_category_name = self.pairing_topology[topology_name]["pairing_topology_category"]
+            condition_variable = self.resonance_particle_properties_normalizer(
+                self.resonance_particle_properties[topology_name]
+            )
+            num_res = condition_variable.shape[-1]
+            condition_variable = condition_variable.view(1, 1, num_res).expand(batch_size, 1, num_res)
+            condition_variable = self.resonance_particle_embed(condition_variable)
+            (
+                assignment,
+                detection,
+                assignment_mask,
+                event_particle_vector,
+                product_particle_vectors
+            ) = self.multiprocess_assign_head[topology_category_name](
+                point_cloud=x,
+                point_cloud_mask=x_mask,
+                global_condition=global_condition,
+                global_condition_mask=global_condition_mask,
+                cond_vector=condition_variable,
+            )
+            event_particle_vector_arrays.append(event_particle_vector.unsqueeze(1))
+            branch_decoder_result[topology_name] = {"assignment": assignment, "detection": detection}
+
+        if event_token is not None and self.encode_event_token:
+            event_particle_cloud = torch.cat(
+                (
+                    torch.cat(event_particle_vector_arrays, dim=1),
+                    self.position_token.expand(batch_size, -1, -1)
+                ),
+                dim=-1
+            )
+            event_particle_cloud = self.mlp_for_event_point_cloud(event_particle_cloud)
+            event_token = self.class_transformer(
+                x=event_particle_cloud,
+                class_token=event_token
+            )
+
+        assignments = OrderedDict()
+        detections = OrderedDict()
+
+        if return_type == "process_base":
+            for process in self.process_names:
+                assignments[process] = []
+                detections[process] = []
+                for event_particle_name, product_symmetry in self.product_symmetries[process].items():
+                    topology_name = ''.join(self.product_particles[process][event_particle_name].names)
+                    topology_name = f"{event_particle_name}/{topology_name}"
+                    topology_name = re.sub(r'\d+', '', topology_name)
+                    assignments[process].append(branch_decoder_result[topology_name]["assignment"].contiguous())
+                    detections[process].append(branch_decoder_result[topology_name]["detection"].contiguous())
+
+        else:
+            for topology_name in branch_decoder_result:
+                assignments[topology_name] = branch_decoder_result[topology_name]["assignment"].contiguous()
+                detections[topology_name] = branch_decoder_result[topology_name]["detection"].contiguous()
+
+        return assignments, detections, event_token
