@@ -42,12 +42,11 @@ def get_assignment_necessaries(
                                             "product_symmetry"].degree)
 
     return {
-        'loss':
-            {
-                'num_targets': num_targets,
-                'event_particles': event_particles,
-                'event_permutations': event_info.event_permutations,
-            },
+        'loss': {
+            'num_targets': num_targets,
+            'event_particles': event_particles,
+            'event_permutations': event_info.event_permutations,
+        },
         'step': {
             'event_permutations': event_info.event_permutations,
             'product_symbolic_groups': event_info.product_symbolic_groups,
@@ -88,7 +87,7 @@ def shared_step(
         )
 
         loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
-        loss_dict[f"det-{process}"] = symmetric_losses["detections"][process]
+        loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
 
         total_loss = total_loss + symmetric_losses["assignment"][process]
         total_loss = total_loss + symmetric_losses["detection"][process]

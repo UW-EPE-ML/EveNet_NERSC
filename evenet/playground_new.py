@@ -152,6 +152,7 @@ shape_metadata = json.load(
     open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
 
 normalization_dict = torch.load("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt")
+particle_balance_dict = normalization_dict['particle_balance']
 
 # Load the Parquet file locally
 df = pq.read_table(
@@ -307,7 +308,7 @@ for iepoch in range(n_epoch):
                     targets_mask = batch["assignments-mask"],
                     num_targets = num_targets,
                     event_particles = event_particles,
-                    event_permutations = event_permutation,
+                    event_permutations = event_info.event_permutations,
                     focal_gamma =  0.1,
             )
 

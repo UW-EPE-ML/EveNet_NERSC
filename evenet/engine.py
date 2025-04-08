@@ -321,7 +321,7 @@ class EveNetEngine(L.LightningModule):
                 classification=self.classification_cfg.include,
                 regression=self.regression_cfg.include,
                 generation=False,
-                assignment=False,
+                assignment=self.assignment_cfg.include,
                 normalization_dict=self.normalization_dict,
             )
         )

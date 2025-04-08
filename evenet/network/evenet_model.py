@@ -168,7 +168,7 @@ class EveNetModel(nn.Module):
 
         if self.include_assignment:
         # [5] Assignment Head
-            self.multiprocess_assign_head = SharedAssignmentHead(
+            self.Assignment = SharedAssignmentHead(
                     resonance_particle_properties_mean=self.event_info.resonance_particle_properties_mean,
                     resonance_particle_properties_std=self.event_info.resonance_particle_properties_std,
                     pairing_topology=self.event_info.pairing_topology,
@@ -301,7 +301,7 @@ class EveNetModel(nn.Module):
         detections = dict()
         #
         if self.include_assignment:
-            assignments, detections, event_token = self.multiprocess_assign_head(
+            assignments, detections, event_token = self.Assignment(
                 x=embeddings,
                 x_mask=input_point_cloud_mask,
                 global_condition=embedded_global_conditions,
