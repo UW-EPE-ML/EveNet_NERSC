@@ -178,8 +178,8 @@ def loss_single_process(
     masks_for_balance = torch.stack(targets_mask).int()
 
     if particle_balance_weight is not None and particle_index_tensor is not None:
-        class_indices = (masks_for_balance * particle_index_tensor.unsqueeze(1)).sum(0).int()
-        particle_balance_weight *= particle_weights_tensor[class_indices]
+        class_indices = (masks_for_balance * particle_index_tensor.to(masks_for_balance.device).unsqueeze(1)).sum(0).int()
+        particle_balance_weight *= particle_weights_tensor.to(masks_for_balance.device)[class_indices]
 
     valid_assignments = torch.sum(torch.stack(targets_mask).float())
 

@@ -11,12 +11,6 @@ Training:
   weight_decay: 1e-3
   decoupled_weight_decay: true
 
-  classification_loss_scale: 1.0
-  regression_loss_scale: 1.0
-  assignment_loss_scale: 1.0
-  feature_generation_loss_scale: 0.0
-  generation_loss_scale: 0.0
-
   Components:
     GlobalEmbedding:
       learning_rate: *lr
