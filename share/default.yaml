@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250406"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250407"
   number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
@@ -30,7 +30,7 @@ options:
       Assignment:
         include: true
   Dataset:
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250406/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250407/normalization.pt"
 
 network:
   default: network/pretrain.yaml
