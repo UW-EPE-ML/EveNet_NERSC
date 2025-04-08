@@ -111,7 +111,7 @@ def train_func(cfg):
         enable_progress_bar=True,
         logger=wandb_logger,
         # val_check_interval=10,
-        # num_sanity_val_steps=0,
+        num_sanity_val_steps=0,
         **accelerator_config,
     )
 
