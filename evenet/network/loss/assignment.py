@@ -3,7 +3,9 @@ import torch
 import numpy as np
 from torch import Tensor
 import torch.nn.functional as F
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
+
+from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
 
 
 # def numpy_tensor_array(tensor_list):
@@ -112,7 +114,7 @@ def symmetric_loss(
         targets_mask: List[Tensor],
         num_targets: List[int],
         focal_gamma: float,
-) -> Tuple[Tensor, Tensor]:
+) -> Tensor:
     assignments = [
         prediction + torch.log(torch.scalar_tensor(num_target))
         for prediction, num_target in zip(assignments, num_targets)
@@ -133,7 +135,9 @@ def loss_single_process(
         targets_mask: List[Tensor],
         num_targets: List[Tensor],
         event_permutations: Tuple[List],
-        focal_gamma: float
+        focal_gamma: float,
+        particle_index_tensor: Union[Tensor, None],
+        particle_weights_tensor: Union[Tensor, None]
 ):
     ####################
     ## Detection Loss ##
@@ -161,6 +165,7 @@ def loss_single_process(
     ## Assignment Loss ##
     #####################
 
+
     symmetric_losses = symmetric_loss(
         assignments,
         targets,
@@ -169,10 +174,18 @@ def loss_single_process(
         focal_gamma
     )
 
+    particle_balance_weight = torch.ones_like(symmetric_losses)
+    masks_for_balance = torch.stack(targets_mask).int()
+
+    if particle_balance_weight is not None and particle_index_tensor is not None:
+        class_indices = (masks_for_balance * particle_index_tensor.unsqueeze(1)).sum(0).int()
+        particle_balance_weight *= particle_weights_tensor[class_indices]
+
     valid_assignments = torch.sum(torch.stack(targets_mask).float())
 
     if valid_assignments > 0:
         assignment_loss = symmetric_losses * torch.stack(targets_mask).float()
+        assignment_loss = assignment_loss * particle_balance_weight
         assignment_loss = torch.sum(assignment_loss) / valid_assignments.clamp(min=1.0)  # TODO: Check balance and masking
     else:
         assignment_loss = torch.zeros_like(valid_assignments, requires_grad=True)
@@ -192,8 +205,11 @@ def loss(
         event_particles: Dict,
         event_permutations: Dict,
         num_targets: Dict,
-        focal_gamma: float
+        focal_gamma: float,
+        particle_balance: Dict
 ):
+
+    # TODO: Add class balance
     targets, targets_mask = convert_target_assignment_array(targets, targets_mask, event_particles, num_targets)
     loss_summary = dict({
         "assignment": dict(),
@@ -201,6 +217,7 @@ def loss(
     }
     )
 
+    num_processes = len(event_permutations.keys())
     for process in event_permutations.keys():
         assignment_loss, detection_loss = loss_single_process(
             assignments[process],
@@ -209,9 +226,11 @@ def loss(
             targets_mask[process],
             num_targets[process],
             event_permutations[process],
-            focal_gamma
+            focal_gamma,
+            particle_balance.get(process, [None, None])[0] if particle_balance else None,
+            particle_balance.get(process, [None, None])[1] if particle_balance else None
         )
-        loss_summary["assignment"][process] = assignment_loss
-        loss_summary["detection"][process] = detection_loss
+        loss_summary["assignment"][process] = assignment_loss / num_processes # not scale with num processes
+        loss_summary["detection"][process] = detection_loss / num_processes # not scale with num processes
 
     return loss_summary

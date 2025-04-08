@@ -46,6 +46,13 @@ class EveNetEngine(L.LightningModule):
         self.regression_cfg = self.component_cfg.Regression
         self.assignment_cfg = self.component_cfg.Assignment
 
+        ###### Initialize Normalizations and Balance #####
+        self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
+        self.class_weight = self.normalization_dict['class_balance']
+        self.assignment_weight = self.normalization_dict['particle_balance']
+
+        print(f"{self.__class__.__name__} normalization dicts initialized")
+
         ###### Initialize Assignment Necessaries ######
         self.ass_args = None
         if self.assignment_cfg.include:
@@ -74,6 +81,7 @@ class EveNetEngine(L.LightningModule):
             assignment_loss_partial = partial(
                 ass_loss.loss,
                 focal_gamma=0.1,
+                particle_balance=self.assignment_weight,
                 **self.ass_args['loss']
             )
             self.ass_loss = assignment_loss_partial
@@ -89,13 +97,6 @@ class EveNetEngine(L.LightningModule):
             'decoupled_weight_decay': global_config.options.Training.decoupled_weight_decay,
         }
         self.automatic_optimization = False
-
-        ###### Initialize Normalizations and Balance #####
-        self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict['class_balance']
-        self.assignment_weight = self.normalization_dict['particle_balance']
-
-        print(f"{self.__class__.__name__} normalization dicts initialized")
 
         ###### Last ######
         # self.save_hyperparameters()

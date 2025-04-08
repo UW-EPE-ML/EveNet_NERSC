@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250407"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250408.tiny"
   number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
@@ -19,7 +19,7 @@ options:
 
   # overwrites
   Training:
-    epochs: 2
+    epochs: 10
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
     model_checkpoint_load_path: null
 
@@ -30,7 +30,7 @@ options:
       Assignment:
         include: true
   Dataset:
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250407/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250408.tiny/normalization.pt"
 
 network:
   default: network/pretrain.yaml

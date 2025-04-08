@@ -310,6 +310,7 @@ for iepoch in range(n_epoch):
                     event_particles = event_particles,
                     event_permutations = event_info.event_permutations,
                     focal_gamma =  0.1,
+                    particle_balance = particle_balance_dict,
             )
 
             assignment_predict = dict()

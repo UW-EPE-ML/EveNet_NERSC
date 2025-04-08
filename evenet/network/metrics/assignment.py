@@ -77,7 +77,8 @@ def shared_step(
 
     assignment_predict = dict()
 
-    total_loss = torch.zeros(batch_size, device=device, requires_grad=True)
+    assignment_loss = torch.zeros(batch_size, device=device, requires_grad=True)
+    detected_loss = torch.zeros(batch_size, device=device, requires_grad=True)
     for process in process_names:
         assignment_predict[process] = predict(
             assignments=assignments[process],
@@ -89,9 +90,13 @@ def shared_step(
         loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
         loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
 
-        total_loss = total_loss + symmetric_losses["assignment"][process]
-        total_loss = total_loss + symmetric_losses["detection"][process]
-        total_loss = total_loss * loss_scale
+        assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
+        detected_loss = detected_loss + symmetric_losses["detection"][process]
+
+    loss_dict['assignment_loss'] = assignment_loss / len(process_names)
+    loss_dict['detection_loss'] = detected_loss / len(process_names)
+
+    total_loss = loss_scale * (assignment_loss + detected_loss) / len(process_names)
 
     return total_loss, assignment_predict
 
