@@ -128,7 +128,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         )
 
         # Filter the data
-        converter.filter_process(process_info[process])
+        converter.filter_process(process=process, process_info=process_info[process])
 
         # Load Point Cloud and Mask
         sources = converter.load_sources()
@@ -142,6 +142,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         process_data = {
             'num_vectors': num_vectors,
             'num_sequential_vectors': num_sequential_vectors,
+            'subprocess_id': converter.raw_data['METADATA/PROCESS'],
 
             'x': sources['sources-0-data'],
             'x_mask': sources['sources-0-mask'],
@@ -160,6 +161,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         # Or simply use the process ID and set the length of the array to the number of unique processes
         class_counts = np.zeros(len(unique_process_ids), dtype=np.int32)
         class_counts[process_info[process]['process_id']] = len(process_data['classification'])
+
+        total_subprocess = global_config.event_info.event_mapping
+        subprocess_counts = np.zeros(len(total_subprocess), dtype=np.int32)
+        if process in total_subprocess:
+            subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
 
         assignment_mask_per_process = {}
         assignment_idx = {key:i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
@@ -183,6 +189,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             regression=process_data['regression-data'],
             num_vectors=process_data['num_sequential_vectors'],
             class_counts=class_counts,
+            subprocess_counts=subprocess_counts,
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)

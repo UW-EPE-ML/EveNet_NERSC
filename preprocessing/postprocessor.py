@@ -137,6 +137,7 @@ def merge_stats(stats_list):
                 total[key] = merge_two(total[key], s[key])
 
     total['class_counts'] = np.sum([s["class_counts"] for s in stats_list], axis=0)
+    total['subprocess_counts'] = np.sum([s["subprocess_counts"] for s in stats_list], axis=0)
 
     # Final result
     result = {
@@ -146,6 +147,8 @@ def merge_stats(stats_list):
         "input_num": compute_mean_std(total["input_num"]),
         "class_counts": total["class_counts"],
         "class_balance": compute_classification_balance(total["class_counts"]),
+        "subprocess_counts": total["subprocess_counts"],
+        "subprocess_balance": compute_classification_balance(total["subprocess_counts"]),
     }
     return result
 
@@ -185,7 +188,7 @@ def compute_particle_balance(merged_assignment_masks, event_equivalence_classes,
         key for key in event_equivalence_classes.keys()
         if key in merged_assignment_masks
     ]
-    
+
     for process in common_processes:
         assignment_masks = merged_assignment_masks[process]
 
@@ -256,7 +259,7 @@ class PostProcessor:
         self.assignment_mask = {p: [] for p in global_config.process_info}
         self.event_equivalence_classes = global_config.event_info.event_equivalence_classes
 
-    def add(self, x, conditions, regression, num_vectors, class_counts):
+    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]))
         cond_stats = masked_stats(conditions)
         regression_stats = masked_stats(regression)
@@ -267,6 +270,7 @@ class PostProcessor:
             "regression": regression_stats,
             "input_num": num_vectors_stats,
             "class_counts": class_counts,
+            "subprocess_counts": subprocess_counts,
         })
 
     def add_assignment_mask(self, process, dict_particle):
@@ -315,6 +319,8 @@ class PostProcessor:
             'class_counts': torch.tensor(merged_stats["class_counts"], dtype=torch.float32),
             'class_balance': torch.tensor(merged_stats["class_balance"], dtype=torch.float32),
             'particle_balance': particle_balance,
+            'subprocess_counts': torch.tensor(merged_stats["subprocess_counts"], dtype=torch.float32),
+            'subprocess_balance': torch.tensor(merged_stats["subprocess_balance"], dtype=torch.float32),
         }
 
         if saved_results_path:

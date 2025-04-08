@@ -132,7 +132,7 @@ class EveNetDataConverter:
         output_dict[f"classification-EVENT/signal"] = self.raw_data[f"{label}/EVENT/signal"]
         return output_dict
 
-    def filter_process(self, process_info: dict):
+    def filter_process(self, process: str, process_info: dict):
         process_id = process_info['process_id']
         category = process_info['category']
 
@@ -142,6 +142,14 @@ class EveNetDataConverter:
         data_selected['CLASSIFICATIONS/EVENT/signal'] = np.zeros_like(
             data_selected['INFO/VetoDoubleAssign'], dtype=int
         ) + process_id
+
+        if process in self.event_info.event_mapping:
+            subprocess_id = list(self.event_info.event_mapping.keys()).index(process)
+        else:
+            subprocess_id = -1
+        data_selected['METADATA/PROCESS'] = np.zeros_like(
+            data_selected['INFO/VetoDoubleAssign'], dtype=int
+        ) + subprocess_id
 
         n_event_original = len(selection)
         n_event_current = len(data_selected['INFO/VetoDoubleAssign'])
