@@ -33,9 +33,10 @@ class AssignmentHead(nn.Module):
             softmax_output: bool = True
     ):
         super(AssignmentHead, self).__init__()
+        # Take hadronic top decay for example (t->bq1q2, symmetry [q1, q2])
 
-        self.degree = product_symmetries.degree
-        self.product_names = product_names
+        self.degree = product_symmetries.degree  # degree: 3
+        self.product_names = product_names  # product_name: ['b', 'q1', 'q2']
         self.softmax_output = softmax_output
 
         self.combinatorial_scale = combinatorial_scale
@@ -71,28 +72,28 @@ class AssignmentHead(nn.Module):
             batch_norm=True
         )
 
-        self.num_targets = len(self.attention.permutation_group)
-        self.permutation_indices = self.attention.permutation_indices
+        self.num_targets = len(self.attention.permutation_group)  # 2 = len([[0, 1, 2], [0, 2, 1]])
+        self.permutation_indices = self.attention.permutation_indices  # [[(1,2)], [(0,)]
 
         self.padding_mask_operation = self.create_padding_mask_operation()
         self.diagonal_mask_operation = self.create_diagonal_mask_operation()
         self.diagonal_mask = {}
 
     def create_padding_mask_operation(self):
-        weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]
-        operands = ','.join(map(lambda x: 'b' + x, weights_index_names))
-        expression = f"{operands}->b{weights_index_names}"
+        weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]  # 'ijk'
+        operands = ','.join(map(lambda x: 'b' + x, weights_index_names))  # 'bi, bj, bk'
+        expression = f"{operands}->b{weights_index_names}"  # 'bi, bj, bk-> 'bijk'
         return expression
 
     def create_diagonal_mask_operation(self):
-            weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]
-            operands = ','.join(map(lambda x: 'b' + x, weights_index_names))
-            expression = f"{operands}->{weights_index_names}"
-            return expression
+        weights_index_names = self.WEIGHTS_INDEX_NAMES[:self.degree]  # 'ijk'
+        operands = ','.join(map(lambda x: 'b' + x, weights_index_names))  # 'bi, bj, bk'
+        expression = f"{operands}->{weights_index_names}"  # 'bi, bj, bk-> ijk'
+        return expression
 
     def create_output_mask(self, output: Tensor, mask: Tensor) -> Tensor:
 
-        num_jets = output.shape[1] # TODO: Double Check
+        num_jets = output.shape[1]
 
         # batch_sequence_mask: [B, T, 1] Positive mask indicating jet is real.
         batch_sequence_mask = mask.contiguous()
@@ -110,7 +111,7 @@ class AssignmentHead(nn.Module):
         try:
             diagonal_mask = self.diagonal_mask[(num_jets, output.device)]
         except KeyError:
-            identity = 1 - torch.eye(num_jets)
+            identity = 1 - torch.eye(num_jets)  # num_jets x num_jets diagonal matrix
             identity = identity.type_as(output)
 
             diagonal_mask_operands = [identity * 1] * self.degree

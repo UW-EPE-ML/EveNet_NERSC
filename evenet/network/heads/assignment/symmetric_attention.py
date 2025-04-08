@@ -21,20 +21,22 @@ class SymmetricAttentionBase(nn.Module):
                  permutation_indices: List[Tuple[int, ...]] = None,
                  attention_dim: int = None):
         super(SymmetricAttentionBase, self).__init__()
+        # Take hadronic top decay for example (t->bq1q2, symmetry [q1, q2])
 
         self.attention_dim = attention_dim
         if self.attention_dim is None:
             self.attention_dim = hidden_dim
 
-        self.permutation_indices = [] if permutation_indices is None else permutation_indices
+        self.permutation_indices = [] if permutation_indices is None else permutation_indices # [[(1,2)]]
         self.features = hidden_dim
-        self.degree = degree
+        self.features = hidden_dim
+        self.degree = degree # degree: 3
 
         # Add any missing cycles to have a complete group
-        self.permutation_indices = complete_indices(self.degree, self.permutation_indices)
-        self.permutation_group = symmetry_group(self.permutation_indices)
-        self.no_identity_permutations = [p for p in self.permutation_group if sorted(p) != p]
-        self.batch_no_identity_permutations = [(0,) + tuple(e + 1 for e in p) for p in self.no_identity_permutations]
+        self.permutation_indices = complete_indices(self.degree, self.permutation_indices)  # [[(1,2)], [(0,)]]
+        self.permutation_group = symmetry_group(self.permutation_indices)  # [[0, 1, 2], [0, 2, 1]]
+        self.no_identity_permutations = [p for p in self.permutation_group if sorted(p) != p] # [[0, 2, 1]]
+        self.batch_no_identity_permutations = [(0,) + tuple(e + 1 for e in p) for p in self.no_identity_permutations] #[(0, 1, 3, 2)]
 
         self.weights_scale = torch.sqrt(torch.scalar_tensor(self.features)) ** self.degree
 
@@ -74,6 +76,7 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
                 conditioned=False)
                 for _ in range(degree)]
         )
+        # TODO: Make ObjectEncoder be able to handle zero layers.
 
         self.linear_layers = nn.ModuleList(
             [nn.Linear(hidden_dim, self.attention_dim) for _ in range(degree)]
@@ -81,7 +84,7 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
 
         self.symmetrize_tensor = create_symmetric_function(self.batch_no_identity_permutations)
 
-        self.contraction_operation = self.make_contraction()
+        self.contraction_operation = self.make_contraction() # 'xbi,ybi,zbi,->bxyz'
 
         self.reset_parameters()
 
@@ -96,11 +99,11 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
                 nn.init.xavier_uniform_(p)
 
     def make_contraction(self):
-        input_index_names = np.array(list(self.INPUT_INDEX_NAMES))
-        operations = map(lambda x: f"{x}bi", input_index_names)
-        operations = ','.join(islice(operations, self.degree))
-        result = f"->b{''.join(input_index_names[:self.degree])}"
-        return operations + result
+        input_index_names = np.array(list(self.INPUT_INDEX_NAMES)) # ['x', 'y', 'z', 'w', 'u', 'v']
+        operations = map(lambda x: f"{x}bi", input_index_names) # ['xbi', 'ybi', 'zbi', 'wbi', 'ubi', 'vbi']
+        operations = ','.join(islice(operations, self.degree)) # 'xbi,ybi,zbi'
+        result = f"->b{''.join(input_index_names[:self.degree])}" # '->bxyz'
+        return operations + result # 'xbi,ybi,zbi,->bxyz'
 
     def forward(self, x: Tensor, x_mask: Tensor, condition: Tensor, condition_mask: Tensor) -> Tuple[
         Tensor, List[Tensor]]:
@@ -144,7 +147,7 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
             # ---------------------------------------------------------
             y = linear_layer(y)
             y = y * x_mask
-            y = y.transpose(0, 1)
+            y = y.transpose(0, 1) # [T, B, D]
 
             # Accumulate vectors into stack for each daughter of this particle.
             daughter_vectors.append(daughter_vector)
@@ -154,7 +157,7 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
         # Construct the output logits via general self-attention.
         # output: [T, T, ...]
         # -------------------------------------------------------
-        output = torch.einsum(self.contraction_operation, *ys)
+        output = torch.einsum(self.contraction_operation, *ys) # [B, T, T, ...]
         output = output / self.weights_scale
 
         # ---------------------------------------------------
@@ -163,6 +166,8 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
         # ---------------------------------------------------
         # TODO Perhaps make the encoder layers match in the symmetric dimensions.
         output = self.symmetrize_tensor(output)
+
+        # TODO: Not exactly the same as paper, need index attention to be consistent with the paper.
 
         return output, daughter_vectors
 

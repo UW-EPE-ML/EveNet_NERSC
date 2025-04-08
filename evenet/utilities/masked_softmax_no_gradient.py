@@ -8,17 +8,19 @@ def masked_log_softmax(
         dim: int = -1
 ) -> torch.Tensor:
     """
-    Another alternative implementation of the masked log-softmax, this time doing a pure
-    mask (setting invalid values to -inf) but also preventing any gradient from flowing
-    at all to masked values!
+    Gradient-safe masked log-softmax.
+    Sets masked values to -inf and ensures no row is all masked to avoid NaNs.
     """
 
     if mask is not None:
-        # Create a -inf with the correct device and datatype
-        fill_value = torch.log(vector.new_zeros(()))
+        fill_value = float("-inf")
 
-        # Replace all masked entries in the output with the gradient-less -inf
-        vector = torch.masked_fill(vector, ~mask, fill_value)
+        # Mask invalid entries
+        vector = vector.masked_fill(~mask, fill_value)
+
+        # Prevent rows from becoming all -inf (causes NaN in log_softmax)
+        all_masked = (mask.sum(dim=dim, keepdim=True) == 0)
+        vector = vector.masked_fill(all_masked, 0.0)
 
     return F.log_softmax(vector, dim=dim)
 

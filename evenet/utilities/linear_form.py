@@ -65,6 +65,15 @@ def symmetric_tensor(weights: Tensor, permutation_group: List[List[int]]):
 # This is necessary for onnx export since it currently does not
 # support tensor.permute with non-constant arguments.
 def create_symmetric_function(permutation_group: List[List[int]]):
+
+
+    # Take permutation_group [(0, 1, 3, 2)] for example:
+    # code:
+    # def symmetrize_tensor(weights):
+    #     symmetric_weights = weights
+    #     symmetric_weights = symmetric_weights + weights.permute(0, 1, 3, 2)
+    #     return symmetric_weights / 2
+
     code = [
         "def symmetrize_tensor(weights):",
         "    symmetric_weights = weights"
