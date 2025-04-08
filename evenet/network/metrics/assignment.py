@@ -93,10 +93,10 @@ def shared_step(
         assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
         detected_loss = detected_loss + symmetric_losses["detection"][process]
 
-    loss_dict['assignment_loss'] = assignment_loss / len(process_names)
-    loss_dict['detection_loss'] = detected_loss / len(process_names)
+    loss_dict['assignment_loss'] = assignment_loss
+    loss_dict['detection_loss'] = detected_loss
 
-    total_loss = loss_scale * (assignment_loss + detected_loss) / len(process_names)
+    total_loss = loss_scale * (assignment_loss + detected_loss)
 
     return total_loss, assignment_predict
 
