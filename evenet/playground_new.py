@@ -321,7 +321,7 @@ for iepoch in range(n_epoch):
                     assignments = outputs["assignments"][process],
                     detections=outputs["detections"][process],
                     product_symbolic_groups=event_info.product_symbolic_groups[process],
-                    event_permutations=event_info.event_permutation[process],
+                    event_permutations=event_info.event_permutations[process],
                 )
 
 

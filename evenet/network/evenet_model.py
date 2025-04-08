@@ -175,7 +175,7 @@ class EveNetModel(nn.Module):
                     process_names = self.event_info.process_names,
                     pairing_topology_category=self.event_info.pairing_topology_category,
                     event_particles=self.event_info.event_particles,
-                    event_permutation=self.event_info.event_permutation,
+                    event_permutation=self.event_info.event_permutations,
                     product_particles = self.event_info.product_particles,
                     product_symmetries = self.event_info.product_symmetries,
                     feature_drop=self.network_cfg.Assignment.feature_drop,

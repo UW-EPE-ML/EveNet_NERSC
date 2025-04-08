@@ -90,14 +90,14 @@ class EventInfo:
             self.product_mappings[process] = product_mappings_process
             self.product_symmetries[process] = product_symmetries_process
 
-        self.event_permutation = OrderedDict()
+        self.event_permutations = OrderedDict()
         self.max_event_particles = 1
         for process_name in self.process_names:
             event_permutation = complete_indices(
                 self.event_symmetries[process_name].degree,
                 self.event_symmetries[process_name].permutations
             )
-            self.event_permutation[process_name] = event_permutation
+            self.event_permutations[process_name] = event_permutation
             for permutation_group in event_permutation:
                 for permutation_element in permutation_group:
                     max_indices = len(list(permutation_element))

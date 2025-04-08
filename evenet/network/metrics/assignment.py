@@ -46,10 +46,10 @@ def get_assignment_necessaries(
             {
                 'num_targets': num_targets,
                 'event_particles': event_particles,
-                'event_permutation': event_info.event_permutation,
+                'event_permutations': event_info.event_permutations,
             },
         'step': {
-            'event_permutation': event_info.event_permutation,
+            'event_permutations': event_info.event_permutations,
             'product_symbolic_groups': event_info.product_symbolic_groups,
         }
     }
@@ -65,7 +65,7 @@ def shared_step(
         targets,
         targets_mask,
         product_symbolic_groups,
-        event_permutation,
+        event_permutations,
         batch_size,
         device,
 ):
@@ -84,7 +84,7 @@ def shared_step(
             assignments=assignments[process],
             detections=detections[process],
             product_symbolic_groups=product_symbolic_groups[process],
-            event_permutations=event_permutation[process],
+            event_permutations=event_permutations[process],
         )
 
         loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
