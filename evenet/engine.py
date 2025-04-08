@@ -15,8 +15,8 @@ from transformers import get_cosine_schedule_with_warmup
 from evenet.network.evenet_model import EveNetModel
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
-from evenet.network.metrics.assigment import get_assignment_necessaries as get_ass
-from evenet.network.metrics.assigment import shared_step as ass_step
+from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
+from evenet.network.metrics.assignment import shared_step as ass_step
 
 
 class EveNetEngine(L.LightningModule):

@@ -14,7 +14,7 @@ from evenet.network.loss.classification import loss as cls_loss
 from evenet.network.loss.regression import loss as reg_loss
 from evenet.network.loss.assignment import loss as ass_loss
 
-from evenet.network.metrics.assigment import predict
+from evenet.network.metrics.assignment import predict
 
 from preprocessing.preprocess import unflatten_dict
 

@@ -21,8 +21,8 @@ INPUTS:
 
   # num_assignment = num_process * num_level1_particles
   assignment_indices: (num_events, num_assignment, num_level2_particles) # with padding
-  assigment_indices_mask: (num_events, num_assignment, num_level2_particles) # with padding
-  assigment_mask: (num_events, num_assignment)
+  assignment_indices_mask: (num_events, num_assignment, num_level2_particles) # with padding
+  assignment_mask: (num_events, num_assignment)
 
   num_vectors: (num_events, ) # num_particles
   num_sequential_vectors: (num_events, ) # num_particles

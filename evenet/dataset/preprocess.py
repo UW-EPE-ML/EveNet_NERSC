@@ -41,7 +41,7 @@ def process_event_batch_old(batch: dict[str, np.ndarray]) -> dict[str, np.ndarra
         k for k in batch if k.startswith('assignments-') and k.endswith('-indices')
     )
 
-    assigment_mask = np.array([
+    assignment_mask = np.array([
         np.vstack(batch[k]).ravel()
         for k in batch if k.startswith('assignments-') and k.endswith('-mask')
     ], dtype=np.float32).swapaxes(0, 1)
@@ -86,7 +86,7 @@ def process_event_batch_old(batch: dict[str, np.ndarray]) -> dict[str, np.ndarra
 
         'assignment_indices': assignment_indices,
         'assignment_indices_mask': assignment_indices_mask,
-        'assignment_mask': assigment_mask,
+        'assignment_mask': assignment_mask,
     }
 
     return {
