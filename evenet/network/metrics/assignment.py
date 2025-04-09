@@ -323,8 +323,9 @@ class SingleProcessAssignmentMetrics:
                     prediction_false = prediction_local[~correct_local]
                     detection_false = detection_local[~correct_local]
                     if prediction_false.size()[0] > 0:
-                        reco_mass_false = reconstruct_mass_peak(jet[~correct_local], prediction_false,
-                                                                input_mask[~correct_local])
+                        reco_mass_false = reconstruct_mass_peak(
+                            jet[~correct_local], prediction_false, input_mask[~correct_local]
+                        ).detach().cpu().numpy()
                         hist, _ = np.histogram(reco_mass_false, bins=self.bins)
                         self.predict_mass_spectrum_wrong[hist_name] += hist
 
