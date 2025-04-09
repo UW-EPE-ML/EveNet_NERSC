@@ -29,10 +29,12 @@ from evenet.utilities.debug_tool import DebugHookManager
 ## Debug configuration ##
 ########################
 
-wandb_enable = False
+wandb_enable = True
 n_epoch = 10
 debugger_enable = False
 device = "cpu"
+
+workspacedir = "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
@@ -49,7 +51,7 @@ df = pq.read_table(
 # Optional: Subsample for speed
 
 df.sample(frac=1).reset_index(drop=True)
-df_number = len(df) // 2
+df_number = 2048 # len(df) // 2
 df = df.head(df_number)
 
 # Assignment setting
@@ -157,7 +159,8 @@ assignment_metrics = {process: SingleProcessAssignmentMetrics(
     event_symbolic_group=event_info.event_symbolic_group[process],
     event_particles=event_info.event_particles[process],
     product_symbolic_groups=event_info.product_symbolic_groups[process],
-    ptetaphimass_index=event_info.ptetaphimass_index
+    ptetaphimass_index=event_info.ptetaphimass_index,
+    process=process
 ) for process in event_info.process_names}
 
 for iepoch in range(n_epoch):
@@ -250,12 +253,7 @@ for iepoch in range(n_epoch):
             for generation_target, generation_result in outputs["generations"].items():
                 generation_loss[generation_target] = gen_loss(generation_result["vector"], generation_result["truth"])
                 total_loss += generation_loss[generation_target]
-            # black_list = ["WJetsToQQ", "ZJetsToLL"]
-            # process_name = global_config.event_info.process_names[i]
-            # if process_name in black_list:
-            #     process_name = global_config.event_info.process_names[i+1]
-            # total_loss += symmetric_losses["assignment"][process_name]
-            # print(f"{process_name}: {symmetric_losses["assignment"][process_name]}")
+
 
             print(f"[Epoch {iepoch} / Batch {i}] Total loss: {total_loss}", flush=True)
 
@@ -296,6 +294,17 @@ for iepoch in range(n_epoch):
     if wandb_enable:
         fig = confusion_accumulator.plot_cm(class_names=num_classes)
         wandb.log({"confusion_matrix": wandb.Image(fig)})
+
+        for process in assignment_metrics:
+            figs = assignment_metrics[process].plot_mass_spectrum()
+            wandb.log({
+                f"assignment_matrix/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+            assignment_metrics[process].reset()
+
         plt.close(fig)
 
     confusion_accumulator.reset()

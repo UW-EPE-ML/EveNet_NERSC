@@ -59,7 +59,8 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      loss_scale: 1.0 # loss coefficient
+      assignment_loss_scale: 1.0
+      detection_loss_scale: 1.0
       include: false # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']

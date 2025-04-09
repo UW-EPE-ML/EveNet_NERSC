@@ -2,11 +2,12 @@ import re
 
 import torch.nn
 
+from evenet.network.loss.assignment import convert_target_assignment
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 from evenet.control.event_info import EventInfo
 from evenet.network.metrics.predict_assignment import extract_predictions
 
-from typing import List
+from typing import List, Dict
 from torch import Tensor
 
 from functools import reduce
@@ -14,22 +15,34 @@ from itertools import permutations, product
 import warnings
 import numpy as np
 
-def reconstruct_mass_peak(Jet, assignment_indices, padding_mask):
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+import wandb
+
+
+def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     """
+    *** input Jet with log pt and log mass ***
     Jet: [batch_size, num_jets, 4]
     assignment_indices: [batch_size, num_targets]
     """
-    Jet_Pt = Jet[...,0]
-    Jet_eta = Jet[...,1]
-    Jet_phi = Jet[...,2]
-    Jet_mass = Jet[...,3]
+    jet_pt = Jet[..., 0]
+    jet_eta = Jet[..., 1]
+    jet_phi = Jet[..., 2]
+    jet_mass = Jet[..., 3]
+
+    if log_mass:
+        jet_pt = torch.exp(jet_pt)
+        jet_mass = torch.exp(jet_mass)
+
     def gather_jets(jet_tensor):
         return torch.gather(jet_tensor.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
 
-    pt = gather_jets(Jet_Pt)
-    eta = gather_jets(Jet_eta)
-    phi = gather_jets(Jet_phi)
-    mass = gather_jets(Jet_mass)
+    pt = gather_jets(jet_pt)
+    eta = gather_jets(jet_eta)
+    phi = gather_jets(jet_phi)
+    mass = gather_jets(jet_mass)
 
     selected_mask = torch.gather(padding_mask.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
     is_valid_event = selected_mask.all(dim=1)
@@ -86,63 +99,19 @@ def get_assignment_necessaries(
             'event_permutations': event_info.event_permutations,
         },
         'step': {
+            'num_targets': num_targets,
+            'event_particles': event_particles,
             'event_permutations': event_info.event_permutations,
             'product_symbolic_groups': event_info.product_symbolic_groups,
         }
     }
 
 
-def shared_step(
-        ass_loss_fn,
-        loss_dict,
-        loss_scale,
-        process_names,
-        assignments,
-        detections,
-        targets,
-        targets_mask,
-        product_symbolic_groups,
-        event_permutations,
-        batch_size,
-        device,
-):
-    symmetric_losses = ass_loss_fn(
-        assignments=assignments,
-        detections=detections,
-        targets=targets,
-        targets_mask=targets_mask,
-    )
-
-    assignment_predict = dict()
-
-    assignment_loss = torch.zeros(batch_size, device=device, requires_grad=True)
-    detected_loss = torch.zeros(batch_size, device=device, requires_grad=True)
-    for process in process_names:
-        assignment_predict[process] = predict(
-            assignments=assignments[process],
-            detections=detections[process],
-            product_symbolic_groups=product_symbolic_groups[process],
-            event_permutations=event_permutations[process],
-        )
-
-        loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
-        loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
-
-        assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
-        detected_loss = detected_loss + symmetric_losses["detection"][process]
-
-    loss_dict['assignment_loss'] = assignment_loss
-    loss_dict['detection_loss'] = detected_loss
-
-    total_loss = loss_scale * (assignment_loss + detected_loss)
-
-    return total_loss, assignment_predict
-
-
 def predict(assignments: List[Tensor],
             detections: List[Tensor],
             product_symbolic_groups,
             event_permutations):
+    device = assignments[0].device
     assignments_indices = extract_predictions(
         [
             np.nan_to_num(assignment.detach().cpu().numpy(), -np.inf)
@@ -189,11 +158,11 @@ def predict(assignments: List[Tensor],
 
             init_probabilities = np.ones_like(assignment_probability[0])
             for iorder in range(len(symmetry_element)):
-                final_assignments_indices.append(assignment_sorted[iorder])
-                final_assignments_probabilities.append(assignment_probability[iorder])
+                final_assignments_indices.append(torch.tensor(assignment_sorted[iorder]).to(device))
+                final_assignments_probabilities.append(torch.tensor(assignment_probability[iorder]).to(device))
                 detections_probabilities = 1 - (detection_prob[:, iorder] / init_probabilities)
                 init_probabilities = detections_probabilities
-                final_detections_probabilities.append(detections_probabilities)
+                final_detections_probabilities.append(torch.tensor(detections_probabilities).to(device))
 
     return {
         "best_indices": final_assignments_indices,
@@ -203,17 +172,20 @@ def predict(assignments: List[Tensor],
 
 
 class SingleProcessAssignmentMetrics:
-    def __init__(self,
-                 device,
-                 event_permutations,
-                 event_symbolic_group,
-                 event_particles,
-                 product_symbolic_groups,
-                 ptetaphimass_index,
-                 detection_WP = [0.0, 0.5, 0.8],
-                 hist_xmin=0,
-                 hist_xmax=200,
-                 num_bins=100):
+    def __init__(
+            self,
+            device,
+            event_permutations,
+            event_symbolic_group,
+            event_particles,
+            product_symbolic_groups,
+            ptetaphimass_index,
+            process,
+            detection_WP=[0.0, 0.5, 0.8],
+            hist_xmin=0,
+            hist_xmax=250,
+            num_bins=125
+    ):
 
         self.device = device
         self.event_permutations = event_permutations
@@ -225,7 +197,7 @@ class SingleProcessAssignmentMetrics:
         self.num_bins = num_bins
         self.detection_WP = detection_WP
         self.ptetaphimass_index = ptetaphimass_index
-
+        self.process = process
         clusters = []
         cluster_groups = []
 
@@ -238,7 +210,7 @@ class SingleProcessAssignmentMetrics:
             cluster_name = map(dict.fromkeys, names_clean)
             cluster_name = map(lambda x: x.keys(), cluster_name)
             cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
-            clusters.append((cluster_name, names, orbit)) # ['t', ['t1', 't2'], Orbit]
+            clusters.append((cluster_name, names, orbit))  # ['t', ['t1', 't2'], Orbit]
 
             cluster_group = self.target_groups[names[0]]
             for name in names:
@@ -247,61 +219,150 @@ class SingleProcessAssignmentMetrics:
                     f"but got {cluster_group}."
                 )
 
-            cluster_groups.append((cluster_name, names, cluster_group)) # ['t', ['t1', 't2'], Group]
+            cluster_groups.append((cluster_name, names, cluster_group))  # ['t', ['t1', 't2'], Group]
 
         self.clusters = clusters
         self.cluster_groups = cluster_groups
 
         self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
+        self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
+
         self.mass_spectrum = dict({
-            f"{i}{cluster_name}": np.zeros(self.num_bins)
-            for i in range(len(names)) for cluster_name, names, orbit in self.clusters
+            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
+            for cluster_name, particle_name, orbit in self.clusters
+            for i in range(len(particle_name))
         })
 
-        self.predict_mass_spectrum = dict({
-            f"{i}{cluster_name}": {
-                f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
-            }
-            for i in range(len(names)) for cluster_name, names, orbit in self.clusters
+        self.predict_mass_spectrum_correct = dict({
+            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
+            for cluster_name, particle_name, orbit in self.clusters
+            for i in range(len(particle_name))
         })
 
+        self.predict_mass_spectrum_wrong = dict({
+            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
+            for cluster_name, particle_name, orbit in self.clusters
+            for i in range(len(particle_name))
+        })
 
-    def update(self,
-               best_indices,
-               assignment_probabilities,
-               detection_probabilities,
-               truth_indices,
-               truth_masks,
-               inputs,
-               inputs_mask,
-            ):
+        # self.predict_mass_spectrum_correct = dict({
+        #     f"{i+1}{cluster_name}": {
+        #         f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
+        #     }
+        #     for cluster_name, particle_name, orbit in self.clusters
+        #     for i in range(len(particle_name))
+        # })
+
+        # self.predict_mass_spectrum_wrong = dict({
+        #     f"{i+1}{cluster_name}": {
+        #         f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
+        #     }
+        #     for cluster_name, particle_name, orbit in self.clusters
+        #     for i in range(len(particle_name))
+        # })
+
+    def update(
+            self,
+            best_indices,
+            assignment_probabilities,
+            detection_probabilities,
+            truth_indices,
+            truth_masks,
+            inputs,
+            inputs_mask,
+    ):
+
+        best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
+
+        correct_assigned = self.check_correct_assignment(
+            best_indices,
+            truth_indices,
+            truth_masks
+        )
+
         for cluster_name, names, orbit in self.clusters:
+
             truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
             truth = torch.stack([truth_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            truth_masking = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             prediction = torch.stack([best_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
-            detection_probabilities = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            predict_detection = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            correct_reco = torch.stack([correct_assigned[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+
             for num_resonance in range(len(names)):
                 truth_mask = (truth_count == (num_resonance + 1))
-                for local_resonance in range(num_resonance + 1):
-                    hist_name = f"{num_resonance}{cluster_name}"
-                    truth_local =  truth[local_resonance, :, :]
-                    prediction_local = prediction[local_resonance, :, :]
-                    detection_local = detection_probabilities[local_resonance, :, :]
-                    truth_local = truth_local[truth_mask]
+                hist_name = f"{num_resonance + 1}{cluster_name}"
+                for local_resonance in range(len(names)):
+                    truth_local = truth[local_resonance, :, :]
+                    truth_mask_local = truth_mask & truth_masking[local_resonance, :]
+                    truth_local = truth_local[truth_mask_local]
                     if not (truth_local.size()[0] > 0):
                         continue
-                    input = inputs[truth_mask]
-                    input_mask = inputs_mask[truth_mask]
+
+                    input = inputs[truth_mask_local]
+                    input_mask = inputs_mask[truth_mask_local]
                     jet = input[:, :, self.ptetaphimass_index]
                     truth_mass = reconstruct_mass_peak(jet, truth_local, input_mask)
                     truth_mass = truth_mass.detach().cpu().numpy()
                     hist, _ = np.histogram(truth_mass, bins=self.bins)
                     self.mass_spectrum[hist_name] += hist
 
+                    prediction_local = prediction[local_resonance, :, :][truth_mask_local]
+                    detection_local = predict_detection[local_resonance, :][truth_mask_local]
+                    correct_local = correct_reco[local_resonance, :][truth_mask_local]
+
+                    predict_correct = prediction_local[correct_local]
+                    detection_correct = detection_local[correct_local]
+                    if prediction_local.size()[0] > 0:
+                        reco_mass_correct = reconstruct_mass_peak(
+                            jet[correct_local], predict_correct, input_mask[correct_local]
+                        )
+                        hist, _ = np.histogram(reco_mass_correct, bins=self.bins)
+                        self.predict_mass_spectrum_correct[hist_name] += hist
+
+                    prediction_false = prediction_local[~correct_local]
+                    detection_false = detection_local[~correct_local]
+                    if prediction_false.size()[0] > 0:
+                        reco_mass_false = reconstruct_mass_peak(jet[~correct_local], prediction_false,
+                                                                input_mask[~correct_local])
+                        hist, _ = np.histogram(reco_mass_false, bins=self.bins)
+                        self.predict_mass_spectrum_wrong[hist_name] += hist
+
+    def check_correct_assignment(
+            self,
+            prediction,
+            target_indices,
+            target_masks,
+    ):
+
+        result = [torch.zeros_like(prediction[i]).bool() for i in range(len(prediction))]
+        for cluster_name, cluster_particles, cluster_indices in self.clusters:
+            cluster_target_masks = torch.stack([target_masks[i] for i in cluster_indices])
+            cluster_target_indices = torch.stack([target_indices[i] for i in cluster_indices])
+            cluster_predictions = torch.stack([prediction[i] for i in cluster_indices])
+            correct_predictions = torch.zeros_like(cluster_target_masks, dtype=torch.int64)
+            for target_permutation in permutations(range(len(cluster_indices))):
+                target_permutation = torch.tensor(
+                    target_permutation, dtype=torch.int64,
+                    device=cluster_target_masks.device
+                )
+                prediction_correct = (cluster_predictions == cluster_target_indices[target_permutation])
+
+                prediction_correct = prediction_correct.all(-1) * cluster_target_masks[target_permutation]
+                correct_predictions = torch.maximum(prediction_correct, correct_predictions)
+
+            for ilocal, iglobal in enumerate(cluster_indices):
+                result[iglobal] = correct_predictions[ilocal, :].bool()
+
+        return result
+
     def reset(self):
         for name, hist in self.mass_spectrum.items():
             self.mass_spectrum[name] = np.zeros(self.num_bins)
-
+        for name, hist in self.predict_mass_spectrum_correct.items():
+            self.predict_mass_spectrum_correct[name] = np.zeros(self.num_bins)
+        for name, hist in self.predict_mass_spectrum_wrong.items():
+            self.predict_mass_spectrum_wrong[name] = np.zeros(self.num_bins)
 
     def reduce_across_gpus(self):
         if torch.distributed.is_initialized():
@@ -309,184 +370,192 @@ class SingleProcessAssignmentMetrics:
                 tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
                 torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
                 self.mass_spectrum[name] = tensor.cpu().numpy()
+            for name, hist in self.predict_mass_spectrum_correct.items():
+                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
+                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                self.predict_mass_spectrum_correct[name] = tensor.cpu().numpy()
+            for name, hist in self.predict_mass_spectrum_wrong.items():
+                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
+                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                self.predict_mass_spectrum_wrong[name] = tensor.cpu().numpy()
 
-    def reset(self):
-        pass
+    def plot_mass_spectrum_func(self,
+                                truth,
+                                predict_correct,
+                                predict_wrong,
+                                ):
 
-    def reduce_across_gpus(self):
-        """All-reduce across DDP workers"""
-        if torch.distributed.is_initialized():
-            tensor = torch.tensor(self.matrix, dtype=torch.long, device=self.device)
-            torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-            self.matrix = tensor.cpu().numpy()
+        fig, ax = plt.subplots(figsize=(9, 6))
+        base_colors = plt.cm.Set2(np.linspace(0.2, 0.8, 2))
+        lighter = lambda c: tuple(min(1.0, x + 0.3) for x in c)
+
+        total_pred = np.zeros_like(predict_wrong)
+
+        ax.bar(
+            self.bin_centers,
+            predict_correct,
+            width=np.diff(self.bins),
+            bottom=total_pred,
+            color=base_colors[0],
+            alpha=0.6,
+            label='Reco Success',
+        )
+
+        ax.bar(
+            self.bin_centers,
+            predict_wrong,
+            width=np.diff(self.bins),
+            bottom=total_pred + predict_correct,
+            color=lighter(base_colors[0]),
+            alpha=0.5,
+            label='Reco False'
+        )
+
+        ax.step(self.bin_centers, truth, where='mid', color='black', linewidth=1.5, label='Truth')
+
+        def gauss(x, a, mu, sigma):
+            return a * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2))
+
+        try:
+            popt_truth, _ = curve_fit(gauss, self.bin_centers, truth, p0=[np.max(truth), 100, 10])
+            ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_truth), 'k--',
+                    label=f'Truth Fit: μ={popt_truth[1]:.2f}, σ={popt_truth[2]:.2f}')
+        except RuntimeError:
+            print("Truth fit failed")
+
+        try:
+            popt_pred, _ = curve_fit(gauss, self.bin_centers, predict_correct + predict_wrong,
+                                     p0=[np.max(predict_correct + predict_wrong), 100, 10])
+            ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_pred), 'r--',
+                    label=f'Pred Fit: μ={popt_pred[1]:.2f}, σ={popt_pred[2]:.2f}')
+        except RuntimeError:
+            print("Prediction fit failed")
+
+        ax.legend()
+        fig.tight_layout()
+        return fig
+
+    def plot_mass_spectrum(self):
+        return_plot = dict()
+        for name, hist in self.mass_spectrum.items():
+            return_plot[f"{name}"] = self.plot_mass_spectrum_func(
+                hist,
+                self.predict_mass_spectrum_correct[name],
+                self.predict_mass_spectrum_wrong[name],
+            )
+        return return_plot
 
     @staticmethod
-    def permute_arrays(array_list, permutation):
+    def permute_arrays(self, array_list, permutation):
         return [array_list[index] for index in permutation]
 
-class SymmetricEvaluator:
-    def __init__(self, event_info: EventInfo, process: str):
-        self.event_info = event_info
-        self.event_group = event_info.event_symbolic_group[process]
-        self.target_groups = event_info.product_symbolic_groups[process]
-        self.process_name = process
-        # Gather all of the Similar particles together based on the permutation groups
-        clusters = []
-        cluster_groups = []
+    def sort_outputs(self, predictions, targets):
+        """
+        :param predictions:
+        :param targets:
+        :return:
+        Sort all of the targets and predictions to avoid any intra-particle symmetries
+        """
 
-        self.clusters = clusters
-        self.cluster_groups = cluster_groups
-
-    @staticmethod
-    def permute_arrays(array_list, permutation):
-        return [array_list[index] for index in permutation]
-
-    def sort_outputs(self, predictions, target_jets, target_masks):
-        predictions = [np.copy(p) for p in predictions]
-        target_jets = [np.copy(p) for p in target_jets]
-
-        # Sort all of the targets and predictions to avoid any intra-particle symmetries
+        predictions = [torch.clone(p) for p in predictions]
+        targets = [torch.clone(p) for p in targets]
         for i, (_, particle_group) in enumerate(self.target_groups.items()):
             for orbit in particle_group.orbits():
                 orbit = tuple(sorted(orbit))
 
-                target_jets[i][:, orbit] = np.sort(target_jets[i][:, orbit], axis=1)
-                predictions[i][:, orbit] = np.sort(predictions[i][:, orbit], axis=1)
+                targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
+                predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
+        return predictions, targets
 
-        return predictions, target_jets, target_masks
 
-    def particle_count_info(self, target_masks):
-        target_masks = np.array(target_masks)
+def shared_step(
+        ass_loss_fn,
+        loss_dict,
+        assignment_loss_scale,
+        detection_loss_scale,
+        process_names,
+        assignments,
+        detections,
+        targets,
+        targets_mask,
+        product_symbolic_groups,
+        event_permutations,
+        batch_size,
+        device,
+        event_particles,
+        num_targets,
+        point_cloud,
+        point_cloud_mask,
+        subprocess_id,
+        metrics: dict[str, SingleProcessAssignmentMetrics]
+):
+    symmetric_losses = ass_loss_fn(
+        assignments=assignments,
+        detections=detections,
+        targets=targets,
+        targets_mask=targets_mask,
+        process_id=subprocess_id,
+    )
 
-        # Count the total number of particles for simple filtering
-        total_particle_counts = target_masks.sum(0)
+    assignment_predict = dict()
+    ass_target_metric, ass_mask_metric = convert_target_assignment(
+        targets=targets,
+        targets_mask=targets_mask,
+        event_particles=event_particles,
+        num_targets=num_targets
+    )
 
-        # Count the number of particles present in each cluster
-        particle_counts = [
-            target_masks[list(cluster_indices)].sum(0)
-            for _, _, cluster_indices in self.clusters
-        ]
+    assignment_loss = torch.zeros(batch_size, device=device, requires_grad=True)
+    detected_loss = torch.zeros(batch_size, device=device, requires_grad=True)
+    for process in process_names:
+        assignment_predict[process] = predict(
+            assignments=assignments[process],
+            detections=detections[process],
+            product_symbolic_groups=product_symbolic_groups[process],
+            event_permutations=event_permutations[process],
+        )
 
-        # Find the maximum number of particles in each cluster
-        particle_max = [len(cluster_indices) for _, _, cluster_indices in self.clusters]
+        metrics[process].update(
+            best_indices=assignment_predict[process]["best_indices"],
+            assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
+            detection_probabilities=assignment_predict[process]["detection_probabilities"],
+            truth_indices=ass_target_metric[process],
+            truth_masks=ass_mask_metric[process],
+            inputs=point_cloud,
+            inputs_mask=point_cloud_mask,
+        )
 
-        return total_particle_counts, particle_counts, particle_max
+        loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
+        loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
 
-    def cluster_purity(self, predictions, target_jets, target_masks):
-        results = []
+        assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
+        detected_loss = detected_loss + symmetric_losses["detection"][process]
 
-        for cluster_name, cluster_particles, cluster_indices in self.clusters:
-            # Extract jet information for the current cluster
-            cluster_target_masks = np.stack([target_masks[i] for i in cluster_indices])
-            cluster_target_jets = np.stack([target_jets[i] for i in cluster_indices])
-            cluster_predictions = np.stack([predictions[i] for i in cluster_indices])
+    loss_dict['assignment_loss'] = assignment_loss
+    loss_dict['detection_loss'] = detected_loss
 
-            # Keep track of the best accuracy achieved for each event
-            best_accuracy = np.zeros(cluster_target_masks.shape[1], dtype=np.int64)
+    total_loss = assignment_loss_scale * assignment_loss + detection_loss_scale * detected_loss
 
-            for target_permutation in permutations(range(len(cluster_indices))):
-                target_permutation = list(target_permutation)
+    return total_loss, assignment_predict
 
-                accuracy = cluster_predictions == cluster_target_jets[target_permutation]
-                accuracy = accuracy.all(-1) * cluster_target_masks[target_permutation]
-                accuracy = accuracy.sum(0)
 
-                best_accuracy = np.maximum(accuracy, best_accuracy)
+def shared_epoch_end(
+        global_rank,
+        metrics_valid,
+        logger,
+):
+    metrics_valid.reduce_across_gpus()
 
-            # Get rid of pesky warnings
-            total_particles = cluster_target_masks.sum()
-            if total_particles > 0:
-                cluster_accuracy = best_accuracy.sum() / cluster_target_masks.sum()
-            else:
-                cluster_accuracy = np.nan
+    if global_rank == 0:
 
-            results.append((cluster_name, cluster_particles, cluster_accuracy))
+        for process in metrics_valid:
+            figs = metrics_valid[process].plot_mass_spectrum()
+            logger.log({
+                f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
 
-        return results
-
-    def event_purity(self, predictions, target_jets, target_masks):
-        target_masks = np.stack(target_masks)
-
-        # Keep track of the best accuracy achieved for each event
-        best_accuracy = np.zeros(target_masks.shape[1], dtype=np.int64)
-
-        for target_permutation in self.event_info.event_permutation_group[self.process_name]:
-            permuted_targets = self.permute_arrays(target_jets, target_permutation)
-            permuted_mask = self.permute_arrays(target_masks, target_permutation)
-            accuracy = np.array([
-                (p == t).all(-1) * m
-                for p, t, m
-                in zip(predictions, permuted_targets, permuted_mask)
-            ])
-            accuracy = accuracy.sum(0)
-
-            best_accuracy = np.maximum(accuracy, best_accuracy)
-
-        # Event accuracy is defined as getting all possible particles in event
-        num_particles_in_event = target_masks.sum(0)
-        accurate_event = best_accuracy == num_particles_in_event
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            return accurate_event.mean()
-
-    def full_report(self, predictions, target_jets, target_masks):
-        predictions, target_jets, target_masks = self.sort_outputs(predictions, target_jets, target_masks)
-
-        total_particle_counts, particle_counts, particle_max = self.particle_count_info(target_masks)
-        particle_ranges = [list(range(-1, pmax + 1)) for pmax in particle_max]
-
-        full_results = []
-
-        for event_counts in product(*particle_ranges):
-            # Filter all events to make sure they at least have a particle there
-            event_mask = total_particle_counts >= 0
-
-            # Filter to have the correct cluster counts
-            for particle_count, event_count in zip(particle_counts, event_counts):
-                if event_count >= 0:
-                    event_mask = event_mask & (particle_count == event_count)
-
-                # During wildcard events, make sure we have at least one particle in the event.
-                if event_count < 0:
-                    event_mask = event_mask & (total_particle_counts > 0)
-
-            # Filter event information according to computed mask
-            masked_predictions = [p[event_mask] for p in predictions]
-            masked_target_jets = [p[event_mask] for p in target_jets]
-            masked_target_masks = [p[event_mask] for p in target_masks]
-
-            # Compute purity values
-            masked_event_purity = self.event_purity(masked_predictions, masked_target_jets, masked_target_masks)
-            masked_cluster_purity = self.cluster_purity(masked_predictions, masked_target_jets, masked_target_masks)
-
-            mask_proportion = event_mask.mean()
-
-            full_results.append((event_counts, mask_proportion, masked_event_purity, masked_cluster_purity))
-
-        return full_results
-
-    def full_report_string(self, predictions, target_jets, target_masks, prefix: str = ""):
-        full_purities = {}
-
-        report = self.full_report(predictions, target_jets, target_masks)
-        for event_mask, mask_proportion, event_purity, particle_purity in report:
-
-            event_mask_name = ""
-            purity = {
-                "{}{}/event_purity": event_purity,
-                "{}{}/event_proportion": mask_proportion
-            }
-
-            for mask_count, (cluster_name, _, cluster_purity) in zip(event_mask, particle_purity):
-                mask_count = "*" if mask_count < 0 else str(mask_count)
-                event_mask_name = event_mask_name + mask_count + cluster_name
-                purity["{}{}/{}_purity".format("{}", "{}", cluster_name)] = cluster_purity
-
-            purity = {
-                key.format(prefix, event_mask_name): val for key, val in purity.items()
-            }
-
-            full_purities.update(purity)
-
-        return full_purities
+        for _, metric in metrics_valid.items():
+            metric.reset()

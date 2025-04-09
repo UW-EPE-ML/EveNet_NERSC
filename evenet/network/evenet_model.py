@@ -261,6 +261,7 @@ class EveNetModel(nn.Module):
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
         global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+
         class_label = x['classification'].unsqueeze(-1)  # (batch_size, 1)
 
 

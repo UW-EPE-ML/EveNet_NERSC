@@ -16,14 +16,19 @@ from evenet.network.evenet_model import EveNetModel
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
 from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
-from evenet.network.metrics.assignment import shared_step as ass_step
+from evenet.network.metrics.assignment import shared_step as ass_step, shared_epoch_end as ass_end
+from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 
 
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.optimizer_name_map = None
+        self.optimizer_name_list = []
         self.classification_metrics_train = None
         self.classification_metrics_valid = None
+        self.assignment_metrics_train = None
+        self.assignment_metrics_valid = None
         self.model_parts = {}
         self.model: Union[EveNetModel, None] = None
         self.config = global_config
@@ -50,6 +55,7 @@ class EveNetEngine(L.LightningModule):
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
         self.class_weight = self.normalization_dict['class_balance']
         self.assignment_weight = self.normalization_dict['particle_balance']
+        self.subprocess_balance = self.normalization_dict['subprocess_balance']
 
         print(f"{self.__class__.__name__} normalization dicts initialized")
 
@@ -82,6 +88,7 @@ class EveNetEngine(L.LightningModule):
                 ass_loss.loss,
                 focal_gamma=0.1,
                 particle_balance=self.assignment_weight,
+                process_balance=self.subprocess_balance,
                 **self.ass_args['loss']
             )
             self.ass_loss = assignment_loss_partial
@@ -113,7 +120,7 @@ class EveNetEngine(L.LightningModule):
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
-            if key in self.input_keys
+            # if key in self.input_keys
         }
 
         outputs = self.model.shared_step(
@@ -122,18 +129,20 @@ class EveNetEngine(L.LightningModule):
         )
 
         loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
-        loss_dict = {}
+        loss_head_dict = {}
+        loss_detailed_dict = {}
         if self.classification_cfg.include:
             scaled_cls_loss = cls_step(
                 target_classification=batch[self.target_classification_key].to(device=device),
                 cls_output=next(iter(outputs["classification"].values())),
                 cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
-                loss_dict=loss_dict,
+                loss_dict=loss_detailed_dict,
                 loss_scale=self.classification_cfg.loss_scale,
                 metrics=self.classification_metrics_train if self.training else self.classification_metrics_valid,
                 device=device,
             )
+            loss_head_dict["classification"] = scaled_cls_loss
 
             loss = loss + scaled_cls_loss
 
@@ -148,7 +157,9 @@ class EveNetEngine(L.LightningModule):
                 target_regression_mask.float(),
             )
             loss = loss + reg_loss * self.regression_cfg.loss_scale
-            loss_dict["regression_loss"] = reg_loss
+
+            loss_head_dict["regression"] = reg_loss
+            loss_detailed_dict["regression_loss"] = reg_loss
 
         ass_predicts = None
         if self.assignment_cfg.include:
@@ -156,8 +167,9 @@ class EveNetEngine(L.LightningModule):
             ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
-                loss_dict=loss_dict,
-                loss_scale=self.assignment_cfg.loss_scale,
+                loss_dict=loss_detailed_dict,
+                assignment_loss_scale=self.assignment_cfg.assignment_loss_scale,
+                detection_loss_scale=self.assignment_cfg.detection_loss_scale,
                 process_names=self.config.event_info.process_names,
                 assignments=outputs["assignments"],
                 detections=outputs["detections"],
@@ -165,31 +177,37 @@ class EveNetEngine(L.LightningModule):
                 targets_mask=ass_targets_mask,
                 batch_size=batch_size,
                 device=device,
+                metrics=self.assignment_metrics_train if self.training else self.assignment_metrics_valid,
+                point_cloud=inputs['x'],
+                point_cloud_mask=inputs['x_mask'],
+                subprocess_id=inputs["subprocess_id"],
                 **self.ass_args['step']
             )
+            loss_head_dict['assigment'] = scaled_ass_loss
 
             loss = loss + scaled_ass_loss
 
-        return loss, loss_dict, ass_predicts
+        return loss, loss_head_dict, loss_detailed_dict, ass_predicts
 
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         step = self.global_step
         epoch = self.current_epoch
 
-        loss, loss_dict, _ = self.shared_step(*args, **kwargs)
+        loss, loss_head, loss_dict, _ = self.shared_step(*args, **kwargs)
 
         self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
         for name, val in loss_dict.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
+        optimizers = list(self.optimizers())
         # Yulei TODO: currently one backward pass for all optimizers
         #       this is not optimal for large models, considering to split loss for each optimizer
         # === Manual optimization ===
-        optimizers = list(self.optimizers())
         for opt in optimizers:
             opt.zero_grad()
 
-        self.backward(loss.mean())
+        # self.backward(loss.mean())
+        self.safe_manual_backward(loss.mean(), optimizers=optimizers)
 
         for opt in optimizers:
             opt.step()
@@ -202,6 +220,30 @@ class EveNetEngine(L.LightningModule):
         else:
             schedulers.step()
 
+        # for i, (loss_name, loss) in enumerate(loss_head.items()):
+        #     opt_list = [
+        #         optimizers[opt_index]
+        #         for name, opt_index in self.optimizer_name_map.items()
+        #         if name in ["body", "object_encoder"] or name == loss_name
+        #     ]
+        #
+        #     for opt in opt_list:
+        #         opt.zero_grad()
+        #     # Retain graph unless it's the last loss
+        #     retain = (i < len(loss_head) - 1)
+        #
+        #     self.safe_manual_backward(loss, optimizers=opt_list, retain_graph=retain)
+        #
+        #     for opt in opt_list:
+        #         opt.step()
+        #
+        #     # Log clean names
+        #     opt_names = [
+        #         name for name in self.optimizer_name_map
+        #         if name in ["body", "object_encoder"] or name == loss_name
+        #     ]
+        #     print(f"✅ Loss `{loss_name}` [Retain: {retain}] backward and stepped for optimizers {opt_names}")
+
         return loss.mean()
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
@@ -210,7 +252,7 @@ class EveNetEngine(L.LightningModule):
         epoch = self.current_epoch
         # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
 
-        loss, loss_dict, _ = self.shared_step(*args, **kwargs)
+        loss, loss_head, loss_dict, _ = self.shared_step(*args, **kwargs)
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
@@ -219,19 +261,40 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
-    def on_validation_start(self):
-        if self.classification_cfg.include:
-            self.classification_metrics_valid = ClassificationMetrics(
-                num_classes=len(self.num_classes), normalize=True,
-                device=self.device,
-            )
-
-    def on_train_epoch_start(self) -> None:
+    def on_fit_start(self) -> None:
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
-                num_classes=len(self.num_classes), normalize=True,
-                device=self.device,
+                num_classes=len(self.num_classes), normalize=True, device=self.device
             )
+            self.classification_metrics_valid = ClassificationMetrics(
+                num_classes=len(self.num_classes), normalize=True, device=self.device
+            )
+
+        if self.assignment_cfg.include:
+            def make_assignment_metrics():
+                return {
+                    process: SingleProcessAssignmentMetrics(
+                        device=self.device,
+                        event_permutations=self.config.event_info.event_permutations[process],
+                        event_symbolic_group=self.config.event_info.event_symbolic_group[process],
+                        event_particles=self.config.event_info.event_particles[process],
+                        product_symbolic_groups=self.config.event_info.product_symbolic_groups[process],
+                        ptetaphimass_index=self.config.event_info.ptetaphimass_index,
+                        process=process
+                    ) for process in self.config.event_info.process_names
+                }
+
+            self.assignment_metrics_train = make_assignment_metrics()
+            self.assignment_metrics_valid = make_assignment_metrics()
+
+    def on_fit_end(self) -> None:
+        pass
+
+    def on_validation_start(self):
+        pass
+
+    def on_train_epoch_start(self) -> None:
+        pass
 
     def on_validation_epoch_end(self) -> None:
         if self.classification_cfg.include:
@@ -240,6 +303,13 @@ class EveNetEngine(L.LightningModule):
                 metrics_valid=self.classification_metrics_valid,
                 metrics_train=self.classification_metrics_train,
                 num_classes=self.num_classes,
+                logger=self.logger.experiment,
+            )
+
+        if self.assignment_cfg.include:
+            ass_end(
+                global_rank=self.global_rank,
+                metrics_valid=self.assignment_metrics_valid,
                 logger=self.logger.experiment,
             )
 
@@ -254,6 +324,16 @@ class EveNetEngine(L.LightningModule):
                     print(f"🚨 Gradient in {name} is NaN or Inf!")
                     raise ValueError("Gradient check failed.")
         super().backward(loss, *args, **kwargs)
+
+    def safe_manual_backward(self, loss, optimizers: list, retain_graph=False):
+        self.manual_backward(loss, retain_graph=retain_graph)
+
+        # Check gradients for all involved optimizers
+        for opt in optimizers:
+            for group in opt.param_groups:
+                for param in group['params']:
+                    if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
+                        raise ValueError("🚨 Gradient is NaN or Inf!")
 
     def configure_optimizers(self):
         cfg = self.hyper_par_cfg
@@ -307,6 +387,11 @@ class EveNetEngine(L.LightningModule):
                 "frequency": 1,
                 "name": f"lr-{name}"
             })
+            self.optimizer_name_list.append(name)
+
+        self.optimizer_name_map = {
+            name: idx for idx, name in enumerate(self.optimizer_name_list)
+        }
 
         return optimizers, schedulers
 
