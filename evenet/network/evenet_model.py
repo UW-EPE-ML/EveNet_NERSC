@@ -12,6 +12,8 @@ from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
 
+
+
 from torch import Tensor, nn
 from typing import Dict
 import re

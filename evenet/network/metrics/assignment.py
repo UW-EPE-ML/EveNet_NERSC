@@ -14,6 +14,36 @@ from itertools import permutations, product
 import warnings
 import numpy as np
 
+def reconstruct_mass_peak(Jet_Pt, Jet_eta, Jet_phi, Jet_mass, assignment_indices, padding_mask):
+    def gather_jets(jet_tensor):
+        return torch.gather(jet_tensor.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
+
+    pt = gather_jets(Jet_Pt)
+    eta = gather_jets(Jet_eta)
+    phi = gather_jets(Jet_phi)
+    mass = gather_jets(Jet_mass)
+
+    selected_mask = torch.gather(padding_mask.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
+    is_valid_event = selected_mask.all(dim=1)
+
+    # 4-vector components
+    px = pt * torch.cos(phi)
+    py = pt * torch.sin(phi)
+    pz = pt * torch.sinh(eta)
+    E = torch.sqrt(px ** 2 + py ** 2 + pz ** 2 + mass ** 2)
+
+    total_E = E.sum(dim=1)
+    total_px = px.sum(dim=1)
+    total_py = py.sum(dim=1)
+    total_pz = pz.sum(dim=1)
+
+    mass_squared = total_E ** 2 - (total_px ** 2 + total_py ** 2 + total_pz ** 2)
+    mass_squared = torch.clamp(mass_squared, min=0.0)
+    invariant_mass = torch.sqrt(mass_squared)
+
+    invariant_mass[~is_valid_event] = float(-999)
+    return invariant_mass
+
 
 def get_assignment_necessaries(
         event_info: EventInfo,
@@ -164,6 +194,72 @@ def predict(assignments: List[Tensor],
     }
 
 
+class SingleProcessAssignmentMetrics:
+    def __init__(self,
+                 device,
+                 event_permutations,
+                 event_symbolic_group,
+                 event_particles,
+                 product_symbolic_groups,
+                 num_bins=50):
+
+        self.device = device
+        self.event_permutations = event_permutations
+        self.event_particles = event_particles
+        self.event_group = event_symbolic_group
+        self.target_groups = product_symbolic_groups
+        clusters = []
+        cluster_groups = []
+
+        for orbit in self.event_group.orbits():
+            orbit = tuple(sorted(orbit))
+            names = [self.event_particles[i] for i in orbit]
+
+            names_clean = [name.replace('/', '') for name in names]
+
+            cluster_name = map(dict.fromkeys, names_clean)
+            cluster_name = map(lambda x: x.keys(), cluster_name)
+            cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
+            clusters.append((cluster_name, names, orbit)) # ['t', ['t1', 't2'], Orbit]
+
+            cluster_group = self.target_groups[names[0]]
+            for name in names:
+                assert self.target_groups[name] == cluster_group, (
+                    f"Invalid symmetry group for '{name}': expected {self.target_groups[name]}, "
+                    f"but got {cluster_group}."
+                )
+
+            cluster_groups.append((cluster_name, names, cluster_group)) # ['t', ['t1', 't2'], Group]
+
+        self.clusters = clusters
+        self.cluster_groups = cluster_groups
+
+
+    def update(self,
+               best_indices,
+               assignment_probabilities,
+               detection_probabilities,
+               inputs,
+               inputs_mask,
+               event_permutations,
+            ):
+        pass
+
+
+
+
+    def reset(self):
+        self.valid = 0
+        self.total = 0
+
+    def reduce_across_gpus(self):
+        """All-reduce across DDP workers"""
+        if torch.distributed.is_initialized():
+            tensor = torch.tensor(self.matrix, dtype=torch.long, device=self.device)
+            torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+            self.matrix = tensor.cpu().numpy()
+
+
 class SymmetricEvaluator:
     def __init__(self, event_info: EventInfo, process: str):
         self.event_info = event_info
@@ -173,26 +269,6 @@ class SymmetricEvaluator:
         # Gather all of the Similar particles together based on the permutation groups
         clusters = []
         cluster_groups = []
-
-        for orbit in self.event_group.orbits():
-            orbit = tuple(sorted(orbit))
-            names = [event_info.event_particles[process][i] for i in orbit]
-
-            names_clean = [name.replace('/', '') for name in names]
-
-            cluster_name = map(dict.fromkeys, names_clean)
-            cluster_name = map(lambda x: x.keys(), cluster_name)
-            cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
-            clusters.append((cluster_name, names, orbit))
-
-            cluster_group = self.target_groups[names[0]]
-            for name in names:
-                assert self.target_groups[name] == cluster_group, (
-                    f"Invalid symmetry group for '{name}': expected {self.target_groups[name]}, "
-                    f"but got {cluster_group}."
-                )
-
-            cluster_groups.append((cluster_name, names, cluster_group))
 
         self.clusters = clusters
         self.cluster_groups = cluster_groups

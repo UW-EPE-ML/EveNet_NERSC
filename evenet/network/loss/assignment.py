@@ -34,26 +34,38 @@ def convert_target_assignment_array(
         targets: List[Tensor],
         targets_mask: List[Tensor],
         event_particles: Dict,
-        num_targets: Dict
+        num_targets: Dict,
+        process_id: Tensor,
+        process_balance: Tensor
 ):
     """
     Convert target assignment array to a dict of tensors list.
     """
     target_assignment = OrderedDict()
     target_assignment_mask = OrderedDict()
+    process_mask = OrderedDict()
+    process_weight = OrderedDict()
+    process_balance = process_balance.to(targets[0].device)
 
     index_global = 0
-    for process in event_particles.keys():
+    for iprocess, process in enumerate(event_particles.keys()):
         target_assignment[process] = []
         target_assignment_mask[process] = []
+        process_mask[process] = []
+        process_weight[process] = []
         local_index = 0
         for event_particle in event_particles[process]:
             target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
             target_assignment_mask[process].append(targets_mask[:, index_global])
+            process_mask[process].append(process_id == iprocess)
+            process_weight[process].append(
+                (process_balance[iprocess] * (process_id == iprocess).float())
+                if process_balance is not None else None
+            )
             index_global += 1
             local_index += 1
 
-    return target_assignment, target_assignment_mask
+    return target_assignment, target_assignment_mask, process_mask, process_weight
 
 
 def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, target_mask: Tensor, gamma: float) -> Tensor:
@@ -133,11 +145,13 @@ def loss_single_process(
         detections: List[Tensor],
         targets: List[Tensor],
         targets_mask: List[Tensor],
+        process_mask: List[Tensor],
         num_targets: List[Tensor],
         event_permutations: Tuple[List],
         focal_gamma: float,
         particle_index_tensor: Union[Tensor, None],
-        particle_weights_tensor: Union[Tensor, None]
+        particle_weights_tensor: Union[Tensor, None],
+        process_weight: Union[Tensor, None]
 ):
     ####################
     ## Detection Loss ##
@@ -146,6 +160,8 @@ def loss_single_process(
     detections = detections
     detections_target = targets_mask
     detection_losses = []
+    process_masking = []
+    process_weighting = []
     for symmetry_group in event_permutations:
         for symmetry_element in symmetry_group:
             symmetry_element = np.array(symmetry_element)
@@ -158,8 +174,23 @@ def loss_single_process(
                 reduction='none',
                 ignore_index=-1,
             ))
+            process_masking.append(process_mask[symmetry_element[0]])
+            process_weighting.append(
+                process_weight[symmetry_element[0]]
+                if process_weight else torch.ones_like(process_mask[symmetry_element[0]])
+            )
 
-    detection_loss = torch.mean(torch.stack(detection_losses))  # TODO: Check balance and masking
+    process_masking = torch.stack(process_masking).float()
+    process_weighting = torch.stack(process_weighting).float()
+    detection_losses = torch.stack(detection_losses) * process_masking * process_weighting
+    valid_process = torch.sum(process_masking)
+    if valid_process > 0:
+        detection_loss = torch.sum(detection_losses) / valid_process
+    else:
+        detection_loss = torch.zeros_like(valid_process, requires_grad=True)
+
+
+    # TODO: Check balance and masking
 
     #####################
     ## Assignment Loss ##
@@ -180,6 +211,9 @@ def loss_single_process(
     if particle_balance_weight is not None and particle_index_tensor is not None:
         class_indices = (masks_for_balance * particle_index_tensor.to(masks_for_balance.device).unsqueeze(1)).sum(0).int()
         particle_balance_weight *= particle_weights_tensor.to(masks_for_balance.device)[class_indices]
+
+    if process_weight is not None:
+        particle_balance_weight *= process_weight[0].unsqueeze(0)
 
     valid_assignments = torch.sum(torch.stack(targets_mask).float())
 
@@ -202,15 +236,25 @@ def loss(
         detections: Dict[str, List[Tensor]],
         targets: List[Tensor],
         targets_mask: List[Tensor],
+        process_id: Tensor,
         event_particles: Dict,
         event_permutations: Dict,
         num_targets: Dict,
         focal_gamma: float,
-        particle_balance: Dict
+        particle_balance: Union[Dict, None] = None,
+        process_balance: Union[Tensor, None] = None
 ):
 
     # TODO: Add class balance
-    targets, targets_mask = convert_target_assignment_array(targets, targets_mask, event_particles, num_targets)
+    targets, targets_mask, process_mask, process_weight = convert_target_assignment_array(
+        targets,
+        targets_mask,
+        event_particles,
+        num_targets,
+        process_id,
+        process_balance
+    )
+
     loss_summary = dict({
         "assignment": dict(),
         "detection": dict()
@@ -224,11 +268,13 @@ def loss(
             detections[process],
             targets[process],
             targets_mask[process],
+            process_mask[process],
             num_targets[process],
             event_permutations[process],
             focal_gamma,
             particle_balance.get(process, [None, None])[0] if particle_balance else None,
-            particle_balance.get(process, [None, None])[1] if particle_balance else None
+            particle_balance.get(process, [None, None])[1] if particle_balance else None,
+            process_weight[process]
         )
         loss_summary["assignment"][process] = assignment_loss / num_processes # not scale with num processes
         loss_summary["detection"][process] = detection_loss / num_processes # not scale with num processes
