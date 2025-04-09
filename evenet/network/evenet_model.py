@@ -397,7 +397,7 @@ class EveNetModel(nn.Module):
         }
 
     def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> Dict[str, Tensor]:
-        time = batch['x'].new_ones((batch_size,))
+        time = batch['x'].new_ones((batch_size,)).to(self.device)
         output = self.forward(batch, time)
         return output
 
