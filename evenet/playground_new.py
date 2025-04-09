@@ -128,14 +128,14 @@ global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
 
 shape_metadata = json.load(
-    open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
+    open(f"{workspacedir}/shape_metadata.json"))
 
-normalization_dict = torch.load("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt")
-particle_balance_dict = normalization_dict['particle_balance']
+normalization_dict = torch.load(f"{workspacedir}/normalization.pt")
+particle_balance_dict = None # normalization_dict['particle_balance']
 
 # Load the Parquet file locally
 df = pq.read_table(
-    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
+    f"{workspacedir}/data_run_yulei_11.parquet").to_pandas()
 # Optional: Subsample for speed
 
 df.sample(frac=1).reset_index(drop=True)
@@ -192,7 +192,8 @@ model = EveNetModel(
     config=global_config,
     device=torch.device("cpu"),
     normalization_dict=normalization_dict,
-    assignment=True
+    assignment=True,
+    generation=True
 )
 
 model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
@@ -297,13 +298,13 @@ for iepoch in range(n_epoch):
 
                 total_loss += symmetric_losses["assignment"][process]
                 total_loss += symmetric_losses["detection"][process]
-
-                assignment_predict[process] = predict(
-                    assignments = outputs["assignments"][process],
-                    detections=outputs["detections"][process],
-                    product_symbolic_groups=event_info.product_symbolic_groups[process],
-                    event_permutations=event_info.event_permutations[process],
-                )
+                #
+                # assignment_predict[process] = predict(
+                #     assignments = outputs["assignments"][process],
+                #     detections=outputs["detections"][process],
+                #     product_symbolic_groups=event_info.product_symbolic_groups[process],
+                #     event_permutations=event_info.event_permutations[process],
+                # )
 
 
             # black_list = ["WJetsToQQ", "ZJetsToLL"]

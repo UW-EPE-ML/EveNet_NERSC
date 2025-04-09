@@ -70,3 +70,13 @@ Assignment:
   combinatorial_scale: 0.0
   encode_event_token: true
   activation: GELU
+
+GlobalGeneration:
+  num_layers: 3
+  num_resnet_layers: 2
+  hidden_dim: 64
+  resnet_dim: 64
+  layer_scale_init: 1.0e-05
+  feature_drop_for_stochastic_depth: 0.0
+  activation: SILU
+  dropout: 0.0

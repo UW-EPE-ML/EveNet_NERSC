@@ -129,8 +129,10 @@ class EventInfo:
         self.classification_names = ['/'.join([SpecialKey.Event, target]) for target in self.classifications[SpecialKey.Event]]
         self.class_label = class_label
         self.num_classes = dict()
+        self.num_classes_total = 0
         for name in class_label['EVENT']:
             self.num_classes[name] = (np.array(class_label['EVENT'][name])).shape[-1]
+            self.num_classes_total += self.num_classes[name]
 
         self.pairing_topology = OrderedDict()
         self.pairing_topology_category = OrderedDict()
@@ -186,6 +188,19 @@ class EventInfo:
 
         self.resonance_particle_properties_mean = torch.Tensor(self.resonance_particle_properties_mean)
         self.resonance_particle_properties_std = torch.Tensor(self.resonance_particle_properties_std)
+
+        # Generation Head setting
+
+        iglobal_index = 0
+        self.generation_condition_indices = []
+        for input_name, input_feature in self.input_features.items():
+            if self.input_types[input_name] == InputType.Global:
+                for input_feature_element in input_feature:
+                    if input_feature_element.name in self.generations["Conditions"]:
+                        self.generation_condition_indices.append(iglobal_index)
+                    iglobal_index += 1
+
+
 
     def normalized_features(self, input_name: str) -> NDArray[bool]:
         return np.array([feature.normalize for feature in self.input_features[input_name]])

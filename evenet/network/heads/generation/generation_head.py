@@ -3,13 +3,14 @@ import torch.nn.functional as F
 import torch
 from torch import Tensor
 
-from typing import Optional
+from typing import Optional, List
 
 from evenet.network.body.embedding import FourierEmbedding
 from evenet.network.layers.activation import create_activation
 from evenet.network.layers.linear_block import ResNetDense
 from evenet.network.layers.utils import StochasticDepth
 from evenet.network.layers.transformer import GeneratorTransformerBlockModule
+
 class EventGenerationHead(nn.Module):
     def __init__(self,
                  input_dim: int,
@@ -86,7 +87,7 @@ class GlobalCondGenerationHead(nn.Module):
                  input_dim: int,
                  hidden_dim: int,
                  output_dim: int,
-                 input_cond_dim: int,
+                 input_cond_indices: List[int],
                  num_classes: int,
                  resnet_dim: int,
                  layer_scale_init: float,
@@ -103,15 +104,17 @@ class GlobalCondGenerationHead(nn.Module):
         self.activation = activation
         self.num_layer = num_layer
         self.num_classes = num_classes
+        self.input_cond_indices = input_cond_indices
+        self.input_cond_dim = len(input_cond_indices)
 
         self.fourier_projection = FourierEmbedding(self.hidden_dim)
         self.dense_t = nn.Sequential(
             nn.Linear(self.hidden_dim, 2 * self.hidden_dim),
         )
 
-        if input_cond_dim > 0:
+        if self.input_cond_dim > 0:
             self.global_cond_embedding = nn.Sequential(
-                nn.Linear(input_cond_dim, self.hidden_dim),
+                nn.Linear(self.input_cond_dim, self.hidden_dim),
                 create_activation(self.activation, self.hidden_dim)
             )
         if num_classes > 0:
@@ -162,19 +165,20 @@ class GlobalCondGenerationHead(nn.Module):
         # ----------------
         # x: [B, 1, D] <- Noised Global Input
         # x_mask: [B, 1, 1] <- Mask
-        # t: [B, 1] <- Time
+        # t: [B,] <- Time
         # global_cond: [B, C] <- Global Condition
         # label: [B, 1] <- Conditional Label, one-hot in function
         # ----------------
 
         batch_size = x.shape[0]
+        time = time.unsqueeze(-1)
         if x_mask is None:
             x_mask = torch.ones((batch_size, 1, 1), device=x.device)
 
         embed_time = self.fourier_projection(time).unsqueeze(1)  # [B, 1, D]
         # TODO: Add conditional labels
         if global_cond is not None:
-            global_cond_token = self.global_cond_embedding(global_cond)  # [B, 1, D]
+            global_cond_token = self.global_cond_embedding(global_cond[..., self.input_cond_indices])  # [B, 1, D]
             global_token = torch.cat([global_cond_token, embed_time], dim=-1)  # [B, 1, 2D]
         else:
             global_token = self.dense_t(embed_time)  # [B, 1, 2D]
