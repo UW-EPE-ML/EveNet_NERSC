@@ -395,4 +395,7 @@ PARTICLE_PROPERTIES:
   - nProduct_Lepton
   - Product_LeptonCharge
 
-    
+GENERATIONS:
+  Conditions:
+    - met
+    - met_phi

@@ -29,6 +29,28 @@ from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
 #         combined_loss = (weights * symmetric_losses).sum(0)
 #
 #     return combined_loss, index
+def convert_target_assignment(
+    targets: List[Tensor],
+    targets_mask: List[Tensor],
+    event_particles: Dict,
+    num_targets: Dict,
+    ):
+    target_assignment = OrderedDict()
+    target_assignment_mask = OrderedDict()
+
+    index_global = 0
+    for iprocess, process in enumerate(event_particles.keys()):
+        target_assignment[process] = []
+        target_assignment_mask[process] = []
+        local_index = 0
+        for event_particle in event_particles[process]:
+            target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
+            target_assignment_mask[process].append(targets_mask[:, index_global])
+            index_global += 1
+            local_index += 1
+
+    return target_assignment, target_assignment_mask
+
 
 def convert_target_assignment_array(
         targets: List[Tensor],
@@ -38,6 +60,7 @@ def convert_target_assignment_array(
         process_id: Tensor,
         process_balance: Tensor
 ):
+
     """
     Convert target assignment array to a dict of tensors list.
     """
@@ -45,7 +68,7 @@ def convert_target_assignment_array(
     target_assignment_mask = OrderedDict()
     process_mask = OrderedDict()
     process_weight = OrderedDict()
-    process_balance = process_balance.to(targets[0].device)
+    process_balance = process_balance.to(targets[0].device) if process_balance is not None else None
 
     index_global = 0
     for iprocess, process in enumerate(event_particles.keys()):
@@ -57,9 +80,10 @@ def convert_target_assignment_array(
         for event_particle in event_particles[process]:
             target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
             target_assignment_mask[process].append(targets_mask[:, index_global])
-            process_mask[process].append(process_id == iprocess)
+            process_masking = (process_id == iprocess) if process_id is not None else torch.ones_like(targets_mask[:, index_global], dtype=torch.bool)
+            process_mask[process].append(process_masking)
             process_weight[process].append(
-                (process_balance[iprocess] * (process_id == iprocess).float())
+                (process_balance[iprocess] * (process_masking).float())
                 if process_balance is not None else None
             )
             index_global += 1
@@ -177,7 +201,7 @@ def loss_single_process(
             process_masking.append(process_mask[symmetry_element[0]])
             process_weighting.append(
                 process_weight[symmetry_element[0]]
-                if process_weight else torch.ones_like(process_mask[symmetry_element[0]])
+                if process_weight[symmetry_element[0]] is not None else torch.ones_like(process_mask[symmetry_element[0]])
             )
 
     process_masking = torch.stack(process_masking).float()
@@ -212,7 +236,7 @@ def loss_single_process(
         class_indices = (masks_for_balance * particle_index_tensor.to(masks_for_balance.device).unsqueeze(1)).sum(0).int()
         particle_balance_weight *= particle_weights_tensor.to(masks_for_balance.device)[class_indices]
 
-    if process_weight is not None:
+    if process_weight[0] is not None:
         particle_balance_weight *= process_weight[0].unsqueeze(0)
 
     valid_assignments = torch.sum(torch.stack(targets_mask).float())

@@ -15,6 +15,8 @@ def create_activation(activation: str, input_dim: int) -> nn.Module:
         return nn.CELU()
     elif activation == "gelu":
         return nn.GELU()
+    elif activation == "silu":
+        return nn.SiLU()
     else:
         return nn.Identity()
 

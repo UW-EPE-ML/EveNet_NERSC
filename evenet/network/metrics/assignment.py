@@ -14,8 +14,15 @@ from itertools import permutations, product
 import warnings
 import numpy as np
 
-
-def reconstruct_mass_peak(Jet_Pt, Jet_eta, Jet_phi, Jet_mass, assignment_indices, padding_mask):
+def reconstruct_mass_peak(Jet, assignment_indices, padding_mask):
+    """
+    Jet: [batch_size, num_jets, 4]
+    assignment_indices: [batch_size, num_targets]
+    """
+    Jet_Pt = Jet[...,0]
+    Jet_eta = Jet[...,1]
+    Jet_phi = Jet[...,2]
+    Jet_mass = Jet[...,3]
     def gather_jets(jet_tensor):
         return torch.gather(jet_tensor.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
 
@@ -196,21 +203,29 @@ def predict(assignments: List[Tensor],
 
 
 class SingleProcessAssignmentMetrics:
-    def __init__(
-            self,
-            device,
-            event_permutations,
-            event_symbolic_group,
-            event_particles,
-            product_symbolic_groups,
-            num_bins=50
-    ):
+    def __init__(self,
+                 device,
+                 event_permutations,
+                 event_symbolic_group,
+                 event_particles,
+                 product_symbolic_groups,
+                 ptetaphimass_index,
+                 detection_WP = [0.0, 0.5, 0.8],
+                 hist_xmin=0,
+                 hist_xmax=200,
+                 num_bins=100):
 
         self.device = device
         self.event_permutations = event_permutations
         self.event_particles = event_particles
         self.event_group = event_symbolic_group
         self.target_groups = product_symbolic_groups
+        self.hist_xmin = hist_xmin
+        self.hist_xmax = hist_xmax
+        self.num_bins = num_bins
+        self.detection_WP = detection_WP
+        self.ptetaphimass_index = ptetaphimass_index
+
         clusters = []
         cluster_groups = []
 
@@ -223,7 +238,7 @@ class SingleProcessAssignmentMetrics:
             cluster_name = map(dict.fromkeys, names_clean)
             cluster_name = map(lambda x: x.keys(), cluster_name)
             cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
-            clusters.append((cluster_name, names, orbit))  # ['t', ['t1', 't2'], Orbit]
+            clusters.append((cluster_name, names, orbit)) # ['t', ['t1', 't2'], Orbit]
 
             cluster_group = self.target_groups[names[0]]
             for name in names:
@@ -232,25 +247,71 @@ class SingleProcessAssignmentMetrics:
                     f"but got {cluster_group}."
                 )
 
-            cluster_groups.append((cluster_name, names, cluster_group))  # ['t', ['t1', 't2'], Group]
+            cluster_groups.append((cluster_name, names, cluster_group)) # ['t', ['t1', 't2'], Group]
 
         self.clusters = clusters
         self.cluster_groups = cluster_groups
 
-    def update(
-            self,
-            best_indices,
-            assignment_probabilities,
-            detection_probabilities,
-            inputs,
-            inputs_mask,
-            event_permutations,
-    ):
-        pass
+        self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
+        self.mass_spectrum = dict({
+            f"{i}{cluster_name}": np.zeros(self.num_bins)
+            for i in range(len(names)) for cluster_name, names, orbit in self.clusters
+        })
+
+        self.predict_mass_spectrum = dict({
+            f"{i}{cluster_name}": {
+                f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
+            }
+            for i in range(len(names)) for cluster_name, names, orbit in self.clusters
+        })
+
+
+    def update(self,
+               best_indices,
+               assignment_probabilities,
+               detection_probabilities,
+               truth_indices,
+               truth_masks,
+               inputs,
+               inputs_mask,
+            ):
+        for cluster_name, names, orbit in self.clusters:
+            truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
+            truth = torch.stack([truth_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            prediction = torch.stack([best_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            detection_probabilities = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            for num_resonance in range(len(names)):
+                truth_mask = (truth_count == (num_resonance + 1))
+                for local_resonance in range(num_resonance + 1):
+                    hist_name = f"{num_resonance}{cluster_name}"
+                    truth_local =  truth[local_resonance, :, :]
+                    prediction_local = prediction[local_resonance, :, :]
+                    detection_local = detection_probabilities[local_resonance, :, :]
+                    truth_local = truth_local[truth_mask]
+                    if not (truth_local.size()[0] > 0):
+                        continue
+                    input = inputs[truth_mask]
+                    input_mask = inputs_mask[truth_mask]
+                    jet = input[:, :, self.ptetaphimass_index]
+                    truth_mass = reconstruct_mass_peak(jet, truth_local, input_mask)
+                    truth_mass = truth_mass.detach().cpu().numpy()
+                    hist, _ = np.histogram(truth_mass, bins=self.bins)
+                    self.mass_spectrum[hist_name] += hist
 
     def reset(self):
-        self.valid = 0
-        self.total = 0
+        for name, hist in self.mass_spectrum.items():
+            self.mass_spectrum[name] = np.zeros(self.num_bins)
+
+
+    def reduce_across_gpus(self):
+        if torch.distributed.is_initialized():
+            for name, hist in self.mass_spectrum.items():
+                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
+                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                self.mass_spectrum[name] = tensor.cpu().numpy()
+
+    def reset(self):
+        pass
 
     def reduce_across_gpus(self):
         """All-reduce across DDP workers"""
@@ -259,6 +320,9 @@ class SingleProcessAssignmentMetrics:
             torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
             self.matrix = tensor.cpu().numpy()
 
+    @staticmethod
+    def permute_arrays(array_list, permutation):
+        return [array_list[index] for index in permutation]
 
 class SymmetricEvaluator:
     def __init__(self, event_info: EventInfo, process: str):

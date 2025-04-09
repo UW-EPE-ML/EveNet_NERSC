@@ -13,6 +13,8 @@ from evenet.network.evenet_model import EveNetModel
 from evenet.network.loss.classification import loss as cls_loss
 from evenet.network.loss.regression import loss as reg_loss
 from evenet.network.loss.assignment import loss as ass_loss
+from evenet.network.loss.generation import loss as gen_loss
+from evenet.network.loss.assignment import convert_target_assignment
 
 from evenet.network.metrics.assignment import predict
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
@@ -20,145 +22,30 @@ from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from preprocessing.preprocess import unflatten_dict
 
 import torch
-import torch.nn as nn
-from collections import defaultdict
 from evenet.network.metrics.classification import ClassificationMetrics
 from matplotlib import pyplot as plt
-
-
-class MLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(2, 128),  # input dim 1 → hidden dim 8
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 9)  # hidden dim 8 → output dim 1
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-    def shared_step(self, x, batch_size):
-        output = self.forward(x["conditions"])
-        return {"classification": {"signal": output},
-                "regression": {"signal": output}}
-
-
-class DebugHookManager:
-    def __init__(self, track_forward=True, track_backward=True, save_values=False):
-        self.forward_hooks = []
-        self.backward_hooks = []
-        self.grad_hooks = []
-        self.save_values = save_values
-
-        self.forward_outputs = defaultdict(list)
-        self.backward_grads = defaultdict(list)
-
-        self.track_forward = track_forward
-        self.track_backward = track_backward
-
-    def check_forward(self, name):
-        def hook(module, input, output):
-            # Check output
-            if isinstance(output, torch.Tensor):
-                if torch.isnan(output).any():
-                    print(f"[NaN Detected] Forward output of {name}")
-                if torch.isinf(output).any():
-                    print(f"[Inf Detected] Forward output of {name}")
-                if self.save_values:
-                    self.forward_outputs[name].append(output.detach().cpu())
-            # Check inputs
-            for i, inp in enumerate(input):
-                if isinstance(inp, torch.Tensor):
-                    if torch.isnan(inp).any():
-                        print(f"[NaN Detected] Forward input {i} of {name}")
-                    if torch.isinf(inp).any():
-                        print(f"[Inf Detected] Forward input {i} of {name}")
-
-        return hook
-
-    def check_backward(self, name):
-        def hook(module, grad_input, grad_output):
-            for i, g in enumerate(grad_input):
-                if isinstance(g, torch.Tensor):
-                    if torch.isnan(g).any():
-                        print(f"[NaN Detected] Grad input {i} of {name}")
-                    if torch.isinf(g).any():
-                        print(f"[Inf Detected] Grad input {i} of {name}")
-                    if self.save_values:
-                        self.backward_grads[name].append(g.detach().cpu())
-
-        return hook
-
-    def check_param_grad(self, name, param):
-        def hook(grad):
-            if grad is not None:
-                if torch.isnan(grad).any():
-                    print(f"[NaN Detected] Grad of param {name}")
-                if torch.isinf(grad).any():
-                    print(f"[Inf Detected] Grad of param {name}")
-                if self.save_values:
-                    self.backward_grads[f"param::{name}"].append(grad.detach().cpu())
-
-        return hook
-
-    def attach_hooks(self, model: nn.Module):
-        for name, module in model.named_modules():
-            if isinstance(module, nn.Module) and len(list(module.children())) == 0:  # only leaf modules
-                if self.track_forward:
-                    fh = module.register_forward_hook(self.check_forward(name))
-                    self.forward_hooks.append(fh)
-                if self.track_backward:
-                    bh = module.register_full_backward_hook(self.check_backward(name))
-                    self.backward_hooks.append(bh)
-
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                gh = param.register_hook(self.check_param_grad(name, param))
-                self.grad_hooks.append(gh)
-
-    def remove_hooks(self):
-        for h in self.forward_hooks + self.backward_hooks:
-            h.remove()
-        self.forward_hooks.clear()
-        self.backward_hooks.clear()
-        self.grad_hooks.clear()
-        print("✅ All hooks removed.")
-
-    def dump_debug_data(self):
-        # Optional utility: Save collected outputs/grads to disk or analyze
-        print("🔍 Dumped forward activations:")
-        for k, v in self.forward_outputs.items():
-            print(f"{k}: {len(v)} tensors")
-
-        print("🔍 Dumped backward gradients:")
-        for k, v in self.backward_grads.items():
-            print(f"{k}: {len(v)} tensors")
-
-
+from evenet.utilities.debug_tool import DebugHookManager
 ########################
 ## Debug configuration ##
 ########################
 
-wandb_enable = True
+wandb_enable = False
 n_epoch = 10
 debugger_enable = False
+device = "cpu"
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
 
 shape_metadata = json.load(
-    open("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/shape_metadata.json"))
+    open(f"{workspacedir}/shape_metadata.json"))
 
-normalization_dict = torch.load(
-    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt")
-particle_balance_dict = normalization_dict['particle_balance']
+normalization_dict = torch.load(f"{workspacedir}/normalization.pt")
+particle_balance_dict = None # normalization_dict['particle_balance']
 
 # Load the Parquet file locally
 df = pq.read_table(
-    "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/data_run_yulei_11.parquet").to_pandas()
+    f"{workspacedir}/data_run_yulei_11.parquet").to_pandas()
 # Optional: Subsample for speed
 
 df.sample(frac=1).reset_index(drop=True)
@@ -201,11 +88,18 @@ for process in global_config.event_info.process_names:
 batch = {col: df[col].to_numpy() for col in df.columns}
 
 # Preprocess batch
-processed_batch = process_event_batch(batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
+processed_batch = process_event_batch(
+    batch,
+    shape_metadata=shape_metadata,
+    unflatten=unflatten_dict
+)
+
 
 # Convert to torch
 torch_batch = convert_batch_to_torch_tensor(processed_batch)
-
+torch_batch = {
+    k: v.to(device) for k, v in torch_batch.items()
+}
 # with open("/Users/avencastmini/PycharmProjects/EveNet/workspace/normalization_file/PreTrain_norm.pkl", 'rb') as f:
 #     normalization_file = pickle.load(f)
 
@@ -214,23 +108,18 @@ num_splits = df_number // 128
 # Run forward
 model = EveNetModel(
     config=global_config,
-    device=torch.device("cpu"),
+    device=torch.device(device),
     normalization_dict=normalization_dict,
-    assignment=True
-)
+    assignment=True,
+    generation=True
+).to(device)
 
-model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
-model.freeze_module("Regression", global_config.options.Training.Components.Regression.get("freeze", {}))
+# model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
+# model.freeze_module("Regression", global_config.options.Training.Components.Regression.get("freeze", {}))
 
 # model = MLP()
 
 model.train()
-
-confusion_accumulator = ClassificationMetrics(
-    num_classes=len(num_classes),
-    normalize=True,
-    device=torch.device("cpu"),
-)
 
 debugger = DebugHookManager(track_forward=True, track_backward=True, save_values=True)
 if debugger_enable:
@@ -241,6 +130,12 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
 batch_size = len(df)
 split_batches = []
+
+confusion_accumulator = ClassificationMetrics(
+    num_classes=len(num_classes),
+    normalize=True,
+    device=torch.device(device),
+)
 
 for i in range(num_splits):
     start = math.floor(i * batch_size / num_splits)
@@ -257,11 +152,12 @@ if wandb_enable:
     )
 
 assignment_metrics = {process: SingleProcessAssignmentMetrics(
-    device='cpu',
+    device=device,
     event_permutations=event_info.event_permutations[process],
     event_symbolic_group=event_info.event_symbolic_group[process],
     event_particles=event_info.event_particles[process],
-    product_symbolic_groups=event_info.product_symbolic_groups[process]
+    product_symbolic_groups=event_info.product_symbolic_groups[process],
+    ptetaphimass_index=event_info.ptetaphimass_index
 ) for process in event_info.process_names}
 
 for iepoch in range(n_epoch):
@@ -274,6 +170,7 @@ for iepoch in range(n_epoch):
                     print(f"[Epoch {iepoch} / Batch {i}] NaN found in input tensor: {name}")
 
             outputs = model.shared_step(batch, batch_size=len(batch["classification"]))
+
             # outputs = model.shared_step(batch)
 
             # Regression
@@ -292,41 +189,44 @@ for iepoch in range(n_epoch):
             # Classification
             cls_output = next(iter(outputs["classification"].values()))
             cls_target = batch["classification"]
-
-            print(cls_target[0], cls_output[0])
             # cls_output = torch.nn.Softmax(dim=1)(cls_output)
             preds = cls_output.argmax(dim=-1)
 
-            print("target", torch.unique(cls_target, return_counts=True))
-            print("pred", torch.unique(preds, return_counts=True))
 
-            c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=normalization_dict['class_balance'])
+            c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=normalization_dict['class_balance'].to(device))
+            if torch.isnan(c_loss).any():
+                print(f"[Epoch {iepoch} / Batch {i}] NaN in classification loss")
+            total_loss = c_loss.mean()  # + r_loss.mean() * 0.1
             # c_loss = cls_loss(predict=cls_output, target=cls_target, class_weight=None)
 
             # mse_loss = torch.nn.MSELoss(reduction='none')
             # c_loss = mse_loss(cls_output, torch.nn.functional.one_hot(cls_target, num_classes=9).float())
             # print(f"c_loss", c_loss.item())
-            if torch.isnan(c_loss).any():
-                print(f"[Epoch {iepoch} / Batch {i}] NaN in classification loss")
 
-            total_loss = c_loss.mean()  # + r_loss.mean() * 0.1
 
             symmetric_losses = ass_loss(
                 assignments=outputs["assignments"],
                 detections=outputs["detections"],
                 targets=batch["assignments-indices"],
                 targets_mask=batch["assignments-mask"],
-                process_id=batch["subprocess_id"],
+                process_id= None, # batch["subprocess_id"],
                 num_targets=num_targets,
                 event_particles=event_particles,
                 event_permutations=event_info.event_permutations,
                 focal_gamma=0.1,
                 particle_balance=particle_balance_dict,
-                process_balance=normalization_dict["subprocess_balance"]
+                process_balance=None # normalization_dict["subprocess_balance"]
             )
 
             assignment_predict = dict()
+            ass_target, ass_mask = convert_target_assignment(
+                targets = batch["assignments-indices"],
+                targets_mask=batch["assignments-mask"],
+                event_particles = event_particles,
+                num_targets = num_targets
+            )
             for process in global_config.event_info.process_names:
+
                 total_loss += symmetric_losses["assignment"][process]
                 total_loss += symmetric_losses["detection"][process]
 
@@ -336,7 +236,20 @@ for iepoch in range(n_epoch):
                     product_symbolic_groups=event_info.product_symbolic_groups[process],
                     event_permutations=event_info.event_permutations[process],
                 )
+                assignment_metrics[process].update(
+                    best_indices=assignment_predict[process]["best_indices"],
+                    assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
+                    detection_probabilities=assignment_predict[process]["detection_probabilities"],
+                    truth_indices=ass_target[process],
+                    truth_masks=ass_mask[process],
+                    inputs=batch["x"],
+                    inputs_mask=batch["x_mask"],
+                )
 
+            generation_loss = dict()
+            for generation_target, generation_result in outputs["generations"].items():
+                generation_loss[generation_target] = gen_loss(generation_result["vector"], generation_result["truth"])
+                total_loss += generation_loss[generation_target]
             # black_list = ["WJetsToQQ", "ZJetsToLL"]
             # process_name = global_config.event_info.process_names[i]
             # if process_name in black_list:
@@ -368,6 +281,13 @@ for iepoch in range(n_epoch):
                             f"detection_loss/{process}": symmetric_losses["detection"][process].item()
                         }
                     )
+                for generation_target in generation_loss:
+                    wandb.log(
+                        {
+                            f"generation_loss/{generation_target}": generation_loss[generation_target].item()
+                        }
+                    )
+
             confusion_accumulator.update(
                 cls_target,
                 cls_output

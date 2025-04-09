@@ -48,7 +48,8 @@ class EventInfo:
             classifications: FeynmanDict[str, List[ClassificationInfo]],
             class_label: Dict[str, Dict],
             resonance_info: Dict[str, Dict],
-            resonance_particle_properties: List
+            resonance_particle_properties: List,
+            generations: Dict[str, Dict],
     ):
 
         self.input_types = input_types
@@ -66,7 +67,7 @@ class EventInfo:
         self.process_names = list(self.event_particles.keys())
         self.resonance_info = resonance_info
         self.resonance_particle_properties = resonance_particle_properties
-
+        self.generations = generations
 
         for process in self.event_particles:
 
@@ -128,8 +129,10 @@ class EventInfo:
         self.classification_names = ['/'.join([SpecialKey.Event, target]) for target in self.classifications[SpecialKey.Event]]
         self.class_label = class_label
         self.num_classes = dict()
+        self.num_classes_total = 0
         for name in class_label['EVENT']:
             self.num_classes[name] = (np.array(class_label['EVENT'][name])).shape[-1]
+            self.num_classes_total += self.num_classes[name]
 
         self.pairing_topology = OrderedDict()
         self.pairing_topology_category = OrderedDict()
@@ -185,6 +188,31 @@ class EventInfo:
 
         self.resonance_particle_properties_mean = torch.Tensor(self.resonance_particle_properties_mean)
         self.resonance_particle_properties_std = torch.Tensor(self.resonance_particle_properties_std)
+
+        # Generation Head setting
+
+        iglobal_index = 0
+        self.generation_condition_indices = []
+        for input_name, input_feature in self.input_features.items():
+            if self.input_types[input_name] == InputType.Global:
+                for input_feature_element in input_feature:
+                    if input_feature_element.name in self.generations["Conditions"]:
+                        self.generation_condition_indices.append(iglobal_index)
+                    iglobal_index += 1
+
+        search_name = ["pt", "eta", "phi", "mass"]
+        self.ptetaphimass_index = []
+        for target_name in search_name:
+            sequential_index = 0
+            for input_name, input_feature in self.input_features.items():
+                if self.input_types[input_name] == InputType.Sequential:
+                    for input_feature_element in input_feature:
+                        if input_feature_element.name.lower() == target_name.lower():
+                            self.ptetaphimass_index.append(sequential_index)
+                            break
+                        sequential_index += 1
+
+
 
     def normalized_features(self, input_name: str) -> NDArray[bool]:
         return np.array([feature.normalize for feature in self.input_features[input_name]])
@@ -377,6 +405,8 @@ class EventInfo:
 
         class_label = key_with_default(config, SpecialKey.ClassLabel, default={})
 
+        generations = key_with_default(config, SpecialKey.Generations, default={})
+
         resonance_particle_property = key_with_default(config, SpecialKey.ParticleProperties, default=[])
 
         # TODO: feynman_fill (not necessary, but would be nice)
@@ -390,5 +420,6 @@ class EventInfo:
             classifications,
             class_label,
             resonance_info,
-            resonance_particle_property
+            resonance_particle_property,
+            generations
         )

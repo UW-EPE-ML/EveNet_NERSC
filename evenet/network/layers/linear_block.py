@@ -3,7 +3,7 @@ import torch
 from evenet.network.layers.norm import create_normalization
 from evenet.network.layers.activation import create_activation, create_dropout
 from evenet.network.layers.mask import FillingMasking
-
+from evenet.network.layers.utils import LayerScale
 
 def create_residual_connection(skip_connection: bool, input_dim: int, output_dim: int) -> nn.Module:
     if input_dim == output_dim or not skip_connection:
@@ -126,6 +126,44 @@ class GRUBlock(nn.Module):
             output = self.gru(output, self.residual(x))
 
         return output * sequence_mask
+
+
+class ResNetDense(nn.Module):
+    def __init__(self,
+                 input_dim: int,
+                 hidden_dim: int,
+                 output_dim: int,
+                 num_layers: int = 2,
+                 activation: str = 'silu',
+                 dropout: float = 0.0,
+                 layer_scale_init: float = 1.0):
+        super(ResNetDense, self).__init__()
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.layer_scale_init = layer_scale_init
+
+        # Define the layers
+        self.residual_layer = nn.Linear(self.input_dim, self.hidden_dim)
+        self.hidden_layers = nn.ModuleList([nn.Sequential(
+            nn.Linear(input_dim if i == 0 else hidden_dim, hidden_dim),
+            create_activation(activation, hidden_dim),
+            nn.Dropout(self.dropout))
+            for i in range(num_layers)])
+        self.layer_scale = LayerScale(self.layer_scale_init, hidden_dim)
+        self.out_layer = create_residual_connection(
+            skip_connection=True,
+            input_dim=self.hidden_dim,
+            output_dim=output_dim
+        )
+    def forward(self, x):
+        residual = self.residual_layer(x)
+        for layer in self.hidden_layers:
+            x = layer(x)
+        x = self.layer_scale(x)
+        return self.out_layer(residual + x)
 
 
 def create_linear_block(

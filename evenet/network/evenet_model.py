@@ -9,10 +9,11 @@ from evenet.network.body.embedding import GlobalVectorEmbedding, PETBody
 from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
+from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
 
-
+from evenet.utilities.diffusion_sampler import add_noise
 
 from torch import Tensor, nn
 from typing import Dict
@@ -76,6 +77,12 @@ class EveNetModel(nn.Module):
             norm_mask=input_normalizers_setting["GLOBAL"]["norm_mask"].to(self.device),
             mean=input_normalizers_setting["GLOBAL"]["mean"].to(self.device),
             std=input_normalizers_setting["GLOBAL"]["std"].to(self.device),
+        )
+
+        self.num_point_cloud_normalizer = Normalizer(
+            mean=normalization_dict["input_num_mean"]["Source"].unsqueeze(-1).to(self.device),
+            std=normalization_dict["input_num_std"]["Source"].unsqueeze(-1).to(self.device),
+            norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool)
         )
 
         self.global_input_dim = input_normalizers_setting["GLOBAL"]["norm_mask"].size()[-1]
@@ -199,6 +206,24 @@ class EveNetModel(nn.Module):
                     device=self.device
             )
 
+        # [6] Global Generation Head
+        if self.include_generation:
+            self.global_generator = GlobalCondGenerationHead(
+                num_layer = self.network_cfg.GlobalGeneration.num_layers,
+                num_resnet_layer = self.network_cfg.GlobalGeneration.num_resnet_layers,
+                input_dim = 1, # Only target on the number of point_cloud
+                hidden_dim = self.network_cfg.GlobalGeneration.hidden_dim,
+                output_dim = 1,
+                input_cond_indices = self.event_info.generation_condition_indices,
+                num_classes = self.event_info.num_classes_total,
+                resnet_dim = self.network_cfg.GlobalGeneration.resnet_dim,
+                layer_scale_init = self.network_cfg.GlobalGeneration.layer_scale_init,
+                feature_drop_for_stochastic_depth = self.network_cfg.GlobalGeneration.feature_drop_for_stochastic_depth,
+                activation = self.network_cfg.GlobalGeneration.activation,
+                dropout = self.network_cfg.GlobalGeneration.dropout
+            )
+
+
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
         """
@@ -236,6 +261,10 @@ class EveNetModel(nn.Module):
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
         global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+        class_label = x['classification'].unsqueeze(-1)  # (batch_size, 1)
+
+
+        num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
         batch_size = input_point_cloud.shape[0]
         #########################
@@ -250,6 +279,42 @@ class EveNetModel(nn.Module):
             x=global_conditions,
             mask=global_conditions_mask
         )
+
+
+        ###########################
+        ## Global Generator Head ##
+        ###########################
+
+        generations = dict()
+        if self.include_generation:
+            if self.training:
+                num_point_cloud = self.num_point_cloud_normalizer(
+                    x=num_point_cloud,
+                    mask=None
+                ) # When doing training, we need to normalize the number of point clouds
+                num_point_cloud, truth_num_point_cloud_vector = add_noise(num_point_cloud, time)
+                predict_num_point_cloud_vector = self.global_generator(
+                    x = num_point_cloud,
+                    time = time,
+                    global_cond = global_conditions,
+                    label = class_label
+                )
+                generations["num_point_cloud"] = {
+                    "vector": predict_num_point_cloud_vector,
+                    "truth": truth_num_point_cloud_vector
+                }
+            else:
+                # in evaluation, we inject noised num_point_cloud, do need to do normalization
+                predict_num_point_cloud_vector = self.global_generator(
+                    x = num_point_cloud,
+                    time = time,
+                    global_cond = global_conditions,
+                    label = class_label
+                )
+                generations["num_point_cloud"] = {
+                    "vector": predict_num_point_cloud_vector,
+                    "truth": None
+                }
 
         #############################
         ## Central embedding (PET) ##
@@ -327,11 +392,12 @@ class EveNetModel(nn.Module):
             "classification": classifications,
             "regression": regressions,
             "assignments": assignments,
-            "detections": detections
+            "detections": detections,
+            "generations": generations,
         }
 
     def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> Dict[str, Tensor]:
-        time = batch['x'].new_ones((batch_size,))
+        time = batch['x'].new_ones((batch_size,)).to(self.device)
         output = self.forward(batch, time)
         return output
 
