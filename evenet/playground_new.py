@@ -15,6 +15,7 @@ from evenet.network.loss.regression import loss as reg_loss
 from evenet.network.loss.assignment import loss as ass_loss
 
 from evenet.network.metrics.assignment import predict
+from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 
 from preprocessing.preprocess import unflatten_dict
 
@@ -23,6 +24,27 @@ import torch.nn as nn
 from collections import defaultdict
 from evenet.network.metrics.classification import ClassificationMetrics
 from matplotlib import pyplot as plt
+
+
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 128),  # input dim 1 → hidden dim 8
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 9)  # hidden dim 8 → output dim 1
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+    def shared_step(self, x, batch_size):
+        output = self.forward(x["conditions"])
+        return {"classification": {"signal": output},
+                "regression": {"signal": output}}
+
 
 class DebugHookManager:
     def __init__(self, track_forward=True, track_backward=True, save_values=False):
@@ -151,6 +173,7 @@ event_permutation = dict()
 event_particles = dict()
 import re
 from evenet.utilities.group_theory import complete_indices, symmetry_group
+
 for process in global_config.event_info.process_names:
     permutation_indices[process] = []
     num_targets[process] = []
@@ -159,10 +182,10 @@ for process in global_config.event_info.process_names:
         topology_name = f"{event_particle_name}/{topology_name}"
         topology_name = re.sub(r'\d+', '', topology_name)
         topology_category_name = global_config.event_info.pairing_topology[topology_name]["pairing_topology_category"]
-        permutation_indices_tmp =  complete_indices(
+        permutation_indices_tmp = complete_indices(
             global_config.event_info.pairing_topology_category[topology_category_name]["product_symmetry"].degree,
             global_config.event_info.pairing_topology_category[topology_category_name]["product_symmetry"].permutations
-            )
+        )
         permutation_indices[process].append(permutation_indices_tmp)
         event_particles[process] = [p for p in event_info.event_particles[process].names]
         event_permutation[process] = complete_indices(
@@ -170,8 +193,8 @@ for process in global_config.event_info.process_names:
             event_info.event_symmetries[process].permutations
         )
         permutation_group = symmetry_group(permutation_indices_tmp)
-        num_targets[process].append(global_config.event_info.pairing_topology_category[topology_category_name]["product_symmetry"].degree)
-
+        num_targets[process].append(
+            global_config.event_info.pairing_topology_category[topology_category_name]["product_symmetry"].degree)
 
 # Convert to dict-of-arrays if needed
 batch = {col: df[col].to_numpy() for col in df.columns}
@@ -233,11 +256,19 @@ if wandb_enable:
         entity=global_config.wandb.entity
     )
 
+assignment_metrics = {process: SingleProcessAssignmentMetrics(
+    device='cpu',
+    event_permutations=event_info.event_permutations[process],
+    event_symbolic_group=event_info.event_symbolic_group[process],
+    event_particles=event_info.event_particles[process],
+    product_symbolic_groups=event_info.product_symbolic_groups[process]
+) for process in event_info.process_names}
+
 for iepoch in range(n_epoch):
     # if (n_epoch > 2): model.eval()
     for i, batch in enumerate(split_batches):
         with torch.autograd.set_detect_anomaly(True):
-        # if True:
+            # if True:
             for name, tensor in batch.items():
                 if torch.isnan(tensor).any():
                     print(f"[Epoch {iepoch} / Batch {i}] NaN found in input tensor: {name}")
@@ -282,15 +313,17 @@ for iepoch in range(n_epoch):
             total_loss = c_loss.mean()  # + r_loss.mean() * 0.1
 
             symmetric_losses = ass_loss(
-                    assignments = outputs["assignments"],
-                    detections = outputs["detections"],
-                    targets = batch["assignments-indices"],
-                    targets_mask = batch["assignments-mask"],
-                    num_targets = num_targets,
-                    event_particles = event_particles,
-                    event_permutations = event_info.event_permutations,
-                    focal_gamma =  0.1,
-                    particle_balance = particle_balance_dict,
+                assignments=outputs["assignments"],
+                detections=outputs["detections"],
+                targets=batch["assignments-indices"],
+                targets_mask=batch["assignments-mask"],
+                process_id=batch["subprocess_id"],
+                num_targets=num_targets,
+                event_particles=event_particles,
+                event_permutations=event_info.event_permutations,
+                focal_gamma=0.1,
+                particle_balance=particle_balance_dict,
+                process_balance=normalization_dict["subprocess_balance"]
             )
 
             assignment_predict = dict()
@@ -298,13 +331,13 @@ for iepoch in range(n_epoch):
 
                 total_loss += symmetric_losses["assignment"][process]
                 total_loss += symmetric_losses["detection"][process]
-                #
-                # assignment_predict[process] = predict(
-                #     assignments = outputs["assignments"][process],
-                #     detections=outputs["detections"][process],
-                #     product_symbolic_groups=event_info.product_symbolic_groups[process],
-                #     event_permutations=event_info.event_permutations[process],
-                # )
+
+                assignment_predict[process] = predict(
+                    assignments=outputs["assignments"][process],
+                    detections=outputs["detections"][process],
+                    product_symbolic_groups=event_info.product_symbolic_groups[process],
+                    event_permutations=event_info.event_permutations[process],
+                )
 
 
             # black_list = ["WJetsToQQ", "ZJetsToLL"]
