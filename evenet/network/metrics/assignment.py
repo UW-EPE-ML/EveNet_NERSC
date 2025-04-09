@@ -280,18 +280,22 @@ class SingleProcessAssignmentMetrics:
         for cluster_name, names, orbit in self.clusters:
             truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
             truth = torch.stack([truth_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            prediction = torch.stack([best_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            detection_probabilities = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             for num_resonance in range(len(names)):
                 truth_mask = (truth_count == (num_resonance + 1))
                 for local_resonance in range(num_resonance + 1):
                     hist_name = f"{num_resonance}{cluster_name}"
-                    truth = truth[truth_mask]
-                    if not (truth.size()[0] > 0):
+                    truth_local =  truth[local_resonance, :, :]
+                    prediction_local = prediction[local_resonance, :, :]
+                    detection_local = detection_probabilities[local_resonance, :, :]
+                    truth_local = truth_local[truth_mask]
+                    if not (truth_local.size()[0] > 0):
                         continue
                     input = inputs[truth_mask]
                     input_mask = inputs_mask[truth_mask]
                     jet = input[:, :, self.ptetaphimass_index]
-                    truth_mass = reconstruct_mass_peak(jet, truth[local_resonance, :, :], input_mask)
-
+                    truth_mass = reconstruct_mass_peak(jet, truth_local, input_mask)
                     truth_mass = truth_mass.detach().cpu().numpy()
                     hist, _ = np.histogram(truth_mass, bins=self.bins)
                     self.mass_spectrum[hist_name] += hist

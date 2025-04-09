@@ -32,7 +32,7 @@ from evenet.utilities.debug_tool import DebugHookManager
 wandb_enable = False
 n_epoch = 10
 debugger_enable = False
-device = "cuda"
+device = "cpu"
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
