@@ -545,7 +545,8 @@ def shared_epoch_end(
         metrics_valid,
         logger,
 ):
-    metrics_valid.reduce_across_gpus()
+    for process in metrics_valid:
+        metrics_valid[process].reduce_across_gpus()
 
     if global_rank == 0:
 
