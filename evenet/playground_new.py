@@ -24,27 +24,6 @@ from collections import defaultdict
 from evenet.network.metrics.classification import ClassificationMetrics
 from matplotlib import pyplot as plt
 
-
-class MLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(2, 128),  # input dim 1 → hidden dim 8
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 9)  # hidden dim 8 → output dim 1
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-    def shared_step(self, x, batch_size):
-        output = self.forward(x["conditions"])
-        return {"classification": {"signal": output},
-                "regression": {"signal": output}}
-
-
 class DebugHookManager:
     def __init__(self, track_forward=True, track_backward=True, save_values=False):
         self.forward_hooks = []

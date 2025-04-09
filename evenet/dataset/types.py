@@ -144,6 +144,7 @@ class SpecialKey(str, Enum):
     Embeddings = "EMBEDDINGS"
     ClassLabel = "CLASSLABEL"
     ParticleProperties = "PARTICLE_PROPERTIES"
+    Generations = "GENERATIONS"
 
 
 class Source(NamedTuple):

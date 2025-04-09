@@ -48,7 +48,8 @@ class EventInfo:
             classifications: FeynmanDict[str, List[ClassificationInfo]],
             class_label: Dict[str, Dict],
             resonance_info: Dict[str, Dict],
-            resonance_particle_properties: List
+            resonance_particle_properties: List,
+            generations: Dict[str, Dict],
     ):
 
         self.input_types = input_types
@@ -66,7 +67,7 @@ class EventInfo:
         self.process_names = list(self.event_particles.keys())
         self.resonance_info = resonance_info
         self.resonance_particle_properties = resonance_particle_properties
-
+        self.generations = generations
 
         for process in self.event_particles:
 
@@ -377,6 +378,8 @@ class EventInfo:
 
         class_label = key_with_default(config, SpecialKey.ClassLabel, default={})
 
+        generations = key_with_default(config, SpecialKey.Generations, default={})
+
         resonance_particle_property = key_with_default(config, SpecialKey.ParticleProperties, default=[])
 
         # TODO: feynman_fill (not necessary, but would be nice)
@@ -390,5 +393,6 @@ class EventInfo:
             classifications,
             class_label,
             resonance_info,
-            resonance_particle_property
+            resonance_particle_property,
+            generations
         )

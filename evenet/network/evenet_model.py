@@ -9,8 +9,11 @@ from evenet.network.body.embedding import GlobalVectorEmbedding, PETBody
 from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
+from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
+
+
 
 from torch import Tensor, nn
 from typing import Dict
@@ -197,7 +200,22 @@ class EveNetModel(nn.Module):
                     device=self.device
             )
 
-            # [6] Event Generation Head
+        # [6] Global Generation Head
+        # if self.include_generation:
+        #     self.global_generator = GlobalCondGenerationHead(
+        #         num_layer = self.network_cfg.GlobalGeneration.num_layers,
+        #         num_resnet_layer = self.network_cfg.GlobalGeneration.num_resnet_layers,
+        #         input_dim = ,
+        #         hidden_dim: int,
+        #         output_dim: int,
+        #         input_cond_dim: int,
+        #         num_classes: int,
+        #         resnet_dim: int,
+        #         layer_scale_init: float,
+        #         feature_drop_for_stochastic_depth: float,
+        #         activation: str,
+        #         dropout: float
+        #     )
 
 
 
