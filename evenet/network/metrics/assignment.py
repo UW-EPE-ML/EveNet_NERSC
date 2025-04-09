@@ -322,6 +322,9 @@ class SingleProcessAssignmentMetrics:
             torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
             self.matrix = tensor.cpu().numpy()
 
+    @staticmethod
+    def permute_arrays(array_list, permutation):
+        return [array_list[index] for index in permutation]
 
 class SymmetricEvaluator:
     def __init__(self, event_info: EventInfo, process: str):
@@ -335,10 +338,6 @@ class SymmetricEvaluator:
 
         self.clusters = clusters
         self.cluster_groups = cluster_groups
-
-    @staticmethod
-    def permute_arrays(array_list, permutation):
-        return [array_list[index] for index in permutation]
 
     def sort_outputs(self, predictions, target_jets, target_masks):
         predictions = [np.copy(p) for p in predictions]
