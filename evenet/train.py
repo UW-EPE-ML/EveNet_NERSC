@@ -140,7 +140,7 @@ def register_dataset(parquet_files: list[str], process_event_batch_partial, plat
             "num_cpus": 0.5,
         },
         shuffle="files",
-    ).limit(int(9089502 / 10))
+    ) # .limit(int(9089502 / 10))
 
     total_events = ds.count()
 
