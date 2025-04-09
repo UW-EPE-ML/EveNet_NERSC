@@ -2,6 +2,8 @@
 __pycache__/
 evenet/__pycache__/
 evenet/*/__pycache__/
+
+
 *.py[cod]
 *$py.class
 
