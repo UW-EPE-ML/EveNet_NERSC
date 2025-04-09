@@ -197,6 +197,9 @@ class EveNetModel(nn.Module):
                     device=self.device
             )
 
+            # [6] Event Generation Head
+
+
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
         """
