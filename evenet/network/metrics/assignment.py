@@ -14,6 +14,7 @@ from itertools import permutations, product
 import warnings
 import numpy as np
 
+
 def reconstruct_mass_peak(Jet_Pt, Jet_eta, Jet_phi, Jet_mass, assignment_indices, padding_mask):
     def gather_jets(jet_tensor):
         return torch.gather(jet_tensor.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
@@ -32,12 +33,12 @@ def reconstruct_mass_peak(Jet_Pt, Jet_eta, Jet_phi, Jet_mass, assignment_indices
     pz = pt * torch.sinh(eta)
     E = torch.sqrt(px ** 2 + py ** 2 + pz ** 2 + mass ** 2)
 
-    total_E = E.sum(dim=1)
+    total_e = E.sum(dim=1)
     total_px = px.sum(dim=1)
     total_py = py.sum(dim=1)
     total_pz = pz.sum(dim=1)
 
-    mass_squared = total_E ** 2 - (total_px ** 2 + total_py ** 2 + total_pz ** 2)
+    mass_squared = total_e ** 2 - (total_px ** 2 + total_py ** 2 + total_pz ** 2)
     mass_squared = torch.clamp(mass_squared, min=0.0)
     invariant_mass = torch.sqrt(mass_squared)
 
@@ -195,13 +196,15 @@ def predict(assignments: List[Tensor],
 
 
 class SingleProcessAssignmentMetrics:
-    def __init__(self,
-                 device,
-                 event_permutations,
-                 event_symbolic_group,
-                 event_particles,
-                 product_symbolic_groups,
-                 num_bins=50):
+    def __init__(
+            self,
+            device,
+            event_permutations,
+            event_symbolic_group,
+            event_particles,
+            product_symbolic_groups,
+            num_bins=50
+    ):
 
         self.device = device
         self.event_permutations = event_permutations
@@ -220,7 +223,7 @@ class SingleProcessAssignmentMetrics:
             cluster_name = map(dict.fromkeys, names_clean)
             cluster_name = map(lambda x: x.keys(), cluster_name)
             cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
-            clusters.append((cluster_name, names, orbit)) # ['t', ['t1', 't2'], Orbit]
+            clusters.append((cluster_name, names, orbit))  # ['t', ['t1', 't2'], Orbit]
 
             cluster_group = self.target_groups[names[0]]
             for name in names:
@@ -229,24 +232,21 @@ class SingleProcessAssignmentMetrics:
                     f"but got {cluster_group}."
                 )
 
-            cluster_groups.append((cluster_name, names, cluster_group)) # ['t', ['t1', 't2'], Group]
+            cluster_groups.append((cluster_name, names, cluster_group))  # ['t', ['t1', 't2'], Group]
 
         self.clusters = clusters
         self.cluster_groups = cluster_groups
 
-
-    def update(self,
-               best_indices,
-               assignment_probabilities,
-               detection_probabilities,
-               inputs,
-               inputs_mask,
-               event_permutations,
-            ):
+    def update(
+            self,
+            best_indices,
+            assignment_probabilities,
+            detection_probabilities,
+            inputs,
+            inputs_mask,
+            event_permutations,
+    ):
         pass
-
-
-
 
     def reset(self):
         self.valid = 0
