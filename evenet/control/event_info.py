@@ -200,6 +200,18 @@ class EventInfo:
                         self.generation_condition_indices.append(iglobal_index)
                     iglobal_index += 1
 
+        search_name = ["pt", "eta", "phi", "mass"]
+        self.ptetaphimass_index = []
+        for target_name in search_name:
+            sequential_index = 0
+            for input_name, input_feature in self.input_features.items():
+                if self.input_types[input_name] == InputType.Sequential:
+                    for input_feature_element in input_feature:
+                        if input_feature_element.name.lower() == target_name.lower():
+                            self.ptetaphimass_index.append(sequential_index)
+                            break
+                        sequential_index += 1
+
 
 
     def normalized_features(self, input_name: str) -> NDArray[bool]:

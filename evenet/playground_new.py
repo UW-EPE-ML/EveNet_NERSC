@@ -14,6 +14,7 @@ from evenet.network.loss.classification import loss as cls_loss
 from evenet.network.loss.regression import loss as reg_loss
 from evenet.network.loss.assignment import loss as ass_loss
 from evenet.network.loss.generation import loss as gen_loss
+from evenet.network.loss.assignment import convert_target_assignment
 
 from evenet.network.metrics.assignment import predict
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
@@ -28,7 +29,7 @@ from evenet.utilities.debug_tool import DebugHookManager
 ## Debug configuration ##
 ########################
 
-wandb_enable = True
+wandb_enable = False
 n_epoch = 10
 debugger_enable = False
 device = "cuda"
@@ -155,7 +156,8 @@ assignment_metrics = {process: SingleProcessAssignmentMetrics(
     event_permutations=event_info.event_permutations[process],
     event_symbolic_group=event_info.event_symbolic_group[process],
     event_particles=event_info.event_particles[process],
-    product_symbolic_groups=event_info.product_symbolic_groups[process]
+    product_symbolic_groups=event_info.product_symbolic_groups[process],
+    ptetaphimass_index=event_info.ptetaphimass_index
 ) for process in event_info.process_names}
 
 for iepoch in range(n_epoch):
@@ -217,17 +219,32 @@ for iepoch in range(n_epoch):
             )
 
             assignment_predict = dict()
+            ass_target, ass_mask = convert_target_assignment(
+                targets = batch["assignments-indices"],
+                targets_mask=batch["assignments-mask"],
+                event_particles = event_particles,
+                num_targets = num_targets
+            )
             for process in global_config.event_info.process_names:
 
                 total_loss += symmetric_losses["assignment"][process]
                 total_loss += symmetric_losses["detection"][process]
 
-                # assignment_predict[process] = predict(
-                #     assignments=outputs["assignments"][process],
-                #     detections=outputs["detections"][process],
-                #     product_symbolic_groups=event_info.product_symbolic_groups[process],
-                #     event_permutations=event_info.event_permutations[process],
-                # )
+                assignment_predict[process] = predict(
+                    assignments=outputs["assignments"][process],
+                    detections=outputs["detections"][process],
+                    product_symbolic_groups=event_info.product_symbolic_groups[process],
+                    event_permutations=event_info.event_permutations[process],
+                )
+                assignment_metrics[process].update(
+                    best_indices=assignment_predict[process]["best_indices"],
+                    assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
+                    detection_probabilities=assignment_predict[process]["detection_probabilities"],
+                    truth_indices=ass_target[process],
+                    truth_masks=ass_mask[process],
+                    inputs=batch["x"],
+                    inputs_mask=batch["x_mask"],
+                )
 
             generation_loss = dict()
             for generation_target, generation_result in outputs["generations"].items():

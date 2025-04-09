@@ -58,9 +58,9 @@ Regression:
 Assignment:
   feature_drop: 0.0
   num_feature_keep: 0
-  hidden_dim: 128
+  hidden_dim: 32
   split_symmetric_attention: true
-  position_embedding_dim: 8
+  position_embedding_dim: 4
   num_attention_heads: 4
   transformer_dim_scale: 2.0
   num_jet_embedding_layers: 0

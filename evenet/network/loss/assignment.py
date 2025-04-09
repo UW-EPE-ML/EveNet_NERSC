@@ -29,6 +29,28 @@ from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
 #         combined_loss = (weights * symmetric_losses).sum(0)
 #
 #     return combined_loss, index
+def convert_target_assignment(
+    targets: List[Tensor],
+    targets_mask: List[Tensor],
+    event_particles: Dict,
+    num_targets: Dict,
+    ):
+    target_assignment = OrderedDict()
+    target_assignment_mask = OrderedDict()
+
+    index_global = 0
+    for iprocess, process in enumerate(event_particles.keys()):
+        target_assignment[process] = []
+        target_assignment_mask[process] = []
+        local_index = 0
+        for event_particle in event_particles[process]:
+            target_assignment[process].append(targets[:, index_global, :][..., :(num_targets[process][local_index])])
+            target_assignment_mask[process].append(targets_mask[:, index_global])
+            index_global += 1
+            local_index += 1
+
+    return target_assignment, target_assignment_mask
+
 
 def convert_target_assignment_array(
         targets: List[Tensor],
@@ -38,6 +60,7 @@ def convert_target_assignment_array(
         process_id: Tensor,
         process_balance: Tensor
 ):
+
     """
     Convert target assignment array to a dict of tensors list.
     """
