@@ -316,7 +316,7 @@ class SingleProcessAssignmentMetrics:
                     if prediction_local.size()[0] > 0:
                         reco_mass_correct = reconstruct_mass_peak(
                             jet[correct_local], predict_correct, input_mask[correct_local]
-                        )
+                        ).detach().cpu().numpy()
                         hist, _ = np.histogram(reco_mass_correct, bins=self.bins)
                         self.predict_mass_spectrum_correct[hist_name] += hist
 
