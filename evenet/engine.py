@@ -297,7 +297,8 @@ class EveNetEngine(L.LightningModule):
             # debug time information
             log_function_stats(self.logger)
 
-            print(f"{self.__class__.__name__} on_fit_end end")
+            wandb.finish()  # ensure everything is flushed
+            print("W&B logging done and finished.")
 
         print(f"{self.__class__.__name__} on_fit_end all end [Rank: {self.global_rank}]")
 
