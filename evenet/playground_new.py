@@ -25,14 +25,15 @@ import torch
 from evenet.network.metrics.classification import ClassificationMetrics
 from matplotlib import pyplot as plt
 from evenet.utilities.debug_tool import DebugHookManager
+from evenet.engine import EveNetEngine
 ########################
 ## Debug configuration ##
 ########################
 
-wandb_enable = True
+wandb_enable = False
 n_epoch = 10
 debugger_enable = False
-device = "cuda"
+device = "cpu"
 
 workspacedir = "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
 
@@ -96,6 +97,13 @@ processed_batch = process_event_batch(
     unflatten=unflatten_dict
 )
 
+l_model = EveNetEngine(
+    global_config=global_config,
+)
+
+l_model.configure_model()
+from lightning.pytorch.utilities.model_summary import summarize
+s = summarize(l_model, max_depth=2)
 
 # Convert to torch
 torch_batch = convert_batch_to_torch_tensor(processed_batch)

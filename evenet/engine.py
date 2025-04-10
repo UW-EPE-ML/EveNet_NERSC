@@ -7,6 +7,7 @@ import wandb
 import lightning as L
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
+from lightning.pytorch.utilities.model_summary import summarize
 from lion_pytorch import Lion
 from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
@@ -312,6 +313,18 @@ class EveNetEngine(L.LightningModule):
 
             # debug time information
             log_function_stats(self.logger)
+
+            summary = summarize(self, max_depth=3)
+            columns = ["Name", "Type", "Params"]
+            data = [
+                [str(name), str(type_), int(num)]
+                for name, type_, num in zip(summary.layer_names, summary.layer_types, summary.param_nums)
+            ]
+            self.logger.log_table(
+                key="model summary",
+                columns=columns,
+                data=data,
+            )
 
             wandb.finish()  # ensure everything is flushed
             print("W&B logging done and finished.")

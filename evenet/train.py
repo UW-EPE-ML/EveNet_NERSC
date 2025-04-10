@@ -34,6 +34,9 @@ from evenet.network.callbacks.ema import EMACallback
 from preprocessing.preprocess import unflatten_dict
 import json
 
+from rich.console import Console
+import lightning.pytorch.utilities.model_summary
+
 
 def train_func(cfg):
     batch_size = cfg['batch_size']
