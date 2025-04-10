@@ -421,24 +421,25 @@ class EveNetEngine(L.LightningModule):
         if self.model is not None:
             return
         # compile model here
-        self.model = torch.compile(
-            EveNetModel(
-                config=self.config,
-                device=self.device,
-                classification=self.classification_cfg.include,
-                regression=self.regression_cfg.include,
-                generation=False,
-                assignment=self.assignment_cfg.include,
-                normalization_dict=self.normalization_dict,
-            )
+        self.model = EveNetModel(
+            config=self.config,
+            device=self.device,
+            classification=self.classification_cfg.include,
+            regression=self.regression_cfg.include,
+            generation=False,
+            assignment=self.assignment_cfg.include,
+            normalization_dict=self.normalization_dict,
         )
 
         if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
+            # Only on rank 0, modify one weight manually
             with torch.no_grad():
-                emb = self.model._orig_mod.embedding_stack.embedding_layers[0].normalization.normalization.weight
-                emb += torch.rand_like(emb)
+                self.model.embedding_stack.embedding_layers[0].normalization.normalization.weight += torch.rand_like(
+                    self.model.embedding_stack.embedding_layers[0].normalization.normalization.weight
+                )
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
+        self.model = torch.compile(model=self.model)
 
         # Define Freezing
         self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
@@ -472,5 +473,3 @@ class EveNetEngine(L.LightningModule):
             if param.requires_grad:
                 print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
                 break  # just one param is enough to test
-
-
