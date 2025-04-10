@@ -112,7 +112,7 @@ def train_func(cfg):
         logger=wandb_logger,
         # val_check_interval=10,
         num_sanity_val_steps=0,
-        log_every_n_steps=10,
+        log_every_n_steps=1,
         **accelerator_config,
     )
 
