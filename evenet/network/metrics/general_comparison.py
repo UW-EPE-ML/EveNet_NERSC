@@ -74,7 +74,7 @@ class GenericMetrics:
     def plot_all(self):
         results = {}
         for metric in sorted(set(self.valid) | set(self.train)):
-            fig, ax = plt.subplots(figsize=(15, 12), dpi=100)
+            fig, ax = plt.subplots(figsize=(16, 12), dpi=100)
             color_map = self.style_config["colors"]
 
             labels = sorted(set(self.valid.get(metric, {})) | set(self.train.get(metric, {})))
@@ -108,7 +108,7 @@ class GenericMetrics:
                     )
 
             ax.set_title(f"{metric} Comparison")
-            ax.set_xlabel("Step")
+            ax.set_xlabel("Epoch")
             ax.set_ylabel(metric)
             ax.legend(
                 loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False
@@ -116,7 +116,7 @@ class GenericMetrics:
             ax.grid(True)
             # set log y
             ax.set_yscale('log')
-            fig.tight_layout(rect=[0, 0, 0.85, 1])  # leave space on the right
+            fig.tight_layout(rect=[0, 0, 0.95, 1])  # leave space on the right
             results[metric] = fig
 
         return results
