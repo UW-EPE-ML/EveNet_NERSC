@@ -305,6 +305,7 @@ class SingleProcessAssignmentMetrics:
                     truth_local = truth_local[truth_mask_local]
                     if not (truth_local.size()[0] > 0):
                         continue
+
                     input = inputs[truth_mask_local]
                     input_mask = inputs_mask[truth_mask_local]
                     jet = input[:, :, self.ptetaphimass_index]
@@ -604,6 +605,75 @@ class SingleProcessAssignmentMetrics:
                 self.predict_metrics_wrong[name][target],
                 self.train_metrics_correct[name][target] if self.train_metrics_correct is not None else None,
                 self.train_metrics_wrong[name][target] if self.train_metrics_wrong is not None else None,
+                hist["mass"],
+                self.predict_metrics_correct[name]["mass"],
+                self.predict_metrics_wrong[name]["mass"],
+                self.train_metrics_correct[name]["mass"] if self.train_metrics_correct is not None else None,
+                self.train_metrics_wrong[name]["mass"] if self.train_metrics_wrong is not None else None,
+            )
+        return return_plot
+
+    def plot_score_func(self,
+                        correct_score,
+                        false_score,
+                        train_correct_score=None,
+                        train_false_score=None
+                        ):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        bin_widths = np.diff(self.bins_score)
+        ax.bar(self.bin_centers_score,
+               correct_score / np.maximum(1.0, np.sum(correct_score) * bin_widths),
+               width=bin_widths,
+               color='C0',
+               alpha=0.85,
+               label='Correct assign',
+               edgecolor='black')
+        ax.bar(self.bin_centers_score,
+               false_score / np.maximum(1.0, np.sum(false_score) * bin_widths),
+               width=bin_widths,
+               color='C1',
+               alpha=0.65,
+               label='Wrong assign',
+               edgecolor='black')
+        # Plot training histogram (b
+        if train_correct_score is not None:
+            train_bin_widths = np.diff(self.bins_score)
+            ax.plot(self.bin_centers_score,
+                    train_correct_score / np.maximum(1, train_correct_score.sum() * train_bin_widths),
+                    linestyle='None',
+                    marker='o',
+                    linewidth=3,
+                    markersize=6,
+                    label='Correct assign (train)',
+                    color='C0')
+            ax.plot(self.bin_centers_score,
+                    train_false_score / np.maximum(1, train_false_score.sum() * train_bin_widths),
+                    linestyle='None',
+                    marker='o',
+                    linewidth=3,
+                    markersize=3,
+                    label='Wrong assign (train)',
+                    color='C1'
+                    )
+
+        ax.set_xlabel("Score")
+        ax.set_ylabel("Density")
+        ax.set_title("Score Distribution")
+        ax.legend(loc="best")
+        ax.grid(True)
+        fig.tight_layout()
+
+        return fig
+
+
+    def plot_score(self, target="detection_score"):
+        return_plot = dict()
+        for name, _ in self.truth_metrics.items():
+            return_plot[f"{name}"] = self.plot_score_func(
+                self.predict_metrics_correct[name][target],
+                self.predict_metrics_wrong[name][target],
+                self.train_metrics_correct[name][target] if self.train_metrics_correct is not None else None,
+                self.train_metrics_wrong[name][target] if self.train_metrics_wrong is not None else None,
             )
         return return_plot
 
@@ -737,6 +807,22 @@ def shared_epoch_end(
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
                 # f"assignment_reco_mass/{process}/{name}": fig
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
+            figs = metrics_valid[process].plot_score(target="detection_score")
+            wandb.log({
+                f"assignment_reco_detection/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
+            figs = metrics_valid[process].plot_score(target="assignment_score")
+            wandb.log({
+                f"assignment_score/{process}/{name}": wandb.Image(fig)
                 for name, fig in figs.items()
             })
             for _, fig in figs.items():
