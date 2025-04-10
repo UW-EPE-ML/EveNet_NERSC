@@ -31,7 +31,7 @@ options:
         include: true
         detection_loss_scale: 0.0
   Dataset:
-    dataset_limit: 1.0
+    dataset_limit: 0.01
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny/normalization.pt"
 
 network:
