@@ -434,11 +434,9 @@ class EveNetEngine(L.LightningModule):
         )
 
         if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
-            # Only on rank 0, modify one weight manually
             with torch.no_grad():
-                self.model.embedding_stack.embedding_layers[0].normalization.normalization.weight += torch.rand_like(
-                    self.model.embedding_stack.embedding_layers[0].normalization.normalization.weight
-                )
+                emb = self.model._orig_mod.embedding_stack.embedding_layers[0].normalization.normalization.weight
+                emb += torch.rand_like(emb)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
 
