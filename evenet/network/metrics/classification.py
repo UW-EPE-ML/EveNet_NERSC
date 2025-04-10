@@ -9,6 +9,8 @@ import matplotlib.colors as mcolors
 
 import torch.nn.functional as F
 
+from evenet.utilities.debug_tool import time_decorator
+
 
 class ClassificationMetrics:
     def __init__(self, num_classes, device, normalize=False, num_bins=50):
@@ -220,7 +222,7 @@ class ClassificationMetrics:
 
         return results
 
-
+@time_decorator(name="[Classification] shared_step")
 def shared_step(
         target_classification: torch.Tensor,
         cls_output: torch.Tensor,
@@ -246,7 +248,7 @@ def shared_step(
 
     return loss
 
-
+@time_decorator(name="[Classification] shared_epoch_end")
 def shared_epoch_end(
         global_rank,
         metrics_valid: ClassificationMetrics,

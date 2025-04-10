@@ -7,6 +7,8 @@ from typing import List, Tuple, Dict, Union
 
 from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
 
+from evenet.utilities.debug_tool import time_decorator
+
 
 # def numpy_tensor_array(tensor_list):
 #     output = np.empty(len(tensor_list), dtype=object)
@@ -29,6 +31,8 @@ from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
 #         combined_loss = (weights * symmetric_losses).sum(0)
 #
 #     return combined_loss, index
+
+@time_decorator(name="[Assignment] convert_target_assignment")
 def convert_target_assignment(
     targets: List[Tensor],
     targets_mask: List[Tensor],
@@ -51,7 +55,7 @@ def convert_target_assignment(
 
     return target_assignment, target_assignment_mask
 
-
+@time_decorator(name="[Assignment] convert_target_assignment_array")
 def convert_target_assignment_array(
         targets: List[Tensor],
         targets_mask: List[Tensor],
@@ -91,7 +95,7 @@ def convert_target_assignment_array(
 
     return target_assignment, target_assignment_mask, process_mask, process_weight
 
-
+@time_decorator(name="[Assignment] assignment_cross_entropy_loss")
 def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, target_mask: Tensor, gamma: float) -> Tensor:
     batch_size = prediction.shape[0]
     prediction_shape = prediction.shape[1:]
@@ -143,7 +147,6 @@ def compute_symmetric_losses(
     )
     return torch.stack(current_permutation_loss)  # [num_particles, B]
 
-
 def symmetric_loss(
         assignments: List[Tensor],
         targets: List[Tensor],
@@ -163,7 +166,7 @@ def symmetric_loss(
     )
     return symmetric_losses
 
-
+@time_decorator(name="[Assignment] loss_single_process")
 def loss_single_process(
         assignments: List[Tensor],
         detections: List[Tensor],
@@ -254,7 +257,7 @@ def loss_single_process(
 ###################
 ## Main Function ##
 ###################
-
+# @time_decorator(name="[Assignment] loss")
 def loss(
         assignments: Dict[str, List[Tensor]],
         detections: Dict[str, List[Tensor]],

@@ -74,7 +74,7 @@ class GenericMetrics:
     def plot_all(self):
         results = {}
         for metric in sorted(set(self.valid) | set(self.train)):
-            fig, ax = plt.subplots(figsize=(16, 12), dpi=100)
+            fig, ax = plt.subplots(figsize=(18, 12), dpi=100)
             color_map = self.style_config["colors"]
 
             labels = sorted(set(self.valid.get(metric, {})) | set(self.train.get(metric, {})))
@@ -116,7 +116,7 @@ class GenericMetrics:
             ax.grid(True)
             # set log y
             ax.set_yscale('log')
-            fig.tight_layout(rect=[0, 0, 0.95, 1])  # leave space on the right
+            fig.tight_layout(rect=[0, 0, 0.98, 1])  # leave space on the right
             results[metric] = fig
 
         return results

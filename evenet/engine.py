@@ -5,7 +5,6 @@ from typing import Any, Dict, Union
 
 import wandb
 import lightning as L
-import numpy as np
 import torch
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 from lion_pytorch import Lion
@@ -20,6 +19,8 @@ from evenet.network.metrics.classification import shared_step as cls_step, share
 from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
 from evenet.network.metrics.assignment import shared_step as ass_step, shared_epoch_end as ass_end
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
+
+from evenet.utilities.debug_tool import time_decorator, log_function_stats
 
 
 class EveNetEngine(L.LightningModule):
@@ -119,6 +120,7 @@ class EveNetEngine(L.LightningModule):
     def on_train_start(self):
         pass
 
+    @time_decorator()
     def shared_step(self, batch: Any, *args: Any, **kwargs: Any):
         batch_size = batch["x"].shape[0]
         device = self.device
@@ -195,6 +197,7 @@ class EveNetEngine(L.LightningModule):
 
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts
 
+    @time_decorator()
     def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         step = self.global_step
         epoch = self.current_epoch
@@ -227,6 +230,7 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
+    # @time_decorator
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
         # Implement your validation step logic here
         step = self.global_step
@@ -242,6 +246,7 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
+    # @time_decorator
     def on_fit_start(self) -> None:
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
@@ -280,6 +285,8 @@ class EveNetEngine(L.LightningModule):
                 })
                 plt.close(fig)
 
+            # debug time information
+            log_function_stats(self.logger)
         pass
 
     def on_validation_start(self):
@@ -288,6 +295,7 @@ class EveNetEngine(L.LightningModule):
     def on_train_epoch_start(self) -> None:
         pass
 
+    @time_decorator()
     def on_validation_epoch_end(self) -> None:
         if self.classification_cfg.include:
             cls_end(
@@ -307,10 +315,12 @@ class EveNetEngine(L.LightningModule):
 
         self.general_log.finalize_epoch(is_train=False)
 
+    @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
         pass
 
+    @time_decorator()
     def backward(self, loss, *args, **kwargs):
         for name, param in self.named_parameters():
             if param.grad is not None:
@@ -319,6 +329,7 @@ class EveNetEngine(L.LightningModule):
                     raise ValueError("Gradient check failed.")
         super().backward(loss, *args, **kwargs)
 
+    # @time_decorator()
     def safe_manual_backward(self, loss, optimizers: list, retain_graph=False):
         self.manual_backward(loss, retain_graph=retain_graph)
 
@@ -329,6 +340,7 @@ class EveNetEngine(L.LightningModule):
                     if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
                         raise ValueError("🚨 Gradient is NaN or Inf!")
 
+    # @time_decorator
     def configure_optimizers(self):
         cfg = self.hyper_par_cfg
         lr_factor = cfg.get('lr_factor', 1.0)
@@ -389,6 +401,7 @@ class EveNetEngine(L.LightningModule):
 
         return optimizers, schedulers
 
+    # @time_decorator
     def configure_model(self) -> None:
         print(f"{self.__class__.__name__} configure model on device {self.device}")
         if self.model is not None:

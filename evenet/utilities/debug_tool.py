@@ -2,6 +2,7 @@ import torch.nn as nn
 from collections import defaultdict
 import torch
 
+
 class DebugHookManager:
     def __init__(self, track_forward=True, track_backward=True, save_values=False):
         self.forward_hooks = []
@@ -92,3 +93,49 @@ class DebugHookManager:
         print("🔍 Dumped backward gradients:")
         for k, v in self.backward_grads.items():
             print(f"{k}: {len(v)} tensors")
+
+
+import time
+from functools import wraps
+from collections import defaultdict
+from lightning.pytorch.loggers import WandbLogger
+
+# Global dictionary to store function stats
+function_stats = defaultdict(lambda: {"count": 0, "total_time": 0.0})
+
+
+def time_decorator(name=None):
+    def wrapper(func):
+        key = name or func.__qualname__
+
+        @wraps(func)
+        def timed_fn(*args, **kwargs):
+            start = time.time()
+            result = func(*args, **kwargs)
+            elapsed = time.time() - start
+
+            function_stats[key]["count"] += 1
+            function_stats[key]["total_time"] += elapsed
+
+            return result
+        return timed_fn
+    return wrapper
+
+
+def print_stats():
+    print("Function timing stats:")
+    for name, stat in function_stats.items():
+        print(f"{name}: {stat['count']} calls, {stat['total_time']:.4f} seconds")
+
+
+def log_function_stats(logger: WandbLogger, table_name: str = "function_timing"):
+    columns = ["function", "call_count", "total_time [sec]", "average_time [sec]"]
+    data = []
+
+    for func_name, stat in function_stats.items():
+        count = stat["count"]
+        total_time = stat["total_time"]
+        avg_time = total_time / count if count > 0 else 0.0
+        data.append([func_name, count, total_time, avg_time])
+
+    logger.log_table(key=table_name, columns=columns, data=data)

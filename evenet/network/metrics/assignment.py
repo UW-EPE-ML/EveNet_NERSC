@@ -3,6 +3,7 @@ import re
 import torch.nn
 
 from evenet.network.loss.assignment import convert_target_assignment
+from evenet.utilities.debug_tool import time_decorator
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 from evenet.control.event_info import EventInfo
 from evenet.network.metrics.predict_assignment import extract_predictions
@@ -21,6 +22,7 @@ from scipy.optimize import curve_fit
 import wandb
 
 
+@time_decorator(name="[Assignment] reconstruct_mass_peak")
 def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     """
     *** input Jet with log pt and log mass ***
@@ -65,7 +67,6 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     invariant_mass[~is_valid_event] = float(-999)
     return invariant_mass
 
-
 def get_assignment_necessaries(
         event_info: EventInfo,
 ):
@@ -106,7 +107,7 @@ def get_assignment_necessaries(
         }
     }
 
-
+@time_decorator(name="[Assignment] predict")
 def predict(assignments: List[Tensor],
             detections: List[Tensor],
             product_symbolic_groups,
@@ -471,6 +472,7 @@ class SingleProcessAssignmentMetrics:
         return predictions, targets
 
 
+@time_decorator(name="[Assignment] shared_step")
 def shared_step(
         ass_loss_fn,
         loss_dict,
@@ -550,6 +552,7 @@ def shared_step(
     return total_loss, assignment_predict
 
 
+@time_decorator(name="[Assignment] shared_epoch_end")
 def shared_epoch_end(
         global_rank,
         metrics_valid,
