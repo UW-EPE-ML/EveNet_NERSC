@@ -462,3 +462,10 @@ class EveNetEngine(L.LightningModule):
             self.model_parts[group]['modules'].append(key)
 
         print("model parts: ", self.model_parts)
+
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
+                break  # just one param is enough to test
+
+
