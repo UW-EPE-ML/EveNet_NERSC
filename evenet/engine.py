@@ -310,6 +310,7 @@ class EveNetEngine(L.LightningModule):
             ass_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.assignment_metrics_valid,
+                metrics_train=self.assignment_metrics_train,
                 logger=self.logger.experiment,
             )
 

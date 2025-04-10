@@ -161,8 +161,8 @@ def predict(assignments: List[Tensor],
             for iorder in range(len(symmetry_element)):
                 final_assignments_indices.append(torch.tensor(assignment_sorted[iorder]).to(device))
                 final_assignments_probabilities.append(torch.tensor(assignment_probability[iorder]).to(device))
-                detections_probabilities = 1 - (detection_prob[:, iorder] / init_probabilities)
-                init_probabilities = detections_probabilities
+                detections_probabilities = 1.0 - (detection_prob[:, iorder] / init_probabilities)
+                init_probabilities = np.copy(detections_probabilities)
                 final_detections_probabilities.append(torch.tensor(detections_probabilities).to(device))
 
     return {
@@ -228,39 +228,41 @@ class SingleProcessAssignmentMetrics:
         self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
         self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
 
-        self.mass_spectrum = dict({
-            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
-            for cluster_name, particle_name, orbit in self.clusters
-            for i in range(len(particle_name))
-        })
+        self.bins_score = np.linspace(0, 1, self.num_bins + 1)
+        self.bin_centers_score = 0.5 * (self.bins_score[:-1] + self.bins_score[1:])
 
-        self.predict_mass_spectrum_correct = dict({
-            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
-            for cluster_name, particle_name, orbit in self.clusters
-            for i in range(len(particle_name))
-        })
+        self.truth_metrics = dict(
+            {f"{i + 1}{cluster_name}": {
+                "mass": np.zeros(self.num_bins),
+                "detection_score": np.zeros(self.num_bins),
+                "assignment_score": np.zeros(self.num_bins)
+            }
+                for cluster_name, particle_name, orbit in self.clusters
+                for i in range(len(particle_name))
+            })
 
-        self.predict_mass_spectrum_wrong = dict({
-            f"{i + 1}{cluster_name}": np.zeros(self.num_bins)
-            for cluster_name, particle_name, orbit in self.clusters
-            for i in range(len(particle_name))
-        })
+        self.predict_metrics_correct = dict(
+            {f"{i + 1}{cluster_name}": {
+                "mass": np.zeros(self.num_bins),
+                "detection_score": np.zeros(self.num_bins),
+                "assignment_score": np.zeros(self.num_bins),
+            }
+                for cluster_name, particle_name, orbit in self.clusters
+                for i in range(len(particle_name))
+            })
 
-        # self.predict_mass_spectrum_correct = dict({
-        #     f"{i+1}{cluster_name}": {
-        #         f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
-        #     }
-        #     for cluster_name, particle_name, orbit in self.clusters
-        #     for i in range(len(particle_name))
-        # })
+        self.predict_metrics_wrong = dict(
+            {f"{i + 1}{cluster_name}": {
+                "mass": np.zeros(self.num_bins),
+                "detection_score": np.zeros(self.num_bins),
+                "assignment_score": np.zeros(self.num_bins),
+            }
+                for cluster_name, particle_name, orbit in self.clusters
+                for i in range(len(particle_name))
+            })
 
-        # self.predict_mass_spectrum_wrong = dict({
-        #     f"{i+1}{cluster_name}": {
-        #         f"{detection_wp}": np.zeros(self.num_bins) for detection_wp in self.detection_WP
-        #     }
-        #     for cluster_name, particle_name, orbit in self.clusters
-        #     for i in range(len(particle_name))
-        # })
+        self.train_metrics_correct = None
+        self.train_metrics_wrong = None
 
     def update(
             self,
@@ -288,6 +290,8 @@ class SingleProcessAssignmentMetrics:
             truth_masking = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             prediction = torch.stack([best_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             predict_detection = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
+            predict_assign_score = torch.stack([assignment_probabilities[iorbit] for iorbit in list(sorted(orbit))],
+                                               dim=0)
             correct_reco = torch.stack([correct_assigned[iorbit] for iorbit in list(sorted(orbit))], dim=0)
 
             for num_resonance in range(len(names)):
@@ -299,36 +303,52 @@ class SingleProcessAssignmentMetrics:
                     truth_local = truth_local[truth_mask_local]
                     if not (truth_local.size()[0] > 0):
                         continue
-
                     input = inputs[truth_mask_local]
                     input_mask = inputs_mask[truth_mask_local]
                     jet = input[:, :, self.ptetaphimass_index]
+
+                    # Fill truth metrics
                     truth_mass = reconstruct_mass_peak(jet, truth_local, input_mask)
-                    truth_mass = truth_mass.detach().cpu().numpy()
-                    hist, _ = np.histogram(truth_mass, bins=self.bins)
-                    self.mass_spectrum[hist_name] += hist
+                    hist, _ = np.histogram(truth_mass.detach().cpu().numpy(), bins=self.bins)
+                    self.truth_metrics[hist_name]["mass"] += hist
 
                     prediction_local = prediction[local_resonance, :, :][truth_mask_local]
                     detection_local = predict_detection[local_resonance, :][truth_mask_local]
                     correct_local = correct_reco[local_resonance, :][truth_mask_local]
+                    assign_score_local = predict_assign_score[local_resonance, :][truth_mask_local]
 
+                    # Fill correct metrics
                     predict_correct = prediction_local[correct_local]
                     detection_correct = detection_local[correct_local]
+                    assign_score_correct = assign_score_local[correct_local]
                     if prediction_local.size()[0] > 0:
                         reco_mass_correct = reconstruct_mass_peak(
                             jet[correct_local], predict_correct, input_mask[correct_local]
-                        ).detach().cpu().numpy()
-                        hist, _ = np.histogram(reco_mass_correct, bins=self.bins)
-                        self.predict_mass_spectrum_correct[hist_name] += hist
+                        )
+                        hist, _ = np.histogram(reco_mass_correct.detach().cpu().numpy(), bins=self.bins)
+                        self.predict_metrics_correct[hist_name]["mass"] += hist
+
+                        hist, _ = np.histogram(detection_correct.detach().cpu().numpy(), bins=self.bins_score)
+                        self.predict_metrics_correct[hist_name]["detection_score"] += hist
+
+                        hist, _ = np.histogram(assign_score_correct.detach().cpu().numpy(), bins=self.bins_score)
+                        self.predict_metrics_correct[hist_name]["assignment_score"] += hist
 
                     prediction_false = prediction_local[~correct_local]
                     detection_false = detection_local[~correct_local]
+                    assign_score_false = assign_score_local[~correct_local]
                     if prediction_false.size()[0] > 0:
                         reco_mass_false = reconstruct_mass_peak(
                             jet[~correct_local], prediction_false, input_mask[~correct_local]
-                        ).detach().cpu().numpy()
-                        hist, _ = np.histogram(reco_mass_false, bins=self.bins)
-                        self.predict_mass_spectrum_wrong[hist_name] += hist
+                        )
+                        hist, _ = np.histogram(reco_mass_false.detach().cpu().numpy(), bins=self.bins)
+                        self.predict_metrics_wrong[hist_name]["mass"] += hist
+
+                        hist, _ = np.histogram(detection_false.detach().cpu().numpy(), bins=self.bins_score)
+                        self.predict_metrics_wrong[hist_name]["detection_score"] += hist
+
+                        hist, _ = np.histogram(assign_score_false.detach().cpu().numpy(), bins=self.bins_score)
+                        self.predict_metrics_wrong[hist_name]["assignment_score"] += hist
 
     def check_correct_assignment(
             self,
@@ -359,39 +379,64 @@ class SingleProcessAssignmentMetrics:
         return result
 
     def reset(self):
-        for name, hist in self.mass_spectrum.items():
-            self.mass_spectrum[name] = np.zeros(self.num_bins)
-        for name, hist in self.predict_mass_spectrum_correct.items():
-            self.predict_mass_spectrum_correct[name] = np.zeros(self.num_bins)
-        for name, hist in self.predict_mass_spectrum_wrong.items():
-            self.predict_mass_spectrum_wrong[name] = np.zeros(self.num_bins)
+        for name, hist in self.truth_metrics.items():
+            for key in hist.keys():
+                self.truth_metrics[name][key] = np.zeros(self.num_bins)
+
+        for name, hist in self.predict_metrics_correct.items():
+            for key in hist.keys():
+                self.predict_metrics_correct[name][key] = np.zeros(self.num_bins)
+
+        for name, hist in self.predict_metrics_wrong.items():
+            for key in hist.keys():
+                self.predict_metrics_wrong[name][key] = np.zeros(self.num_bins)
+
+        self.train_metrics_correct = None
+        self.train_metrics_wrong = None
 
     def reduce_across_gpus(self):
         if torch.distributed.is_initialized():
-            for name, hist in self.mass_spectrum.items():
-                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
-                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-                self.mass_spectrum[name] = tensor.cpu().numpy()
-            for name, hist in self.predict_mass_spectrum_correct.items():
-                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
-                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-                self.predict_mass_spectrum_correct[name] = tensor.cpu().numpy()
-            for name, hist in self.predict_mass_spectrum_wrong.items():
-                tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
-                torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-                self.predict_mass_spectrum_wrong[name] = tensor.cpu().numpy()
+            for name, hist in self.truth_metrics.items():
+                for key in hist.keys():
+                    tensor = torch.tensor(hist[key], dtype=torch.long, device=self.device)
+                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.truth_metrics[name][key] = tensor.cpu().numpy()
+
+            for name, hist in self.predict_metrics_correct.items():
+                for key in hist.keys():
+                    tensor = torch.tensor(hist[key], dtype=torch.long, device=self.device)
+                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.predict_metrics_correct[name][key] = tensor.cpu().numpy()
+
+            for name, hist in self.predict_metrics_wrong.items():
+                for key in hist.keys():
+                    tensor = torch.tensor(hist[key], dtype=torch.long, device=self.device)
+                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.predict_metrics_wrong[name][key] = tensor.cpu().numpy()
+
+    def assign_train_result(self,
+                            train_metrics_correct=None,
+                            train_metrics_wrong=None):
+        self.train_metrics_correct = train_metrics_correct
+        self.train_metrics_wrong = train_metrics_wrong
 
     def plot_mass_spectrum_func(self,
                                 truth,
                                 predict_correct,
                                 predict_wrong,
+                                train_predict_correct=None,
+                                train_predict_wrong=None,
                                 ):
 
         fig, ax = plt.subplots(figsize=(9, 6))
         base_colors = plt.cm.Set2(np.linspace(0.2, 0.8, 2))
         lighter = lambda c: tuple(min(1.0, x + 0.3) for x in c)
 
+        ## Self plot
+
         total_pred = np.zeros_like(predict_wrong)
+
+        predict_accuracy = predict_correct.sum() / (predict_correct.sum() + predict_wrong.sum())
 
         ax.bar(
             self.bin_centers,
@@ -400,7 +445,7 @@ class SingleProcessAssignmentMetrics:
             bottom=total_pred,
             color=base_colors[0],
             alpha=0.6,
-            label='Reco Success',
+            label=f'Reco Success [acc: {predict_accuracy:.2f}]',
         )
 
         ax.bar(
@@ -412,6 +457,8 @@ class SingleProcessAssignmentMetrics:
             alpha=0.5,
             label='Reco False'
         )
+
+        # Train plot
 
         ax.step(self.bin_centers, truth, where='mid', color='black', linewidth=1.5, label='Truth')
 
@@ -435,23 +482,128 @@ class SingleProcessAssignmentMetrics:
         except RuntimeError:
             print("Prediction fit failed")
 
+        if train_predict_correct is not None:
+            train_accuracy = train_predict_correct.sum() / (train_predict_correct.sum() + train_predict_wrong.sum())
+            ax.step(
+                self.bin_centers,
+                train_predict_correct,
+                where='mid',
+                markersize=6,
+                marker='o',
+                markerfacecolor=base_colors[0],
+                markeredgecolor=base_colors[0],
+                label=f'Reco Success (train) [acc: {train_accuracy:.2f}]',
+            )
+
+            ax.step(
+                self.bin_centers,
+                train_predict_correct + train_predict_wrong,
+                where='mid',
+                color=base_colors[0],
+                markersize=6,
+                marker='o',
+                markerfacecolor='none',
+                markeredgecolor=base_colors[0],
+                linestyle='None',
+                label='Total (train)'
+            )
+
+            try:
+                popt_train, _ = curve_fit(
+                    gauss, self.bin_centers, train_predict_correct + train_predict_wrong,
+                    p0=[np.max(train_predict_correct + train_predict_wrong), 100, 10]
+                )
+                ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_train), 'b--',
+                        label=f'Pred Fit (Train): μ={popt_train[1]:.2f}, σ={popt_train[2]:.2f}')
+
+            except RuntimeError:
+                print("Prediction fit failed")
+
         ax.legend()
         fig.tight_layout()
         return fig
 
     def plot_mass_spectrum(self):
         return_plot = dict()
-        for name, hist in self.mass_spectrum.items():
+        for name, hist in self.truth_metrics.items():
             return_plot[f"{name}"] = self.plot_mass_spectrum_func(
-                hist,
-                self.predict_mass_spectrum_correct[name],
-                self.predict_mass_spectrum_wrong[name],
+                hist["mass"],
+                self.predict_metrics_correct[name]["mass"],
+                self.predict_metrics_wrong[name]["mass"],
+                self.train_metrics_correct[name]["mass"] if self.train_metrics_correct is not None else None,
+                self.train_metrics_wrong[name]["mass"] if self.train_metrics_wrong is not None else None,
             )
         return return_plot
+
+    def plot_score_func(self,
+                        correct_score,
+                        false_score,
+                        train_correct_score=None,
+                        train_false_score=None
+                        ):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        bin_widths = np.diff(self.bins_score)
+        ax.bar(self.bin_centers_score,
+               correct_score / np.maximum(1.0, np.sum(correct_score) * bin_widths),
+               width=bin_widths,
+               color='C0',
+               alpha=0.85,
+               label='Correct assign',
+               edgecolor='black')
+        ax.bar(self.bin_centers_score,
+               false_score / np.maximum(1.0, np.sum(false_score) * bin_widths),
+               width=bin_widths,
+               color='C1',
+               alpha=0.65,
+               label='Wrong assign',
+               edgecolor='black')
+        # Plot training histogram (b
+        if train_correct_score is not None:
+            train_bin_widths = np.diff(self.bins_score)
+            ax.plot(self.bin_centers_score,
+                    train_correct_score / np.maximum(1, train_correct_score.sum() * train_bin_widths),
+                    linestyle='None',
+                    marker='o',
+                    linewidth=3,
+                    markersize=6,
+                    label='Correct assign (train)',
+                    color='C0')
+            ax.plot(self.bin_centers_score,
+                    train_false_score / np.maximum(1, train_false_score.sum() * train_bin_widths),
+                    linestyle='None',
+                    marker='o',
+                    linewidth=3,
+                    markersize=3,
+                    label='Wrong assign (train)',
+                    color='C1'
+                    )
+
+        ax.set_xlabel("Score")
+        ax.set_ylabel("Density")
+        ax.set_title("Score Distribution")
+        ax.legend(loc="best")
+        ax.grid(True)
+        fig.tight_layout()
+
+        return fig
+
+
+    def plot_score(self, target="detection_score"):
+        return_plot = dict()
+        for name, _ in self.truth_metrics.items():
+            return_plot[f"{name}"] = self.plot_score_func(
+                self.predict_metrics_correct[name][target],
+                self.predict_metrics_wrong[name][target],
+                self.train_metrics_correct[name][target] if self.train_metrics_correct is not None else None,
+                self.train_metrics_wrong[name][target] if self.train_metrics_wrong is not None else None,
+            )
+        return return_plot
+
 
     @staticmethod
     def permute_arrays(self, array_list, permutation):
         return [array_list[index] for index in permutation]
+
 
     def sort_outputs(self, predictions, targets):
         """
@@ -556,14 +708,22 @@ def shared_step(
 def shared_epoch_end(
         global_rank,
         metrics_valid,
+        metrics_train,
         logger,
 ):
     for process in metrics_valid:
         metrics_valid[process].reduce_across_gpus()
-
+    if metrics_train:
+        for process in metrics_train:
+            metrics_train[process].reduce_across_gpus()
     if global_rank == 0:
 
         for process in metrics_valid:
+            metrics_valid[process].assign_train_result(
+                metrics_train[process].predict_metrics_correct,
+                metrics_train[process].predict_metrics_wrong,
+            )
+
             figs = metrics_valid[process].plot_mass_spectrum()
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
@@ -573,5 +733,25 @@ def shared_epoch_end(
             for _, fig in figs.items():
                 plt.close(fig)
 
+            figs = metrics_valid[process].plot_score(target="detection_score")
+            wandb.log({
+                f"assignment_reco_detection/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
+            figs = metrics_valid[process].plot_score(target="assignment_score")
+            wandb.log({
+                f"assignment_score/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
     for _, metric in metrics_valid.items():
         metric.reset()
+
+    if metrics_train:
+        for _, metric in metrics_train.items():
+            metric.reset()

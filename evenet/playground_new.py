@@ -32,7 +32,7 @@ from evenet.utilities.debug_tool import DebugHookManager
 wandb_enable = True
 n_epoch = 10
 debugger_enable = False
-device = "cpu"
+device = "cuda"
 
 workspacedir = "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
 
@@ -51,7 +51,7 @@ df = pq.read_table(
 # Optional: Subsample for speed
 
 df.sample(frac=1).reset_index(drop=True)
-df_number = 2048 # len(df) // 2
+df_number = 512 # len(df) // 2
 df = df.head(df_number)
 
 # Assignment setting
@@ -295,7 +295,12 @@ for iepoch in range(n_epoch):
         fig = confusion_accumulator.plot_cm(class_names=num_classes)
         wandb.log({"confusion_matrix": wandb.Image(fig)})
 
+        plt.close(fig)
         for process in assignment_metrics:
+            assignment_metrics[process].assign_train_result(
+                assignment_metrics[process].predict_metrics_correct,
+                assignment_metrics[process].predict_metrics_wrong,
+            )
             figs = assignment_metrics[process].plot_mass_spectrum()
             wandb.log({
                 f"assignment_matrix/{process}/{name}": wandb.Image(fig)
@@ -303,10 +308,24 @@ for iepoch in range(n_epoch):
             })
             for _, fig in figs.items():
                 plt.close(fig)
+
+            figs = assignment_metrics[process].plot_score(target = "detection_score")
+            wandb.log({
+                f"assignment_reco_detection/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
+            figs = assignment_metrics[process].plot_score(target = "assignment_score")
+            wandb.log({
+                f"assignment_reco_score/{process}/{name}": wandb.Image(fig)
+                for name, fig in figs.items()
+            })
+            for _, fig in figs.items():
+                plt.close(fig)
+
             assignment_metrics[process].reset()
-
-        plt.close(fig)
-
     confusion_accumulator.reset()
 
     # break
