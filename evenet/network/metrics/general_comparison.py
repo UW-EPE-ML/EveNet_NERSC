@@ -17,11 +17,13 @@ class GenericMetrics:
         }
 
         self.style_config = style_config or {
-            "train": {"linestyle": "-", "marker": "x", "alpha": 0.7},
-            "valid": {"linestyle": "--", "marker": "o", "alpha": 0.9},
+            "train": {"linestyle": "-", "marker": "x", "alpha": 0.75, "linewidth": 2},
+            "valid": {"linestyle": "--", "marker": "o", "alpha": 0.9, "linewidth": 1.5},
             "colors": [
-                "#40B0A6", "#6D8EF7", "#6E579A", "#A38E89",
-                "#A5C8DD", "#CD5582", "#E1BE6A", "#E89A7A", "#EC6B2D"
+                "#2D8875", "#52AADC", "#7C7979", "#7FABD1",
+                "#91ccc0", "#963B79", "#97D0C5", "#B5CE4E",
+                "#BD7795", "#C7C1DE", "#C89736", "#D75B4E",
+                "#EC6E66", "#EEB6D4", "#F39865", "#F7AC53"
             ]
         }
 
