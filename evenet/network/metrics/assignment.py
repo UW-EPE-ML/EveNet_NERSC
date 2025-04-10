@@ -425,8 +425,10 @@ class SingleProcessAssignmentMetrics:
             print("Truth fit failed")
 
         try:
-            popt_pred, _ = curve_fit(gauss, self.bin_centers, predict_correct + predict_wrong,
-                                     p0=[np.max(predict_correct + predict_wrong), 100, 10])
+            popt_pred, _ = curve_fit(
+                gauss, self.bin_centers, predict_correct + predict_wrong,
+                p0=[np.max(predict_correct + predict_wrong), 100, 10]
+            )
             ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_pred), 'r--',
                     label=f'Pred Fit: μ={popt_pred[1]:.2f}, σ={popt_pred[2]:.2f}')
         except RuntimeError:
