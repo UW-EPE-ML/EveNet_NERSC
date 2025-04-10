@@ -490,6 +490,8 @@ def shared_step(
         subprocess_id,
         metrics: dict[str, SingleProcessAssignmentMetrics]
 ):
+    num_processes = len(event_permutations)
+
     symmetric_losses = ass_loss_fn(
         assignments=assignments,
         detections=detections,
@@ -529,8 +531,8 @@ def shared_step(
         loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
         loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
 
-        assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
-        detected_loss = detected_loss + symmetric_losses["detection"][process]
+        assignment_loss = (assignment_loss + symmetric_losses["assignment"][process]) / num_processes
+        detected_loss = (detected_loss + symmetric_losses["detection"][process]) / num_processes
 
     loss_dict['assignment_loss'] = assignment_loss
     loss_dict['detection_loss'] = detected_loss
@@ -559,5 +561,5 @@ def shared_epoch_end(
             for _, fig in figs.items():
                 plt.close(fig)
 
-        for _, metric in metrics_valid.items():
-            metric.reset()
+    for _, metric in metrics_valid.items():
+        metric.reset()

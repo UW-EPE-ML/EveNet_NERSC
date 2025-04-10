@@ -83,7 +83,7 @@ def convert_target_assignment_array(
             process_masking = (process_id == iprocess) if process_id is not None else torch.ones_like(targets_mask[:, index_global], dtype=torch.bool)
             process_mask[process].append(process_masking)
             process_weight[process].append(
-                (process_balance[iprocess] * (process_masking).float())
+                (process_balance[iprocess] * process_masking.float())
                 if process_balance is not None else None
             )
             index_global += 1
@@ -175,7 +175,7 @@ def loss_single_process(
         focal_gamma: float,
         particle_index_tensor: Union[Tensor, None],
         particle_weights_tensor: Union[Tensor, None],
-        process_weight: Union[Tensor, None]
+        process_weight: Union[List[Tensor], None]
 ):
     ####################
     ## Detection Loss ##
@@ -285,7 +285,7 @@ def loss(
     }
     )
 
-    num_processes = len(event_permutations.keys())
+    # num_processes = len(event_permutations.keys())
     for process in event_permutations.keys():
         assignment_loss, detection_loss = loss_single_process(
             assignments[process],
@@ -300,7 +300,7 @@ def loss(
             particle_balance.get(process, [None, None])[1] if particle_balance else None,
             process_weight[process]
         )
-        loss_summary["assignment"][process] = assignment_loss / num_processes # not scale with num processes
-        loss_summary["detection"][process] = detection_loss / num_processes # not scale with num processes
+        loss_summary["assignment"][process] = assignment_loss # / num_processes # not scale with num processes
+        loss_summary["detection"][process] = detection_loss # / num_processes # not scale with num processes
 
     return loss_summary
