@@ -274,7 +274,14 @@ class EveNetEngine(L.LightningModule):
             self.assignment_metrics_valid = make_assignment_metrics()
 
     def on_fit_end(self) -> None:
-        self.general_log.reduce_across_gpus(device=self.device)
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+
+        self.general_log.reduce_across_gpus(
+            device=device
+        )
 
         if self.global_rank == 0:
             figs = self.general_log.plot_all()
