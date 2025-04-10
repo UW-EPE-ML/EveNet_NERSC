@@ -443,10 +443,11 @@ class EveNetEngine(L.LightningModule):
                 missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
-            # Sync all params
-            torch.distributed.barrier()
-            for param in self.model.parameters():
-                torch.distributed.broadcast(param.data, src=0)
+
+        # Sync all params
+        torch.distributed.barrier()
+        for param in self.model.parameters():
+            torch.distributed.broadcast(param.data, src=0)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
 
