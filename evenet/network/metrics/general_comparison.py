@@ -6,8 +6,7 @@ from collections import defaultdict
 
 
 class GenericMetrics:
-    def __init__(self, device, style_config=None):
-        self.device = device
+    def __init__(self, style_config=None):
         self.valid = defaultdict(lambda: defaultdict(list))
         self.train = defaultdict(lambda: defaultdict(list))
 
@@ -49,7 +48,7 @@ class GenericMetrics:
         # Clear the buffer
         self.epoch_buffer["train" if is_train else "valid"] = defaultdict(lambda: defaultdict(list))
 
-    def reduce_across_gpus(self):
+    def reduce_across_gpus(self, device):
         if not torch.distributed.is_initialized():
             return
 
@@ -58,7 +57,7 @@ class GenericMetrics:
             for metric, values_dict in storage.items():
                 for label, arrays in values_dict.items():
                     stacked = np.stack(arrays)
-                    tensor = torch.tensor(stacked, dtype=torch.float32, device=self.device)
+                    tensor = torch.tensor(stacked, dtype=torch.float32, device=device)
                     torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
                     tensor /= torch.distributed.get_world_size()
                     reduced[metric][label] = [tensor.cpu().numpy()]
@@ -124,7 +123,7 @@ class GenericMetrics:
 
 if __name__ == '__main__':
     # Instantiate the plotter
-    plotter = GenericMetrics(device='cpu')
+    plotter = GenericMetrics()
 
     # Simulate dummy updates
     for step in range(100):

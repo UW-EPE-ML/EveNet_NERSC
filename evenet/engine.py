@@ -109,7 +109,7 @@ class EveNetEngine(L.LightningModule):
         self.automatic_optimization = False
 
         ###### For general log ######
-        self.general_log = GenericMetrics(device=self.device)
+        self.general_log = GenericMetrics()
 
         ###### Last ######
         # self.save_hyperparameters()
@@ -274,7 +274,7 @@ class EveNetEngine(L.LightningModule):
             self.assignment_metrics_valid = make_assignment_metrics()
 
     def on_fit_end(self) -> None:
-        self.general_log.reduce_across_gpus()
+        self.general_log.reduce_across_gpus(device=self.device)
 
         if self.global_rank == 0:
             figs = self.general_log.plot_all()
