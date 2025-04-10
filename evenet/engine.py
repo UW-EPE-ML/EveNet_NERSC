@@ -249,6 +249,8 @@ class EveNetEngine(L.LightningModule):
 
     # @time_decorator
     def on_fit_start(self) -> None:
+        self.model = torch.compile(model=self.model, fullgraph=True)
+
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
                 num_classes=len(self.num_classes), normalize=True, device=self.device
@@ -435,7 +437,9 @@ class EveNetEngine(L.LightningModule):
         if self.pretrain_ckpt_path is not None:
             if self.global_rank == 0:
                 print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
-                state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)
+                state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)['state_dict']
+                # Remove "model." prefix from keys
+                state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
                 missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
@@ -445,7 +449,6 @@ class EveNetEngine(L.LightningModule):
                 torch.distributed.broadcast(param.data, src=0)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
-        self.model = torch.compile(model=self.model)
 
         # Define Freezing
         self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
@@ -475,7 +478,19 @@ class EveNetEngine(L.LightningModule):
 
         print("model parts: ", self.model_parts)
 
-        for name, param in self.model.named_parameters():
+        for i, (name, param) in enumerate(self.model.named_parameters()):
             if param.requires_grad:
                 print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
-                break  # just one param is enough to test
+
+            if i == 3:
+                break
+
+    def on_save_checkpoint(self, checkpoint):
+        # Get the original model if it's torch.compile'd
+        orig_model = getattr(self.model, "_orig_mod", self.model)
+        # Get the state_dict and add "model." prefix to all keys
+        new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
+        # Replace the checkpoint state_dict
+        checkpoint["state_dict"] = new_sd
+
+        pass
