@@ -249,7 +249,20 @@ class EveNetEngine(L.LightningModule):
 
     # @time_decorator
     def on_fit_start(self) -> None:
-        self.model = torch.compile(model=self.model, fullgraph=True)
+
+        # # Sync all params
+        # torch.distributed.barrier()
+        # for param in self.model.parameters():
+        #     torch.distributed.broadcast(param.data, src=0)
+        #
+        # self.model = torch.compile(model=self.model, fullgraph=True)
+
+        for i, (name, param) in enumerate(self.model.named_parameters()):
+            if param.requires_grad:
+                print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
+
+            if i == 3:
+                break
 
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
@@ -444,11 +457,6 @@ class EveNetEngine(L.LightningModule):
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
 
-        # Sync all params
-        torch.distributed.barrier()
-        for param in self.model.parameters():
-            torch.distributed.broadcast(param.data, src=0)
-
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
 
         # Define Freezing
@@ -478,13 +486,6 @@ class EveNetEngine(L.LightningModule):
             self.model_parts[group]['modules'].append(key)
 
         print("model parts: ", self.model_parts)
-
-        for i, (name, param) in enumerate(self.model.named_parameters()):
-            if param.requires_grad:
-                print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
-
-            if i == 3:
-                break
 
     def on_save_checkpoint(self, checkpoint):
         # Get the original model if it's torch.compile'd
