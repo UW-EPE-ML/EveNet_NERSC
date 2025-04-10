@@ -284,6 +284,8 @@ class EveNetEngine(L.LightningModule):
         )
 
         if self.global_rank == 0:
+            print(f"{self.__class__.__name__} on_fit_end")
+
             figs = self.general_log.plot_all()
 
             for metric, fig in figs.items():
