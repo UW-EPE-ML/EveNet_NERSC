@@ -195,6 +195,8 @@ class EveNetModel(nn.Module):
                     position_embedding_dim=self.network_cfg.Assignment.position_embedding_dim,
                     num_attention_heads=self.network_cfg.Assignment.num_attention_heads,
                     transformer_dim_scale=self.network_cfg.Assignment.transformer_dim_scale,
+                    num_linear_layers=self.network_cfg.Assignment.num_linear_layers,
+                    num_encoder_layers=self.network_cfg.Assignment.num_encoder_layers,
                     num_jet_embedding_layers=self.network_cfg.Assignment.num_jet_embedding_layers,
                     num_jet_encoder_layers=self.network_cfg.Assignment.num_jet_encoder_layers,
                     num_max_event_particles=self.event_info.max_event_particles,
