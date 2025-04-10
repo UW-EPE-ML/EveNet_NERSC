@@ -438,6 +438,10 @@ class EveNetEngine(L.LightningModule):
                     self.model.GlobalEmbedding.embedding_stack.embedding_layers[0].normalization.normalization.weight
                 )
 
+        torch.distributed.barrier()
+        for param in self.model.parameters():
+            torch.distributed.broadcast(param.data, src=0)
+
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
         self.model = torch.compile(model=self.model)
 
