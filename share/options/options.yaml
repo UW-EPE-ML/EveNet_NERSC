@@ -4,6 +4,7 @@ Training:
   model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
 
+  pretrain_model_load_path: null
 
   learning_rate: &lr 0.000015
   learning_rate_factor: &lr_factor 1.0

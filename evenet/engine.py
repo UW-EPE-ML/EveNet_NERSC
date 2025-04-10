@@ -38,6 +38,7 @@ class EveNetEngine(L.LightningModule):
         self.world_size = world_size
         self.total_events = total_events
         self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal'][0]  # list [process_name]
+        self.pretrain_ckpt_path = global_config.options.Training.pretrain_model_load_path
 
         ###### Initialize Keys for Data Inputs #####
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
@@ -431,16 +432,17 @@ class EveNetEngine(L.LightningModule):
             normalization_dict=self.normalization_dict,
         )
 
-        if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
-            # Only on rank 0, modify one weight manually
-            with torch.no_grad():
-                self.model.GlobalEmbedding.embedding_stack.embedding_layers[0].normalization.normalization.weight += torch.rand_like(
-                    self.model.GlobalEmbedding.embedding_stack.embedding_layers[0].normalization.normalization.weight
-                )
-
-        torch.distributed.barrier()
-        for param in self.model.parameters():
-            torch.distributed.broadcast(param.data, src=0)
+        if self.pretrain_ckpt_path is not None:
+            if self.global_rank == 0:
+                print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
+                state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)
+                missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+                print("--> Missing keys:", missing)
+                print("--> Unexpected keys:", unexpected)
+            # Sync all params
+            torch.distributed.barrier()
+            for param in self.model.parameters():
+                torch.distributed.broadcast(param.data, src=0)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
         self.model = torch.compile(model=self.model)
