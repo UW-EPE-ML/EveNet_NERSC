@@ -19,7 +19,7 @@ options:
 
   # overwrites
   Training:
-    epochs: 5
+    epochs: 10
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
     model_checkpoint_load_path: null
 
@@ -31,7 +31,7 @@ options:
 
       Assignment:
         include: true
-        detection_loss_scale: 0.001
+        detection_loss_scale: 1.0
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny/normalization.pt"
