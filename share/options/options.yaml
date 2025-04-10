@@ -1,7 +1,7 @@
 Training:
   epochs: 100
 
-  model_checkpoint_save_path: "./checkpoints/"
+  model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
 
   pretrain_model_load_path: null
