@@ -296,7 +296,10 @@ class EveNetEngine(L.LightningModule):
 
             # debug time information
             log_function_stats(self.logger)
-        pass
+
+            print(f"{self.__class__.__name__} on_fit_end end")
+
+        print(f"{self.__class__.__name__} on_fit_end all end [Rank: {self.global_rank}]")
 
     def on_validation_start(self):
         pass
