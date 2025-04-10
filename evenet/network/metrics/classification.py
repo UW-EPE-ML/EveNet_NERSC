@@ -199,7 +199,9 @@ class ClassificationMetrics:
                     color = colors[cls % len(colors)]
                     label = f"{class_names[cls]} (True)" if cls == true_cls else f"{class_names[cls]}"
                     plt.plot(
-                        bin_centers, val_density, color=color, label=label,
+                        bin_centers, val_density,
+                        color=color,
+                        label=label,
                         linestyle='-' if cls == true_cls else '--',
                         marker='o' if cls == true_cls else 'x',
                         linewidth=3 if cls == true_cls else 2,
@@ -235,7 +237,7 @@ def shared_step(
         class_weight=class_weight.to(device=device),
     )
     loss = cls_loss * loss_scale
-    loss_dict["classification_loss"] = cls_loss
+    loss_dict["classification"] = cls_loss
 
     metrics.update(
         y_true=target_classification,
@@ -264,13 +266,17 @@ def shared_epoch_end(
         )
 
         fig_cm = metrics_valid.plot_cm(class_names=num_classes)
-        logger.log({"classification/CM": wandb.Image(fig_cm)})
+        logger.log({
+            # "classification/CM": wandb.Image(fig_cm)
+            "classification/CM": fig_cm
+        })
         plt.close(fig_cm)
 
         fig_logits = metrics_valid.plot_logits(class_names=num_classes)
         for i, class_name in enumerate(num_classes):
             logger.log({
                 f"classification/logits_{class_name}": wandb.Image(fig_logits[i])
+                # f"classification/logits_{class_name}": fig_logits[i]
             })
             plt.close(fig_logits[i])
 

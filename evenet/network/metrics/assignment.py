@@ -474,6 +474,7 @@ class SingleProcessAssignmentMetrics:
 def shared_step(
         ass_loss_fn,
         loss_dict,
+        loss_detailed_dict,
         assignment_loss_scale,
         detection_loss_scale,
         process_names,
@@ -493,6 +494,11 @@ def shared_step(
         metrics: dict[str, SingleProcessAssignmentMetrics]
 ):
     num_processes = len(event_permutations)
+
+    loss_detailed_dict.update({
+        "assignment": {},
+        "detection": {},
+    })
 
     symmetric_losses = ass_loss_fn(
         assignments=assignments,
@@ -530,14 +536,14 @@ def shared_step(
             inputs_mask=point_cloud_mask,
         )
 
-        loss_dict[f"ass-{process}"] = symmetric_losses["assignment"][process]
-        loss_dict[f"det-{process}"] = symmetric_losses["detection"][process]
+        loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
+        loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]
 
         assignment_loss = (assignment_loss + symmetric_losses["assignment"][process]) / num_processes
         detected_loss = (detected_loss + symmetric_losses["detection"][process]) / num_processes
 
-    loss_dict['assignment_loss'] = assignment_loss
-    loss_dict['detection_loss'] = detected_loss
+    loss_dict['assignment'] = assignment_loss
+    loss_dict['detection'] = detected_loss
 
     total_loss = assignment_loss_scale * assignment_loss + detection_loss_scale * detected_loss
 
@@ -558,6 +564,7 @@ def shared_epoch_end(
             figs = metrics_valid[process].plot_mass_spectrum()
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
+                # f"assignment_reco_mass/{process}/{name}": fig
                 for name, fig in figs.items()
             })
             for _, fig in figs.items():

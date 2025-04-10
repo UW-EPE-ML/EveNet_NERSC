@@ -131,7 +131,12 @@ def train_func(cfg):
     )
 
 
-def register_dataset(parquet_files: list[str], process_event_batch_partial, platform_info) -> tuple[Dataset, int]:
+def register_dataset(
+        parquet_files: list[str],
+        process_event_batch_partial,
+        platform_info,
+        dataset_total: float = 1.0
+) -> tuple[Dataset, int]:
     # Create Ray datasets
     ds = ray.data.read_parquet(
         parquet_files,
@@ -140,8 +145,11 @@ def register_dataset(parquet_files: list[str], process_event_batch_partial, plat
             "num_cpus": 0.5,
         },
         shuffle="files",
-    ) # .limit(int(9089502 / 10))
+    )
 
+    total_events = ds.count()
+
+    ds = ds.limit(int(total_events * dataset_total))
     total_events = ds.count()
 
     ds = ds.map_batches(
@@ -195,8 +203,9 @@ def main(args):
     val_files = parquet_files[split_index:]
 
     # Create Ray datasets
-    train_ds, total_events = register_dataset(train_files, process_event_batch_partial, platform_info)
-    valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info)
+    dataset_limit = global_config.options.Dataset.dataset_limit
+    train_ds, total_events = register_dataset(train_files, process_event_batch_partial, platform_info, dataset_limit)
+    valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info, dataset_limit)
 
     run_config = RunConfig(
         name="EveNet-Training",

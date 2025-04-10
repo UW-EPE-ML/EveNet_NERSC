@@ -18,3 +18,4 @@ pyarrow==19.0.1
 opt_einsum==3.4.0
 lion-pytorch==0.2.3
 transformers==4.50.3
+plotly==6.0.1

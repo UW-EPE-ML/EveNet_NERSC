@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
+
+from evenet.network.metrics.general_comparison import GenericMetrics
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
 from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
@@ -105,6 +107,9 @@ class EveNetEngine(L.LightningModule):
         }
         self.automatic_optimization = False
 
+        ###### For general log ######
+        self.general_log = GenericMetrics(device=self.device)
+
         ###### Last ######
         # self.save_hyperparameters()
 
@@ -137,12 +142,11 @@ class EveNetEngine(L.LightningModule):
                 cls_output=next(iter(outputs["classification"].values())),
                 cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
-                loss_dict=loss_detailed_dict,
+                loss_dict=loss_head_dict,
                 loss_scale=self.classification_cfg.loss_scale,
                 metrics=self.classification_metrics_train if self.training else self.classification_metrics_valid,
                 device=device,
             )
-            loss_head_dict["classification"] = scaled_cls_loss
 
             loss = loss + scaled_cls_loss
 
@@ -159,7 +163,6 @@ class EveNetEngine(L.LightningModule):
             loss = loss + reg_loss * self.regression_cfg.loss_scale
 
             loss_head_dict["regression"] = reg_loss
-            loss_detailed_dict["regression_loss"] = reg_loss
 
         ass_predicts = None
         if self.assignment_cfg.include:
@@ -167,7 +170,8 @@ class EveNetEngine(L.LightningModule):
             ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
-                loss_dict=loss_detailed_dict,
+                loss_dict=loss_head_dict,
+                loss_detailed_dict=loss_detailed_dict,
                 assignment_loss_scale=self.assignment_cfg.assignment_loss_scale,
                 detection_loss_scale=self.assignment_cfg.detection_loss_scale,
                 process_names=self.config.event_info.process_names,
@@ -183,9 +187,11 @@ class EveNetEngine(L.LightningModule):
                 subprocess_id=inputs["subprocess_id"],
                 **self.ass_args['step']
             )
-            loss_head_dict['assigment'] = scaled_ass_loss
+            loss_head_dict['assignment'] = scaled_ass_loss
 
             loss = loss + scaled_ass_loss
+
+        self.general_log.update(loss_detailed_dict, is_train=self.training)
 
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts
 
@@ -196,12 +202,11 @@ class EveNetEngine(L.LightningModule):
         loss, loss_head, loss_dict, _ = self.shared_step(*args, **kwargs)
 
         self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
-        for name, val in loss_dict.items():
+        for name, val in loss_head.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
         optimizers = list(self.optimizers())
-        # Yulei TODO: currently one backward pass for all optimizers
-        #       this is not optimal for large models, considering to split loss for each optimizer
+        # Yulei TODO: considering add Gradient Surgery
         # === Manual optimization ===
         for opt in optimizers:
             opt.zero_grad()
@@ -220,30 +225,6 @@ class EveNetEngine(L.LightningModule):
         else:
             schedulers.step()
 
-        # for i, (loss_name, loss) in enumerate(loss_head.items()):
-        #     opt_list = [
-        #         optimizers[opt_index]
-        #         for name, opt_index in self.optimizer_name_map.items()
-        #         if name in ["body", "object_encoder"] or name == loss_name
-        #     ]
-        #
-        #     for opt in opt_list:
-        #         opt.zero_grad()
-        #     # Retain graph unless it's the last loss
-        #     retain = (i < len(loss_head) - 1)
-        #
-        #     self.safe_manual_backward(loss, optimizers=opt_list, retain_graph=retain)
-        #
-        #     for opt in opt_list:
-        #         opt.step()
-        #
-        #     # Log clean names
-        #     opt_names = [
-        #         name for name in self.optimizer_name_map
-        #         if name in ["body", "object_encoder"] or name == loss_name
-        #     ]
-        #     print(f"✅ Loss `{loss_name}` [Retain: {retain}] backward and stepped for optimizers {opt_names}")
-
         return loss.mean()
 
     def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
@@ -256,7 +237,7 @@ class EveNetEngine(L.LightningModule):
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
-        for name, val in loss_dict.items():
+        for name, val in loss_head.items():
             self.log(f"val/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
         return loss.mean()
@@ -288,6 +269,17 @@ class EveNetEngine(L.LightningModule):
             self.assignment_metrics_valid = make_assignment_metrics()
 
     def on_fit_end(self) -> None:
+        self.general_log.reduce_across_gpus()
+
+        if self.global_rank == 0:
+            figs = self.general_log.plot_all()
+
+            for metric, fig in figs.items():
+                self.logger.experiment.log({
+                    f"General/{metric}": wandb.Image(fig)
+                })
+                plt.close(fig)
+
         pass
 
     def on_validation_start(self):
@@ -313,8 +305,10 @@ class EveNetEngine(L.LightningModule):
                 logger=self.logger.experiment,
             )
 
+        self.general_log.finalize_epoch(is_train=False)
+
     def on_train_epoch_end(self) -> None:
-        # Implement your logic for the end of the validation epoch here
+        self.general_log.finalize_epoch(is_train=True)
         pass
 
     def backward(self, loss, *args, **kwargs):
