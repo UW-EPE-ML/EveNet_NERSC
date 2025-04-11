@@ -19,28 +19,28 @@ Body:
     feature_drop: 0.0
     hidden_dim: 128
     enable_local_embedding: true
-    local_Krank: 2
+    local_Krank: 5
     local_point_index:
       - 2
       - 3
-    num_local_layer: 4
-    num_layers: 8
+    num_local_layer: 10
+    num_layers: 16
     drop_probability: 0.0
     talking_head: false
     layer_scale: true
     layer_scale_init: 1.0e-05
-    num_heads: 4
+    num_heads: 8
     mode: "train"
     dropout: 0.1
 
   ObjectEncoder:
     hidden_dim: 128
-    position_embedding_dim: 4
+    position_embedding_dim: 32
     num_attention_heads: 4
     transformer_dim_scale: 2.0
     num_embedding_layers: 2
-    num_encoder_layers: 2
-    dropout: 0.2
+    num_encoder_layers: 4
+    dropout: 0.1
 
 
 Classification:
@@ -58,20 +58,20 @@ Regression:
 Assignment:
   feature_drop: 0.0
   num_feature_keep: 0
-  hidden_dim: 32
+  hidden_dim: 128
   split_symmetric_attention: true
-  position_embedding_dim: 4
-  num_attention_heads: 4
+  position_embedding_dim: 32
+  num_attention_heads: 8
   transformer_dim_scale: 2.0
   num_jet_embedding_layers: 0
   num_jet_encoder_layers: 0
-  num_detection_layers: 0
-  dropout: 0.0
+  num_detection_layers: 2
+  dropout: 0.1
   combinatorial_scale: 0.0
   encode_event_token: true
   activation: GELU
-  num_encoder_layers: 2 # At least 1 layer, otherwise detection will not work
-  num_linear_layers: 2
+  num_encoder_layers: 8 # At least 1 layer, otherwise detection will not work
+  num_linear_layers: 4
 
 GlobalGeneration:
   num_layers: 3

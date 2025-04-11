@@ -104,7 +104,7 @@ l_model = EveNetEngine(
 l_model.configure_model()
 from lightning.pytorch.utilities.model_summary import summarize
 s = summarize(l_model, max_depth=2)
-
+print(s)
 # Convert to torch
 torch_batch = convert_batch_to_torch_tensor(processed_batch)
 torch_batch = {
@@ -121,7 +121,7 @@ model = EveNetModel(
     device=torch.device(device),
     normalization_dict=normalization_dict,
     assignment=True,
-    generation=True
+    generation=False
 ).to(device)
 
 # model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
