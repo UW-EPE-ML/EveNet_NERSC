@@ -70,8 +70,8 @@ Assignment:
   combinatorial_scale: 0.0
   encode_event_token: true
   activation: GELU
-  num_encoder_layers: 8 # At least 1 layer, otherwise detection will not work
-  num_linear_layers: 4
+  num_encoder_layers: 4 # At least 1 layer, otherwise detection will not work
+  num_linear_layers: 2
 
 GlobalGeneration:
   num_layers: 3
