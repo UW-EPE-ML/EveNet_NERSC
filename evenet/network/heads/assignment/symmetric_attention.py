@@ -66,7 +66,9 @@ class SymmetricAttentionSplit(SymmetricAttentionBase):
 
         self.encoders = nn.ModuleList(
             [ObjectEncoder(
+                input_dim=hidden_dim,
                 hidden_dim=hidden_dim,
+                output_dim=hidden_dim,
                 position_embedding_dim=position_embedding_dim,
                 num_heads=num_heads,
                 transformer_dim_scale=transformer_dim_scale,
