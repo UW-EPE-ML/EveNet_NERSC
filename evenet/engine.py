@@ -210,6 +210,10 @@ class EveNetEngine(L.LightningModule):
         for name, val in loss_head.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
+        for name,val in loss_dict.items():
+            for n, v in val.items():
+                self.log(f"{n}/train/{name}", v.mean(), prog_bar=True, sync_dist=True)
+
         optimizers = list(self.optimizers())
         # Yulei TODO: considering add Gradient Surgery
         # === Manual optimization ===
@@ -245,6 +249,10 @@ class EveNetEngine(L.LightningModule):
 
         for name, val in loss_head.items():
             self.log(f"val/{name}", val.mean(), prog_bar=False, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            for n, v in val.items():
+                self.log(f"{n}/val/{name}", v.mean(), prog_bar=True, sync_dist=True)
 
         return loss.mean()
 
