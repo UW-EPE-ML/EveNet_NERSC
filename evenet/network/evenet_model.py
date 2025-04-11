@@ -141,7 +141,9 @@ class EveNetModel(nn.Module):
         # [2] Classification + Regression + Assignment Body
         obj_encoder_cfg = self.network_cfg.Body.ObjectEncoder
         self.ObjectEncoder = ObjectEncoder(
+            input_dim=pet_config.hidden_dim,
             hidden_dim=obj_encoder_cfg.hidden_dim,
+            output_dim=obj_encoder_cfg.hidden_dim,
             position_embedding_dim=obj_encoder_cfg.position_embedding_dim,
             num_heads=obj_encoder_cfg.num_attention_heads,
             transformer_dim_scale=obj_encoder_cfg.transformer_dim_scale,
@@ -155,6 +157,7 @@ class EveNetModel(nn.Module):
         if self.include_classification:
             cls_cfg = self.network_cfg.Classification
             self.Classification = ClassificationHead(
+                input_dim=obj_encoder_cfg.hidden_dim,
                 class_label=self.event_info.class_label["EVENT"],
                 event_num_classes=self.event_info.num_classes,
                 num_layers=cls_cfg.num_classification_layers,
@@ -165,6 +168,7 @@ class EveNetModel(nn.Module):
         if self.include_regression:
             reg_cfg = self.network_cfg.Regression
             self.Regression = RegressionHead(
+                input_dim=obj_encoder_cfg.hidden_dim,
                 regressions_target=self.event_info.regressions,
                 regression_names=self.event_info.regression_names,
                 means=self.normalization_dict["regression_mean"],

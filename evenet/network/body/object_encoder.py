@@ -7,10 +7,14 @@ from evenet.network.layers.linear_block import create_linear_block
 from evenet.network.layers.transformer import create_transformer
 from evenet.network.body.embedding import CombinedEmbedding
 
+from evenet.network.layers.activation import create_residual_connection
+
 class ObjectEncoder(nn.Module):
     def __init__(
             self,
+            input_dim: int,
             hidden_dim: int,
+            output_dim: int,
             position_embedding_dim: int,
             num_heads: int,
             transformer_dim_scale: float,
@@ -20,6 +24,17 @@ class ObjectEncoder(nn.Module):
             conditioned: bool = False
     ):
         super(ObjectEncoder, self).__init__()
+
+        self.point_cloud_bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=input_dim,
+            output_dim=hidden_dim,
+        )
+        self.global_cond_bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=input_dim,
+            output_dim=hidden_dim,
+        )
 
         self.particle_vector = nn.Parameter(torch.randn(1, 1, hidden_dim))
         if conditioned:
@@ -51,6 +66,12 @@ class ObjectEncoder(nn.Module):
                 skip_connection=False
             ) for _ in range(num_linear_layers)])
 
+        self.output_bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=hidden_dim,
+            output_dim=output_dim,
+        )
+
     def forward(self,
                 encoded_vectors: Tensor,
                 mask: Tensor,
@@ -66,6 +87,10 @@ class ObjectEncoder(nn.Module):
         :param cond_vector: (batch_size, hidden_dim)
         :return:
         """
+
+        encoded_vectors = self.point_cloud_bridge(encoded_vectors) * mask
+        condition_vectors = self.global_cond_bridge(condition_vectors) * condition_mask
+
         batch_size, num_vectors, hidden_dim = encoded_vectors.shape
         batch_size, num_conditions, hidden_dim = condition_vectors.shape
 
@@ -124,6 +149,8 @@ class ObjectEncoder(nn.Module):
             padding_mask = combined_padding_mask,
             sequence_mask = combined_sequence_mask
         )
+        combined_vectors = self.output_bridge(combined_vectors)
+
         particle_vector, encoded_vectors, condition_vectors = combined_vectors[:, 0, :], combined_vectors[:, 1: (1+num_vectors) , :], combined_vectors[:, (1 + num_vectors):, :]
 
         return encoded_vectors, condition_vectors, particle_vector

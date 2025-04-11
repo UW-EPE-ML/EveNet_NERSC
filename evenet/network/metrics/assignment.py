@@ -535,7 +535,13 @@ class SingleProcessAssignmentMetrics:
                 self.train_metrics_correct[name]["mass"] if self.train_metrics_correct is not None else None,
                 self.train_metrics_wrong[name]["mass"] if self.train_metrics_wrong is not None else None,
             )
-        return return_plot
+
+        return_log = dict()
+        for name, hist in self.truth_metrics.items():
+            return_log ={
+                f"{self.process}/{name}/predict_accuracy": self.predict_metrics_correct[name]["mass"].sum() / (self.predict_metrics_correct[name]["mass"].sum() + self.predict_metrics_wrong[name]["mass"].sum()),
+            }
+        return return_plot, return_log
 
     def plot_score_func(self,
                         correct_score,
@@ -726,7 +732,8 @@ def shared_epoch_end(
                 metrics_train[process].predict_metrics_wrong,
             )
 
-            figs = metrics_valid[process].plot_mass_spectrum()
+            figs, logs = metrics_valid[process].plot_mass_spectrum()
+            logger.log(logs)
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
                 # f"assignment_reco_mass/{process}/{name}": fig

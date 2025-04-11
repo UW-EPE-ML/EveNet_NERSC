@@ -51,19 +51,11 @@ class AssignmentHead(nn.Module):
         self.softmax_output = softmax_output
 
         self.combinatorial_scale = combinatorial_scale
-        self.point_cloud_bridge = create_residual_connection(
-            skip_connection=True,
-            input_dim=input_dim,
-            output_dim=hidden_dim,
-        )
-        self.global_cond_bridge = create_residual_connection(
-            skip_connection=True,
-            input_dim=input_dim,
-            output_dim=hidden_dim,
-        )
 
         self.encoder = ObjectEncoder(
+            input_dim=input_dim,
             hidden_dim=hidden_dim,
+            output_dim=hidden_dim,
             position_embedding_dim=position_embedding_dim,
             num_heads=num_heads,
             transformer_dim_scale=transformer_dim_scale,
@@ -87,6 +79,7 @@ class AssignmentHead(nn.Module):
 
         self.detection_classifier = BranchLinear(
             num_layers=num_detection_layers,
+            input_dim=hidden_dim,
             hidden_dim=hidden_dim,
             num_outputs=detection_output_dim,
             dropout=dropout,
@@ -173,8 +166,6 @@ class AssignmentHead(nn.Module):
         # particle_vectors : (batch_size, num_vectors, hidden_dim)
         # ------------------------------------------------------
 
-        point_cloud = self.point_cloud_bridge(point_cloud) * point_cloud_mask
-        global_condition = self.global_cond_bridge(global_condition) * global_condition_mask
 
         encoded_vectors, encoded_global_cond, particle_vector = self.encoder(
             point_cloud, point_cloud_mask,
@@ -206,7 +197,7 @@ class AssignmentHead(nn.Module):
         assignment, daughter_vectors = self.attention(
             x=sequential_particle_vectors,
             x_mask=sequential_sequence_mask,
-            condition=global_condition,
+            condition=encoded_global_cond,
             condition_mask=global_condition_mask
         )
 

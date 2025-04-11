@@ -6,6 +6,7 @@ from collections import OrderedDict
 import torch
 
 import numpy as np
+from evenet.network.layers.activation import  create_residual_connection
 
 
 class BranchLinear(nn.Module):
@@ -13,6 +14,7 @@ class BranchLinear(nn.Module):
     def __init__(
             self,
             num_layers: int,
+            input_dim: int,
             hidden_dim: int,
             num_outputs: int = 1,
             dropout: float = 0.0,
@@ -22,6 +24,13 @@ class BranchLinear(nn.Module):
 
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.input_dim = input_dim
+
+        self.bridge = create_residual_connection(
+            skip_connection=True,
+            input_dim=self.input_dim,
+            output_dim=self.hidden_dim,
+        )
 
         self.hidden_layers = nn.ModuleList([
             create_linear_block(
@@ -56,6 +65,7 @@ class BranchLinear(nn.Module):
         classification: [B, O]
             Probability of this particle existing in the data.
         """
+        single_vector = self.bridge(single_vector)
         batch_size, input_dim = single_vector.shape
 
         # -----------------------------------------------------------------------------
@@ -90,6 +100,7 @@ class ClassificationHead(nn.Module):
             class_label,
             event_num_classes,
             num_layers: int,
+            input_dim: int,
             hidden_dim: int,
             dropout: float = 0.0,
     ):
@@ -98,6 +109,7 @@ class ClassificationHead(nn.Module):
         for name in class_label:
             num_classes = event_num_classes[name]
             networks[f"classification/{name}"] = BranchLinear(
+                input_dim=input_dim,
                 num_layers=num_layers,
                 hidden_dim=hidden_dim,
                 num_outputs=num_classes,
@@ -126,6 +138,7 @@ class RegressionHead(nn.Module):
             means: Dict[str, Tensor],
             stds: Dict[str, Tensor],
             num_layers: int,
+            input_dim: int,
             hidden_dim: int,
             device,
             dropout: float = 0.0,
@@ -145,6 +158,7 @@ class RegressionHead(nn.Module):
             if num_regressions == 0:
                 continue
             networks[f"regression/{name}"] = BranchLinear(
+                input_dim=input_dim,
                 num_layers=num_layers,
                 hidden_dim=hidden_dim,
                 num_outputs=num_regressions,
