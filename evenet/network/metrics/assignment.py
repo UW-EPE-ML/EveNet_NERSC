@@ -431,6 +431,8 @@ class SingleProcessAssignmentMetrics:
                                 train_predict_wrong=None,
                                 ):
 
+        logs = dict()
+
         fig, ax = plt.subplots(figsize=(9, 6))
         base_colors = plt.cm.Set2(np.linspace(0.2, 0.8, 2))
         lighter = lambda c: tuple(min(1.0, x + 0.3) for x in c)
@@ -440,6 +442,7 @@ class SingleProcessAssignmentMetrics:
         total_pred = np.zeros_like(predict_wrong)
 
         predict_accuracy = predict_correct.sum() / (predict_correct.sum() + predict_wrong.sum())
+        logs["pred_accuracy"] = predict_accuracy
 
         ax.bar(
             self.bin_centers,
@@ -482,11 +485,17 @@ class SingleProcessAssignmentMetrics:
             )
             ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_pred), 'r--',
                     label=f'Pred Fit: μ={popt_pred[1]:.2f}, σ={popt_pred[2]:.2f}')
+
+            logs["pred_mass"] = popt_pred[1]
+            logs["pred_resolution"] = popt_pred[2]
         except RuntimeError:
             print("Prediction fit failed")
+            logs["pred_mass"] = None
+            logs["pred_resolution"] = None
 
         if train_predict_correct is not None:
             train_accuracy = train_predict_correct.sum() / (train_predict_correct.sum() + train_predict_wrong.sum())
+            logs["train_accuracy"] = train_accuracy
             ax.step(
                 self.bin_centers,
                 train_predict_correct,
@@ -519,17 +528,23 @@ class SingleProcessAssignmentMetrics:
                 ax.plot(self.bin_centers, gauss(self.bin_centers, *popt_train), 'b--',
                         label=f'Pred Fit (Train): μ={popt_train[1]:.2f}, σ={popt_train[2]:.2f}')
 
+                logs["train_mass"] = popt_train[1]
+                logs["train_resolution"] = popt_train[2]
+
             except RuntimeError:
                 print("Prediction fit failed")
+                logs["train_mass"] = None
+                logs["train_resolution"] = None
 
         ax.legend()
         fig.tight_layout()
-        return fig
+        return fig, logs
 
     def plot_mass_spectrum(self):
         return_plot = dict()
+        return_log = dict()
         for name, hist in self.truth_metrics.items():
-            return_plot[f"{name}"] = self.plot_mass_spectrum_func(
+            return_plot[f"{name}"], return_log_tmp = self.plot_mass_spectrum_func(
                 hist["mass"],
                 self.predict_metrics_correct[name]["mass"],
                 self.predict_metrics_wrong[name]["mass"],
@@ -537,11 +552,13 @@ class SingleProcessAssignmentMetrics:
                 self.train_metrics_wrong[name]["mass"] if self.train_metrics_wrong is not None else None,
             )
 
-        return_log = dict()
-        for name, hist in self.truth_metrics.items():
-            return_log ={
-                f"{self.process}/{name}/predict_accuracy": self.predict_metrics_correct[name]["mass"].sum() / (self.predict_metrics_correct[name]["mass"].sum() + self.predict_metrics_wrong[name]["mass"].sum()),
-            }
+            for log_name, log in return_log_tmp.items():
+                variable_name = log_name.replace("train_", "").replace("pred_", "")
+                if variable_name not in return_log:
+                    return_log[variable_name] = dict()
+                return_log[variable_name][f"{self.process}/{name}"] = log
+
+
         return return_plot, return_log
 
     def plot_score_func(self,
@@ -803,7 +820,11 @@ def shared_epoch_end(
             )
 
             figs, logs = metrics_valid[process].plot_mass_spectrum()
-            logger.log(logs)
+            for name in logs:
+                logger.log(
+                    logs[name],
+                    step = epoch
+                )
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
                 # f"assignment_reco_mass/{process}/{name}": fig
