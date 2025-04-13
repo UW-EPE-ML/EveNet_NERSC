@@ -68,6 +68,23 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
+    GlobalGeneration:
+      learning_rate: *lr
+      optimizer_group: "generator"
+      include: false # whether to build in network
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    EventGeneration:
+      learning_rate: *lr
+      optimizer_group: "generator"
+      include: false # whether to build in network
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
 
 Dataset:
   dataset_limit: 1.0

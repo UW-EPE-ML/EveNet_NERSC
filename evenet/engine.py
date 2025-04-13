@@ -20,6 +20,8 @@ from evenet.network.metrics.classification import shared_step as cls_step, share
 from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
 from evenet.network.metrics.assignment import shared_step as ass_step, shared_epoch_end as ass_end
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
+from evenet.network.metrics.generation import GenerationMetrics
+from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
 
@@ -33,6 +35,8 @@ class EveNetEngine(L.LightningModule):
         self.classification_metrics_valid = None
         self.assignment_metrics_train = None
         self.assignment_metrics_valid = None
+        self.generation_metrics_train = None
+        self.generation_metrics_valid = None
         self.model_parts = {}
         self.model: Union[EveNetModel, None] = None
         self.config = global_config
@@ -55,6 +59,7 @@ class EveNetEngine(L.LightningModule):
         self.classification_cfg = self.component_cfg.Classification
         self.regression_cfg = self.component_cfg.Regression
         self.assignment_cfg = self.component_cfg.Assignment
+        self.generation_cfg = self.component_cfg.GlobalGeneration
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
@@ -98,6 +103,12 @@ class EveNetEngine(L.LightningModule):
             )
             self.ass_loss = assignment_loss_partial
             print(f"{self.__class__.__name__} assignment loss initialized")
+
+        self.gen_loss = None
+        if self.generation_cfg.include:
+            import evenet.network.loss.generation as gen_loss
+            self.gen_loss = gen_loss.loss
+            print(f"{self.__class__.__name__} generation loss initialized")
 
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
@@ -194,6 +205,19 @@ class EveNetEngine(L.LightningModule):
             loss_head_dict['assignment'] = scaled_ass_loss
 
             loss = loss + scaled_ass_loss
+
+        if self.generation_cfg.include:
+            scaled_gen_loss, detailed_gen_loss = gen_step(
+                batch=batch,
+                outputs=outputs["generations"],
+                gen_metrics=self.generation_metrics_train if self.training else self.generation_metrics_valid,
+                model=self.model,
+                loss_scale=self.generation_cfg.loss_scale,
+                device=device,
+                training=self.training,
+            )
+            loss_head_dict["generation"] = scaled_gen_loss
+            loss = loss + scaled_gen_loss
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
 
@@ -298,6 +322,19 @@ class EveNetEngine(L.LightningModule):
             self.assignment_metrics_train = make_assignment_metrics()
             self.assignment_metrics_valid = make_assignment_metrics()
 
+
+        if self.generation_cfg.include:
+            self.generation_metrics_train = GenerationMetrics(
+                class_names=self.config.event_info.class_label['EVENT']['signal'][0],
+                feature_names=self.config.event_info.sequential_feature_names,
+                device=self.device
+            )
+            self.generation_metrics_valid = GenerationMetrics(
+                class_names=self.config.event_info.class_label['EVENT']['signal'][0],
+                feature_names=self.config.event_info.sequential_feature_names,
+                device=self.device
+            )
+
     def on_fit_end(self) -> None:
         if torch.cuda.is_available():
             device = torch.device("cuda")
@@ -362,6 +399,14 @@ class EveNetEngine(L.LightningModule):
                 metrics_valid=self.assignment_metrics_valid,
                 metrics_train=self.assignment_metrics_train,
                 logger=self.logger.experiment,
+            )
+
+        if self.generation_cfg.include:
+            gen_end(
+                global_rank=self.global_rank,
+                metrics_valid=self.generation_metrics_valid,
+                metrics_train=self.generation_metrics_train,
+                logger=self.logger.experiment
             )
 
         self.general_log.finalize_epoch(is_train=False)
@@ -463,7 +508,7 @@ class EveNetEngine(L.LightningModule):
             device=self.device,
             classification=self.classification_cfg.include,
             regression=self.regression_cfg.include,
-            generation=False,
+            generation=self.generation_cfg.include,
             assignment=self.assignment_cfg.include,
             normalization_dict=self.normalization_dict,
         )

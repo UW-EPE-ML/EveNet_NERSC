@@ -10,6 +10,7 @@ from evenet.network.layers.activation import create_activation
 from evenet.network.layers.linear_block import ResNetDense
 from evenet.network.layers.utils import StochasticDepth
 from evenet.network.layers.transformer import GeneratorTransformerBlockModule
+from evenet.network.layers.activation import create_residual_connection
 
 class EventGenerationHead(nn.Module):
     def __init__(self,
@@ -17,25 +18,33 @@ class EventGenerationHead(nn.Module):
                  projection_dim: int,
                  num_global_cond: int,
                  num_classes: int,
-                 num_feat: int,
-                 num_layers: int, simple,
+                 output_dim: int,
+                 num_layers: int,
                  num_heads: int,
                  dropout: float,
-                 talking_head: bool,
                  layer_scale: bool,
                  layer_scale_init: float,
                  drop_probability: float,
-                 feature_drop):
+                 feature_drop: float):
         super().__init__()
         self.input_dim = input_dim
         self.projection_dim = projection_dim
-        self.num_diffusion = 3  # Adjust this based on your settings
+        self.num_classes = num_classes
 
-        self.global_cond_embedding = nn.Sequential(
-            nn.Linear(num_global_cond, projection_dim),
-            nn.GELU(approximate='none')
-        )
         self.time_embedding = FourierEmbedding(projection_dim)
+        self.num_point_cloud_embedding = FourierEmbedding(projection_dim)
+
+        self.bridge_point_cloud = create_residual_connection(
+            skip_connection=True,
+            input_dim=input_dim,
+            output_dim=projection_dim
+        )
+        self.bridge_global_cond = create_residual_connection(
+            skip_connection=True,
+            input_dim=num_global_cond,
+            output_dim=projection_dim,
+        )
+
         self.cond_token = nn.Sequential(
             nn.Linear(2 * projection_dim, 2 * projection_dim),
             nn.GELU(approximate='none'),
@@ -47,37 +56,56 @@ class EventGenerationHead(nn.Module):
         self.feature_drop = feature_drop
         self.stochastic_depth = StochasticDepth(feature_drop)
         self.gen_transformer_blocks = nn.ModuleList([
-            GeneratorTransformerBlockModule(projection_dim, num_heads, dropout, talking_head,
-                                            layer_scale, layer_scale_init, drop_probability)
+            GeneratorTransformerBlockModule(
+                projection_dim=projection_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+                layer_scale=layer_scale,
+                layer_scale_init=layer_scale_init,
+                drop_probability=drop_probability)
             for _ in range(num_layers)
         ])
-        self.generator = nn.Linear(projection_dim, num_feat)
+        self.generator = nn.Linear(projection_dim, output_dim)
 
-    def forward(self, x, jet, mask, time, label):
-        jet_emb = self.jet_embedding(jet)  # jet_emb shape after embedding: torch.Size([B, proj_dim])
-        time_emb = self.time_embedding(time)  # time_emb shape after embedding: torch.Size([B, 1, proj_dim])
-        time_emb = time_emb.squeeze(1)  # time_emb shape after squeezing: torch.Size([B, proj_dim])
+    def forward(self, x, global_cond,global_cond_mask, num_x, x_mask, time, label):
+        """
+        x: [B, T, D] <- Noised Input
+        global_cond: [B, 1, D] <- Global Condition
+        global_cond_mask: [B, 1, 1] <- Mask
+        num_x: [B, 1] <- Number of points_cloud
+        x_mask: [B, T, 1] <- Mask
+        time: [B,] <- Time
+        label: [B, 1] <- Conditional Label, one-hot in function
+        """
+        time_emb = self.time_embedding(time).unsqueeze(1) # [B, 1, proj_dim]
         cond_token = self.cond_token(
-            torch.cat([time_emb, jet_emb], dim=-1))  # After MLP, cond_token shape: torch.Size([B, proj_dim])
+            torch.cat([time_emb, self.bridge_global_cond(global_cond) * global_cond_mask],
+            dim=-1)
+        )  # After MLP, cond_token shape: torch.Size([B, 1, proj_dim])
+        x = self.bridge_point_cloud(x) * x_mask
+        if num_x is not None:
+            num_x_embed = self.num_point_cloud_embedding(num_x).unsqueeze(1)  # [B, 1, proj_dim]
+            cond_token = cond_token + num_x_embed
+            # TODO: Check if this works
 
         if label is not None:
-            # label_emb = self.label_embedding(label)
-            label_emb = self.label_dense(label.float())
-            label_emb = self.stochastic_depth(label_emb)
+            label = F.one_hot(label, num_classes=self.num_classes).float()  # [B, 1, C]
+            label_emb = self.label_dense(label)  # [B, 1, D]
             cond_token = cond_token + label_emb
+
         else:
             print("ERROR: In Generation Head, Label is None, skipping label embedding")
 
-        cond_token = cond_token.unsqueeze(1).expand(-1, x.shape[1], -1) * mask.unsqueeze(-1)
+        cond_token = cond_token.expand(-1, x.shape[1], -1) * x_mask
 
         for transformer_block in self.gen_transformer_blocks:
             concatenated = cond_token + x
-            out_x, cond_token = transformer_block(concatenated, cond_token, mask)
+            out_x, cond_token = transformer_block(concatenated, cond_token, x_mask)
         x = cond_token + x
         x = F.layer_norm(x, [x.size(-1)])
         x = self.generator(x)
 
-        return x * mask.unsqueeze(-1)
+        return x * x_mask
 
 class GlobalCondGenerationHead(nn.Module):
 
@@ -163,20 +191,21 @@ class GlobalCondGenerationHead(nn.Module):
                 label: Optional[Tensor] = None
         ) -> Tensor:
         # ----------------
-        # x: [B, 1, D] <- Noised Global Input
+        # x: [B, 1,] <- Noised Global Input
         # x_mask: [B, 1, 1] <- Mask
         # t: [B,] <- Time
-        # global_cond: [B, C] <- Global Condition
+        # global_cond: [B, 1, C] <- Global Condition
         # label: [B, 1] <- Conditional Label, one-hot in function
         # ----------------
 
         batch_size = x.shape[0]
-        time = time.unsqueeze(-1)
+        time = time.unsqueeze(-1) # [B, 1]
         if x_mask is None:
-            x_mask = torch.ones((batch_size, 1, 1), device=x.device)
+            x_mask = torch.ones((batch_size, 1), device=x.device)
+
+        x_mask = x_mask.reshape((batch_size, 1))
 
         embed_time = self.fourier_projection(time).unsqueeze(1)  # [B, 1, D]
-        # TODO: Add conditional labels
         if global_cond is not None:
             global_cond_token = self.global_cond_embedding(global_cond[..., self.input_cond_indices])  # [B, 1, D]
             global_token = torch.cat([global_cond_token, embed_time], dim=-1)  # [B, 1, 2D]
@@ -186,11 +215,13 @@ class GlobalCondGenerationHead(nn.Module):
         cond_token = self.cond_token_embedding(global_token)  # [B, 1, 2D]
 
         if label is not None:
-            label = F.one_hot(label, num_classes = self.num_classes).float().unsqueeze(1) # [B, 1, C]
+            label = F.one_hot(label, num_classes = self.num_classes).float() # [B, 1, C]
             cond_label = self.label_embedding(label) # [B, 1, 2D]
             cond_token = cond_token + cond_label
 
-        scale, shift = torch.chunk(cond_token, 2, dim=-1)  # [B, 1, D], [B, 1, D]
+        scale, shift = torch.chunk(cond_token, 2, dim=-1)
+        scale = scale.squeeze(1) # [B, D]
+        shift = shift.squeeze(1) # [B, D]
 
         embed_x = self.dense_layer(x)
         embed_x = (embed_x * (1.0 + scale) + shift) * x_mask
@@ -200,7 +231,7 @@ class GlobalCondGenerationHead(nn.Module):
         embed_x = self.out_layer_norm(embed_x) * x_mask
         outputs = self.out(embed_x) * x_mask
 
-        return outputs.squeeze(1) # [B, output_dim]
+        return outputs # [B, output_dim]
 
 
 

@@ -82,3 +82,14 @@ GlobalGeneration:
   feature_drop_for_stochastic_depth: 0.0
   activation: SILU
   dropout: 0.0
+
+EventGeneration:
+  hidden_dim: 64
+  num_layers: 3
+  num_heads: 4
+  dropout: 0.1
+  layer_scale: true
+  layer_scale_init: 1.0e-05
+  drop_probability: 0.0
+  feature_drop: 0.0
+  extend_batch: true

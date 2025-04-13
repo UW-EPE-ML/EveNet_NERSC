@@ -9,17 +9,18 @@ from evenet.network.body.embedding import GlobalVectorEmbedding, PETBody
 from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
-from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead
+from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead, EventGenerationHead
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
 
 from evenet.utilities.diffusion_sampler import add_noise
-
+from evenet.utilities.tool import gather_index
 from torch import Tensor, nn
-from typing import Dict
+from typing import Dict, Optional
 import re
 
 from collections import OrderedDict
+
 
 class EveNetModel(nn.Module):
     def __init__(
@@ -71,6 +72,7 @@ class EveNetModel(nn.Module):
             norm_mask=input_normalizers_setting["SEQUENTIAL"]["norm_mask"].to(self.device),
             mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
             std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device),
+            inv_cdf_index=self.event_info.sequential_inv_cdf_index
         )
 
         self.global_normalizer = Normalizer(
@@ -180,56 +182,71 @@ class EveNetModel(nn.Module):
             )
 
         if self.include_assignment:
-        # [5] Assignment Head
+            # [5] Assignment Head
             self.Assignment = SharedAssignmentHead(
-                    resonance_particle_properties_mean=self.event_info.resonance_particle_properties_mean,
-                    resonance_particle_properties_std=self.event_info.resonance_particle_properties_std,
-                    pairing_topology=self.event_info.pairing_topology,
-                    process_names = self.event_info.process_names,
-                    pairing_topology_category=self.event_info.pairing_topology_category,
-                    event_particles=self.event_info.event_particles,
-                    event_permutation=self.event_info.event_permutations,
-                    product_particles = self.event_info.product_particles,
-                    product_symmetries = self.event_info.product_symmetries,
-                    feature_drop=self.network_cfg.Assignment.feature_drop,
-                    num_feature_keep=self.network_cfg.Assignment.num_feature_keep,
-                    input_dim=obj_encoder_cfg.hidden_dim,
-                    split_attention=self.network_cfg.Assignment.split_symmetric_attention,
-                    hidden_dim=self.network_cfg.Assignment.hidden_dim,
-                    position_embedding_dim=self.network_cfg.Assignment.position_embedding_dim,
-                    num_attention_heads=self.network_cfg.Assignment.num_attention_heads,
-                    transformer_dim_scale=self.network_cfg.Assignment.transformer_dim_scale,
-                    num_linear_layers=self.network_cfg.Assignment.num_linear_layers,
-                    num_encoder_layers=self.network_cfg.Assignment.num_encoder_layers,
-                    num_jet_embedding_layers=self.network_cfg.Assignment.num_jet_embedding_layers,
-                    num_jet_encoder_layers=self.network_cfg.Assignment.num_jet_encoder_layers,
-                    num_max_event_particles=self.event_info.max_event_particles,
-                    num_detection_layers=self.network_cfg.Assignment.num_detection_layers,
-                    dropout=self.network_cfg.Assignment.dropout,
-                    combinatorial_scale=self.network_cfg.Assignment.combinatorial_scale,
-                    encode_event_token = self.network_cfg.Assignment.encode_event_token,
-                    activation=self.network_cfg.Assignment.activation,
-                    device=self.device
+                resonance_particle_properties_mean=self.event_info.resonance_particle_properties_mean,
+                resonance_particle_properties_std=self.event_info.resonance_particle_properties_std,
+                pairing_topology=self.event_info.pairing_topology,
+                process_names=self.event_info.process_names,
+                pairing_topology_category=self.event_info.pairing_topology_category,
+                event_particles=self.event_info.event_particles,
+                event_permutation=self.event_info.event_permutations,
+                product_particles=self.event_info.product_particles,
+                product_symmetries=self.event_info.product_symmetries,
+                feature_drop=self.network_cfg.Assignment.feature_drop,
+                num_feature_keep=self.network_cfg.Assignment.num_feature_keep,
+                input_dim=obj_encoder_cfg.hidden_dim,
+                split_attention=self.network_cfg.Assignment.split_symmetric_attention,
+                hidden_dim=self.network_cfg.Assignment.hidden_dim,
+                position_embedding_dim=self.network_cfg.Assignment.position_embedding_dim,
+                num_attention_heads=self.network_cfg.Assignment.num_attention_heads,
+                transformer_dim_scale=self.network_cfg.Assignment.transformer_dim_scale,
+                num_linear_layers=self.network_cfg.Assignment.num_linear_layers,
+                num_encoder_layers=self.network_cfg.Assignment.num_encoder_layers,
+                num_jet_embedding_layers=self.network_cfg.Assignment.num_jet_embedding_layers,
+                num_jet_encoder_layers=self.network_cfg.Assignment.num_jet_encoder_layers,
+                num_max_event_particles=self.event_info.max_event_particles,
+                num_detection_layers=self.network_cfg.Assignment.num_detection_layers,
+                dropout=self.network_cfg.Assignment.dropout,
+                combinatorial_scale=self.network_cfg.Assignment.combinatorial_scale,
+                encode_event_token=self.network_cfg.Assignment.encode_event_token,
+                activation=self.network_cfg.Assignment.activation,
+                device=self.device
             )
 
-        # [6] Global Generation Head
+        # [6] Generation Head
         if self.include_generation:
-            self.global_generator = GlobalCondGenerationHead(
-                num_layer = self.network_cfg.GlobalGeneration.num_layers,
-                num_resnet_layer = self.network_cfg.GlobalGeneration.num_resnet_layers,
-                input_dim = 1, # Only target on the number of point_cloud
-                hidden_dim = self.network_cfg.GlobalGeneration.hidden_dim,
-                output_dim = 1,
-                input_cond_indices = self.event_info.generation_condition_indices,
-                num_classes = self.event_info.num_classes_total,
-                resnet_dim = self.network_cfg.GlobalGeneration.resnet_dim,
-                layer_scale_init = self.network_cfg.GlobalGeneration.layer_scale_init,
-                feature_drop_for_stochastic_depth = self.network_cfg.GlobalGeneration.feature_drop_for_stochastic_depth,
-                activation = self.network_cfg.GlobalGeneration.activation,
-                dropout = self.network_cfg.GlobalGeneration.dropout
+            # [6-1] Global Generation Head
+            self.GlobalGeneration = GlobalCondGenerationHead(
+                num_layer=self.network_cfg.GlobalGeneration.num_layers,
+                num_resnet_layer=self.network_cfg.GlobalGeneration.num_resnet_layers,
+                input_dim=1,  # Only target on the number of point_cloud
+                hidden_dim=self.network_cfg.GlobalGeneration.hidden_dim,
+                output_dim=1,
+                input_cond_indices=self.event_info.generation_condition_indices,
+                num_classes=self.event_info.num_classes_total,
+                resnet_dim=self.network_cfg.GlobalGeneration.resnet_dim,
+                layer_scale_init=self.network_cfg.GlobalGeneration.layer_scale_init,
+                feature_drop_for_stochastic_depth=self.network_cfg.GlobalGeneration.feature_drop_for_stochastic_depth,
+                activation=self.network_cfg.GlobalGeneration.activation,
+                dropout=self.network_cfg.GlobalGeneration.dropout
             )
-
-
+            # [6-2] Event Generation Head
+            self.EventGeneration = EventGenerationHead(
+                input_dim=pet_config.hidden_dim,
+                projection_dim=self.network_cfg.EventGeneration.hidden_dim,
+                num_global_cond=global_embedding_cfg.hidden_dim,
+                num_classes=self.event_info.num_classes_total,
+                output_dim=self.sequential_input_dim,
+                num_layers=self.network_cfg.EventGeneration.num_layers,
+                num_heads=self.network_cfg.EventGeneration.num_heads,
+                dropout=self.network_cfg.EventGeneration.dropout,
+                layer_scale=self.network_cfg.EventGeneration.layer_scale,
+                layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
+                drop_probability=self.network_cfg.EventGeneration.drop_probability,
+                feature_drop=self.network_cfg.EventGeneration.feature_drop
+            )
+        self.generation_extend_batch = self.network_cfg.EventGeneration.extend_batch
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
         """
@@ -266,10 +283,9 @@ class EveNetModel(nn.Module):
         input_point_cloud = x['x']
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
-        global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+        global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1) TODO: check
 
         class_label = x['classification'].unsqueeze(-1)  # (batch_size, 1)
-
 
         num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
@@ -280,13 +296,16 @@ class EveNetModel(nn.Module):
 
         input_point_cloud = self.sequential_normalizer(
             x=input_point_cloud,
-            mask=input_point_cloud_mask
+            mask=input_point_cloud_mask,
         )
         global_conditions = self.global_normalizer(
             x=global_conditions,
             mask=global_conditions_mask
         )
-
+        num_point_cloud = self.num_point_cloud_normalizer(
+            x=num_point_cloud,
+            mask=None
+        )
 
         ###########################
         ## Global Generator Head ##
@@ -294,34 +313,48 @@ class EveNetModel(nn.Module):
 
         generations = dict()
         if self.include_generation:
-            if self.training:
-                num_point_cloud = self.num_point_cloud_normalizer(
-                    x=num_point_cloud,
-                    mask=None
-                ) # When doing training, we need to normalize the number of point clouds
-                num_point_cloud, truth_num_point_cloud_vector = add_noise(num_point_cloud, time)
-                predict_num_point_cloud_vector = self.global_generator(
-                    x = num_point_cloud,
-                    time = time,
-                    global_cond = global_conditions,
-                    label = class_label
-                )
-                generations["num_point_cloud"] = {
-                    "vector": predict_num_point_cloud_vector,
-                    "truth": truth_num_point_cloud_vector
-                }
+            num_point_cloud_noised, truth_num_point_cloud_vector = add_noise(num_point_cloud, time)
+            predict_num_point_cloud_vector = self.GlobalGeneration(
+                x=num_point_cloud_noised,
+                time=time,
+                global_cond=global_conditions,
+                label=class_label
+            )
+            generations["num_point_cloud"] = {
+                "vector": predict_num_point_cloud_vector,
+                "truth": truth_num_point_cloud_vector
+            }
+
+        ####################
+        ##  Inject noise  ##
+        ####################
+
+        diffusion_mask = torch.zeros_like(time).bool()
+        truth_input_point_cloud_vector = None
+        if self.include_generation:
+            input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
+            if self.generation_extend_batch:
+                # Extend the batch by 2 times without noise and with noise.
+                input_point_cloud = torch.cat([input_point_cloud, input_point_cloud_noised], dim=0)
+                num_point_cloud = torch.cat([num_point_cloud, num_point_cloud], dim=0)
+                input_point_cloud_mask = torch.cat([input_point_cloud_mask, input_point_cloud_mask], dim=0)
+                global_conditions = torch.cat([global_conditions, global_conditions], dim=0)
+                global_conditions_mask = torch.cat([global_conditions_mask, global_conditions_mask], dim=0)
+                class_label = torch.cat([class_label, class_label], dim=0)
+                diffusion_mask = torch.cat([torch.zeros_like(time).bool(), torch.ones_like(time).bool()], dim=0)
+                time = torch.cat([torch.zeros_like(time), time], dim=0)
+                truth_input_point_cloud_vector = torch.cat(
+                    [torch.zeros_like(truth_input_point_cloud_vector), truth_input_point_cloud_vector], dim=0)
             else:
-                # in evaluation, we inject noised num_point_cloud, do need to do normalization
-                predict_num_point_cloud_vector = self.global_generator(
-                    x = num_point_cloud,
-                    time = time,
-                    global_cond = global_conditions,
-                    label = class_label
-                )
-                generations["num_point_cloud"] = {
-                    "vector": predict_num_point_cloud_vector,
-                    "truth": None
-                }
+                diffusion_boundary = input_point_cloud.shape[0] // 2
+                input_point_cloud = torch.cat(
+                    [input_point_cloud[:diffusion_boundary], input_point_cloud_noised[diffusion_boundary:]], dim=0)
+                diffusion_mask = torch.cat([torch.zeros_like(time).bool()[:diffusion_boundary],
+                                            torch.ones_like(time).bool()[diffusion_boundary:]], dim=0)
+                time = torch.cat([torch.zeros_like(time)[:diffusion_boundary], time[diffusion_boundary:]], dim=0)
+                truth_input_point_cloud_vector = torch.cat(
+                    [torch.zeros_like(truth_input_point_cloud_vector)[:diffusion_boundary],
+                     truth_input_point_cloud_vector[diffusion_boundary:]], dim=0)
 
         #############################
         ## Central embedding (PET) ##
@@ -368,7 +401,6 @@ class EveNetModel(nn.Module):
         # ## Output Head for deterministic task ##
         # ########################################
 
-
         # Assignment head
         # Create output lists for each particle in event.
         assignments = dict()
@@ -395,16 +427,105 @@ class EveNetModel(nn.Module):
         if self.include_regression:
             regressions = self.Regression(event_token)
 
+        #######################################
+        ##  Output Head For Diffusion Model  ##
+        #######################################
+
+        if self.include_generation:
+            pred_point_cloud_vector = self.EventGeneration(
+                x=input_point_cloud,
+                x_mask=input_point_cloud_mask,
+                global_cond=global_conditions,
+                global_cond_mask=global_conditions_mask,
+                num_x=num_point_cloud,
+                time=time,
+                label=class_label
+            )
+            generations["point_cloud"] = {
+                "vector": pred_point_cloud_vector[diffusion_mask],
+                "truth": truth_input_point_cloud_vector[diffusion_mask]
+            }
+
         return {
-            "classification": classifications,
-            "regression": regressions,
-            "assignments": assignments,
-            "detections": detections,
-            "generations": generations,
+            "classification": gather_index(classifications, ~diffusion_mask),
+            "regression": gather_index(regressions, ~diffusion_mask),
+            "assignments": gather_index(assignments, ~diffusion_mask),
+            "detections": gather_index(detections, ~diffusion_mask),
+            "classification-noised": gather_index(classifications, diffusion_mask),
+            "regression-noised": gather_index(regressions, diffusion_mask),
+            "generations": generations
         }
 
+    def predict_diffusion_vector(self, noise_x: Tensor, cond_x: Dict[str, Tensor], time: Tensor, mode: str, noise_mask: Optional[Tensor] = None):
+
+        """
+        Predict the number of point clouds in the batch.
+        """
+
+        batch_size = noise_x.shape[0]
+
+        if mode == "global":
+            """
+            Predict the number of point clouds diffusion vector in the batchs.
+            noise_x: (batch_size, 1)
+            """
+            global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
+            global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            global_conditions = self.global_normalizer(
+                x=global_conditions,
+                mask=global_conditions_mask
+            )
+            predict_num_point_cloud_vector = self.GlobalGeneration(
+                x=noise_x,
+                time=time,
+                global_cond=global_conditions,
+                label=class_label
+            )
+            return predict_num_point_cloud_vector
+        elif mode == "event":
+            global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
+            global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
+            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
+
+            global_conditions = self.global_normalizer(
+                x=global_conditions,
+                mask=global_conditions_mask
+            )
+            num_point_cloud = self.num_point_cloud_normalizer(
+                x=num_point_cloud,
+                mask=None
+            )
+            global_conditions = self.GlobalEmbedding(
+                x=global_conditions,
+                mask=global_conditions_mask
+            )
+
+            local_points = noise_x[..., self.local_feature_indices]
+            input_point_cloud = self.PET(
+                input_features=noise_x,
+                input_points=local_points,
+                mask=noise_mask,
+                time=time
+            )
+            pred_point_cloud_vector = self.EventGeneration(
+                x=input_point_cloud,
+                x_mask=noise_mask,
+                global_cond=global_conditions,
+                global_cond_mask=global_conditions_mask,
+                num_x=num_point_cloud,
+                time=time,
+                label=class_label
+            )
+            return pred_point_cloud_vector
+
+
+
+        return None
+
     def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> Dict[str, Tensor]:
-        time = batch['x'].new_ones((batch_size,)).to(self.device)
+        time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
         output = self.forward(batch, time)
         return output
 

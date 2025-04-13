@@ -127,6 +127,7 @@ class FeatureInfo(NamedTuple):
     name: str
     normalize: bool
     log_scale: bool
+    uniform: bool
 
 
 ClassificationInfo = str

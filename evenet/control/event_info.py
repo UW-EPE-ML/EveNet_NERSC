@@ -191,7 +191,10 @@ class EventInfo:
 
         # Generation Head setting
 
+        self.sequential_feature_names = []
+        self.sequential_inv_cdf_index = []
         iglobal_index = 0
+        seq_index = 0
         self.generation_condition_indices = []
         for input_name, input_feature in self.input_features.items():
             if self.input_types[input_name] == InputType.Global:
@@ -199,6 +202,14 @@ class EventInfo:
                     if input_feature_element.name in self.generations["Conditions"]:
                         self.generation_condition_indices.append(iglobal_index)
                     iglobal_index += 1
+            elif self.input_types[input_name] == InputType.Sequential:
+                for input_feature_element in input_feature:
+                    log_prefix = "log_" if input_feature_element.log_scale else ""
+                    name = f"{log_prefix}{input_feature_element.name}"
+                    self.sequential_feature_names.append(name)
+                    if input_feature_element.uniform:
+                        self.sequential_inv_cdf_index.append(seq_index)
+                    seq_index += 1
 
         search_name = ["pt", "eta", "phi", "mass"]
         self.ptetaphimass_index = []
@@ -334,7 +345,8 @@ class EventInfo:
                     FeatureInfo(
                         name=name,
                         normalize=("normalize" in normalize.lower()) or ("true" in normalize.lower()),
-                        log_scale="log" in normalize.lower()
+                        log_scale="log" in normalize.lower(),
+                        uniform="uniform" in normalize.lower()
                     )
 
                     for name, normalize in input_information.items()

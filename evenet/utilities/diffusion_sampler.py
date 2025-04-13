@@ -1,6 +1,6 @@
 import torch
 from torch import Tensor
-
+from typing import Callable, Optional
 
 def logsnr_schedule_cosine(time: Tensor,
                            logsnr_min: float = -20.,
@@ -43,20 +43,20 @@ def add_noise(x: Tensor,
 
 
 class DDIMSampler():
-    def __init__(self):
-        pass
+    def __init__(self, device):
+        self.device = device
 
     def prior_sde(self, dimensions) -> Tensor:
-        return torch.randn(dimensions, dtype=torch.float32)
+        return torch.randn(dimensions, dtype=torch.float32, device=self.device)
 
     def sample(
         self,
-        input_set,
         data_shape,
-        device,
-        model,
-        num_steps: int,
+        pred_fn: Callable,
+        normalize_fn: Optional[torch.nn.Module] = None,
+        num_steps: int = 20,
         eta: float = 1.0,
+        noise_mask: Optional[torch.Tensor]=None
     ) -> Tensor:
         """
         time: time tensor (B,)
@@ -64,23 +64,33 @@ class DDIMSampler():
         batch_size = data_shape[0]
         const_shape = (batch_size, *([1] * (len(data_shape) - 1)))
         x = self.prior_sde(data_shape)
-        model.eval()
+        if noise_mask is not None:
+            x = x * noise_mask
         for time_step in range(num_steps, 0, -1):
-            t = torch.ones((batch_size, 1)).to(device) * time_step / num_steps
+            t = torch.ones((batch_size,)).to(self.device) * time_step / num_steps
             t = t.float()  # Convert to float if needed
             logsnr, alpha, sigma = get_logsnr_alpha_sigma(t, shape=const_shape)
 
-            t_prev = torch.ones((batch_size, 1), device=device) * (time_step - 1) / num_steps
+            t_prev = torch.ones((batch_size,), device=self.device) * (time_step - 1) / num_steps
             t_prev = t_prev.float()
             logsnr_, alpha_, sigma_ = get_logsnr_alpha_sigma(t_prev, shape=const_shape)
 
             with torch.no_grad():
-                input_set[""] = x
+
                 # Compute the predicted epsilon using the model
-                v = model(input_set, t.squeeze(-1)) # TODO
+                v = pred_fn(
+                    noise_x = x,
+                    time = t
+                )
+
                 eps = v * alpha + x * sigma
 
             # Update x using DDIM deterministic update rule
             pred_x0 = (x - sigma * eps) / alpha
             x = alpha_ * pred_x0 + sigma_ * (eta * eps)
+            if noise_mask is not None:
+                x = x * noise_mask
+
+        if normalize_fn is not None:
+            x = normalize_fn.denormalize(x, noise_mask)
         return x

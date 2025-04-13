@@ -232,7 +232,13 @@ class ClassifierTransformerBlockModule(nn.Module):
 
 
 class GeneratorTransformerBlockModule(nn.Module):
-    def __init__(self, projection_dim, num_heads, dropout, layer_scale, layer_scale_init, drop_probability):
+    def __init__(self,
+                 projection_dim: int,
+                 num_heads: int,
+                 dropout: float,
+                 layer_scale: bool,
+                 layer_scale_init: float,
+                 drop_probability: float):
         super().__init__()
         self.projection_dim = projection_dim
         self.num_heads = num_heads
@@ -256,8 +262,14 @@ class GeneratorTransformerBlockModule(nn.Module):
             self.layer_scale2 = LayerScale(layer_scale_init, projection_dim)
 
     def forward(self, x, cond_token, mask=None):
+        """
+        :param x: point_cloud (batch_size, num_objects, projection_dim)
+        :param cond_token: (batch_size, 1, projection_dim)
+        :param mask: (batch_size, num_objects, 1)
+        """
         x1 = self.norm1(x)
-        updates, _ = self.attn(x1, x1, x1, key_padding_mask=~mask.bool() if mask is not None else None)
+        padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None
+        updates, _ = self.attn(x1, x1, x1, key_padding_mask=padding_mask)
 
         if self.layer_scale_flag:
             updates = self.layer_scale1(updates, mask)
