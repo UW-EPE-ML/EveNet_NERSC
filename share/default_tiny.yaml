@@ -1,6 +1,6 @@
 platform:
   data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet/v2_tiny/"
-  number_of_workers: 16
+  number_of_workers: 4
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
@@ -9,7 +9,7 @@ platform:
   prefetch_batches: 2
 
 wandb:
-  project: "Pretrain"
+  project: "Generation-test"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
   tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node" ]
@@ -19,23 +19,29 @@ options:
 
   # overwrites
   Training:
-    epochs: 10
+    epochs: 40
     model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet/v2/"
-    model_checkpoint_load_path: null
+    model_checkpoint_load_path: "/pscratch/sd/t/tihsu/database/EveNet/v2/best_epoch=9-v4.ckpt"
+    learning_rate: 1e-4
 
     Components:
       Regression:
         include: false
 
       Assignment:
-        include: true
+        include: false
         detection_loss_scale: 0.0
+
+      GlobalGeneration:
+        include: true
+        loss_scale: 1.0
+
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/t/tihsu/database/EveNet/v2_tiny/normalization.pt"
 
 network:
-  default: network/pretrain.yaml
+  default: network/pretrain_tiny.yaml
 
   # overwrites
   # ...
