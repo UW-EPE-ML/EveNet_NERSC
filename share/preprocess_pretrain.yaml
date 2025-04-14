@@ -1,3 +1,5 @@
+max_neutrinos: 2
+
 process_info:
   default: process_info/pretrain.yaml
 
