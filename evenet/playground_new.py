@@ -279,7 +279,8 @@ for iepoch in range(n_epoch):
 
             generation_loss = dict()
             for generation_target, generation_result in outputs["generations"].items():
-                generation_loss[generation_target] = gen_loss(generation_result["vector"], generation_result["truth"])
+                masking = batch["x_mask"].unsqueeze(-1) if generation_target == "point_cloud" else None
+                generation_loss[generation_target] = gen_loss(generation_result["vector"], generation_result["truth"], masking)
                 total_loss += generation_loss[generation_target]
 
 

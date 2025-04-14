@@ -218,7 +218,7 @@ class EveNetEngine(L.LightningModule):
                 model=self.model,
                 loss_scale=self.generation_cfg.loss_scale,
                 device=device,
-                training=self.training,
+                diffusion_on= (not (self.training) and ((self.current_epoch%20) == 19) and ((self.global_step%5) == 0)) # TODO: hard coded now
             )
             loss_head_dict["generation"] = scaled_gen_loss
             loss = loss + scaled_gen_loss

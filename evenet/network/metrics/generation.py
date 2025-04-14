@@ -212,9 +212,9 @@ def shared_step(
         model: torch.nn.Module,
         loss_scale: float,
         device: torch.device,
-        training: bool = False,
         num_steps_global=20,
-        num_steps_point_cloud=200
+        num_steps_point_cloud=100,
+        diffusion_on: bool = False,
 ):
     generation_loss = dict()
     total_gen_losses = 0
@@ -227,7 +227,7 @@ def shared_step(
         )
         total_gen_losses += generation_loss[generation_target]
 
-        if not training:
+        if not diffusion_on:
             gen_metrics.update(
                 model=model,
                 input_set=batch,
