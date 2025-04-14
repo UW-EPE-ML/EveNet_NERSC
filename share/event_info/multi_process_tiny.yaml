@@ -104,7 +104,7 @@ REGRESSIONS:
 # -----------------------------------------------------------------------------
 CLASSIFICATIONS:
   EVENT:
-    - signal 
+    - signal
 
 CLASSLABEL:
   EVENT:
@@ -123,3 +123,12 @@ GENERATIONS:
   Conditions:
     - met
     - met_phi
+
+  Neutrinos:
+    mass: empty
+    px: normalize
+    py: normalize
+    pz: normalize
+    btag: empty
+    isLepton: empty
+    charge: empty

@@ -23,7 +23,6 @@ INPUTS:
       met: log_normalize
       met_phi: normalize
 
-
 # ----------------------------------------------------------------------
 # REQUIRED - EVENT - Complete list of resonance particles and daughters.
 # ----------------------------------------------------------------------
@@ -172,14 +171,14 @@ PERMUTATIONS:
       - [ q1, q2 ]
 
   TT2L:
-    - []
+    - [ ]
 
   WJetsToQQ:
     W:
       - [ q1, q2 ]
 
   ZJetsToQQ:
-    Z: 
+    Z:
       - [ q1, q2 ]
 
   ZJetsToLL:
@@ -216,7 +215,7 @@ PERMUTATIONS:
 
   WZ_3L:
     Z:
-      - [ l1, l2 ] 
+      - [ l1, l2 ]
   
   ttW_FullHadronics:
     EVENT:
@@ -249,7 +248,7 @@ PERMUTATIONS:
       - [ l1, l2 ]
 
   WJetsToLNu:
-    - []
+    - [ ]
 
 
 # ------------------------------------------------------------------------------
@@ -258,116 +257,38 @@ PERMUTATIONS:
 REGRESSIONS:
 
   TT1L:
-    t1:
-      - pt
-      - eta
-      - phi
-    t2:
-      - pt
-      - eta
-      - phi
     t2/v:
       - px
       - py
       - pz
 
   TT2L:
-    t1:
-      - pt
-      - eta
-      - phi
     t1/v:
       - px
-      - py 
+      - py
       - pz
-    t2:
-      - pt
-      - eta
-      - phi
     t2/v:
       - px
       - py
       - pz
 
-  WJetsToQQ:
-    W:
-      - pt
-      - eta
-      - phi
-
-  ZJetsToQQ:
-    Z:
-      - pt
-      - eta
-      - phi
-
-  ZJetsToLL:
-    Z:
-      - pt
-      - eta
-      - phi
-
-  ZZ_2L:
-    Z1:
-      - pt
-      - eta
-      - phi
-    Z2:
-      - pt
-      - eta
-      - phi
-
   WZ_1L:
-    W:
-      - pt
-      - eta
-      - phi
     W/v:
       - px
       - py
       - pz
-    Z:
-      - pt
-      - eta
-      - phi
 
   WW_1L:
-    W1:
-      - pt
-      - eta
-      - phi
     W1/v:
       - px
       - py
-      - pz 
-    W2:
-      - pt
-      - eta
-      - phi
-
-  WZ_2L:
-    W:
-      - pt
-      - eta
-      - phi
-    Z:
-      - pt
-      - eta
-      - phi
+      - pz
 
   WZ_3L:
-    W:
-      - pt
-      - eta
-      - phi
     W/v:
       - px
       - py
       - pz
-    Z:
-      - pt
-      - eta 
-      - phi
 
   WJetsToLNu:
     W/v:
@@ -380,12 +301,12 @@ REGRESSIONS:
 # -----------------------------------------------------------------------------
 CLASSIFICATIONS:
   EVENT:
-    - signal 
+    - signal
 
 CLASSLABEL:
   EVENT:
     signal:
-      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ]
+      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ ]
 
 PARTICLE_PROPERTIES:
   - Mass
@@ -399,3 +320,12 @@ GENERATIONS:
   Conditions:
     - met
     - met_phi
+
+  Neutrinos:
+    mass: empty
+    px: normalize
+    py: normalize
+    pz: normalize
+    btag: empty
+    isLepton: empty
+    charge: empty
