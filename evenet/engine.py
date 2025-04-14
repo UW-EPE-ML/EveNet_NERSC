@@ -474,6 +474,7 @@ class EveNetEngine(L.LightningModule):
         warmup_steps = warm_up_factor * steps_per_epoch
         total_steps = epochs * steps_per_epoch
 
+        print(f"--> Optimizer Configuration:")
         print("word_size: ", world_size)
         print("dataset_size: ", dataset_size)
         print("steps_per_epoch: ", steps_per_epoch)
