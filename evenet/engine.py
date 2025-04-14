@@ -79,8 +79,8 @@ class EveNetEngine(L.LightningModule):
             self.ass_args = get_ass(global_config.event_info)
 
         #######  Initialize Diffusion Settings ##########
-        self.diffusion_every_n_epochs = global_config.options.Trainging.diffusion_every_n_epochs
-        self.diffusion_every_n_steps  = global_config.optioins.Training.diffusion_every_n_steps
+        self.diffusion_every_n_epochs = global_config.options.Training.diffusion_every_n_epochs
+        self.diffusion_every_n_steps  = global_config.options.Training.diffusion_every_n_steps
 
         self.global_diffusion_steps = self.component_cfg.GlobalGeneration.diffusion_steps
         self.point_cloud_diffusion_steps =  self.component_cfg.EventGeneration.diffusion_steps

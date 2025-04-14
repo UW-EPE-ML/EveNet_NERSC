@@ -444,6 +444,11 @@ class SingleProcessAssignmentMetrics:
         predict_accuracy = predict_correct.sum() / (predict_correct.sum() + predict_wrong.sum())
         logs["pred_accuracy"] = predict_accuracy
 
+        bin_widths = np.diff(self.bins)
+        total_prediction_sum = predict_correct + predict_wrong
+        predict_correct = predict_correct / np.maximum(1, total_prediction_sum.sum() * bin_widths)
+        predict_wrong = predict_wrong / np.maximum(1, total_prediction_sum.sum() * bin_widths)
+
         ax.bar(
             self.bin_centers,
             predict_correct,
@@ -464,9 +469,14 @@ class SingleProcessAssignmentMetrics:
             label='Reco False'
         )
 
-        # Train plot
-
-        ax.step(self.bin_centers, truth, where='mid', color='black', linewidth=1.5, label='Truth')
+        truth = truth / np.maximum(1, truth.sum() * bin_widths)
+        ax.plot(self.bin_centers,
+                truth,
+                linestyle='None',
+                marker='o',
+                markersize=6,
+                label='Truth',
+                color='black')
 
         def gauss(x, a, mu, sigma):
             return a * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2))
@@ -496,27 +506,29 @@ class SingleProcessAssignmentMetrics:
         if train_predict_correct is not None:
             train_accuracy = train_predict_correct.sum() / (train_predict_correct.sum() + train_predict_wrong.sum())
             logs["train_accuracy"] = train_accuracy
-            ax.step(
+            train_predict_sum = train_predict_correct + train_predict_wrong
+            train_predict_correct = train_predict_correct / np.maximum(1, (train_predict_sum).sum() * bin_widths)
+            train_predict_wrong = train_predict_wrong /  np.maximum(1, (train_predict_sum).sum() * bin_widths)
+            ax.plot(
                 self.bin_centers,
                 train_predict_correct,
-                where='mid',
-                markersize=6,
+                linestyle='None',
                 marker='o',
+                markersize=6,
                 markerfacecolor=base_colors[0],
                 markeredgecolor=base_colors[0],
                 label=f'Reco Success (train) [acc: {train_accuracy:.2f}]',
             )
 
-            ax.step(
+            ax.plot(
                 self.bin_centers,
                 train_predict_correct + train_predict_wrong,
-                where='mid',
                 color=base_colors[0],
+                linestyle='None',
                 markersize=6,
                 marker='o',
                 markerfacecolor='none',
                 markeredgecolor=base_colors[0],
-                linestyle='None',
                 label='Total (train)'
             )
 

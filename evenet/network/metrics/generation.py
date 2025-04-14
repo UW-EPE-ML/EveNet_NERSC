@@ -227,7 +227,7 @@ def shared_step(
         )
         total_gen_losses += generation_loss[generation_target]
 
-        if not diffusion_on:
+        if diffusion_on:
             gen_metrics.update(
                 model=model,
                 input_set=batch,
