@@ -108,7 +108,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
     shape_metadata = None
 
     for process in global_config.process_info:
-    # for process in ["ttZ_FullHadronics", "ttZ_Leptonic", "ZJetsToLL"]:
+    # for process in ["TT1L", "TT2L", "WZ_3L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -139,6 +139,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         regressions = converter.load_regressions(regression_keys, regression_key_map)
         classifications = converter.load_classification()
 
+        invisible = converter.load_invisible(max_num_neutrinos=global_config.get("max_neutrinos", 2))
+
         process_data = {
             'num_vectors': num_vectors,
             'num_sequential_vectors': num_sequential_vectors,
@@ -150,6 +152,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             'conditions_mask': sources['sources-1-mask'][:, np.newaxis],
 
             'classification': classifications['classification-EVENT/signal'],
+
+            'x_invisible': invisible['invisible-data'],
+            'x_invisible_mask': invisible['invisible-mask'],
+            'num_invisible_raw': invisible['invisible-num-raw'],
+            'num_invisible_valid': invisible['invisible-num-valid'],
 
             **assignments,
             **regressions,
@@ -190,6 +197,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             num_vectors=process_data['num_sequential_vectors'],
             class_counts=class_counts,
             subprocess_counts=subprocess_counts,
+            invisible=process_data['x_invisible'],
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)

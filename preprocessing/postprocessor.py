@@ -127,6 +127,7 @@ def merge_stats(stats_list):
         "conditions": None,
         "regression": None,
         "input_num": None,
+        "invisible": None,
     }
 
     for s in stats_list:
@@ -149,6 +150,8 @@ def merge_stats(stats_list):
         "class_balance": compute_classification_balance(total["class_counts"]),
         "subprocess_counts": total["subprocess_counts"],
         "subprocess_balance": compute_classification_balance(total["subprocess_counts"]),
+
+        "invisible": compute_mean_std(total["invisible"]),
     }
     return result
 
@@ -259,11 +262,14 @@ class PostProcessor:
         self.assignment_mask = {p: [] for p in global_config.process_info}
         self.event_equivalence_classes = global_config.event_info.event_equivalence_classes
 
-    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts):
+    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]))
         cond_stats = masked_stats(conditions)
         regression_stats = masked_stats(regression)
         num_vectors_stats = masked_stats(num_vectors)
+
+        invisible_stats = masked_stats(invisible.reshape(-1, invisible.shape[-1]))
+
         self.stats.append({
             "x": x_stats,
             "conditions": cond_stats,
@@ -271,6 +277,8 @@ class PostProcessor:
             "input_num": num_vectors_stats,
             "class_counts": class_counts,
             "subprocess_counts": subprocess_counts,
+
+            "invisible": invisible_stats,
         })
 
     def add_assignment_mask(self, process, dict_particle):
@@ -321,6 +329,13 @@ class PostProcessor:
             'particle_balance': particle_balance,
             'subprocess_counts': torch.tensor(merged_stats["subprocess_counts"], dtype=torch.float32),
             'subprocess_balance': torch.tensor(merged_stats["subprocess_balance"], dtype=torch.float32),
+
+            'invisible_mean': {
+                'Source': torch.tensor(merged_stats["invisible"]["mean"], dtype=torch.float32),
+            },
+            'invisible_std': {
+                'Source': torch.tensor(merged_stats["invisible"]["std"], dtype=torch.float32),
+            },
         }
 
         if saved_results_path:

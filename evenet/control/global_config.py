@@ -94,7 +94,11 @@ class Config:
                 self._global_config[section].merge(content)
             else:
                 self._global_config[section] = self._global_config.get(section, DotDict())
-                self._global_config[section].merge(content)
+                if isinstance(content, dict):
+                    self._global_config[section].merge(content)
+                else:
+                    self._global_config[section] = content
+
 
         required = self.skip_keys
         missing = [key for key in required if key not in self._global_config]

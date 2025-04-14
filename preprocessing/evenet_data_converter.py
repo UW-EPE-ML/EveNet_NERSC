@@ -158,3 +158,40 @@ class EveNetDataConverter:
 
         self.raw_data = data_selected
         self.total_length = n_event_current
+
+    def load_invisible(self, max_num_neutrinos: int = 2):
+
+        source_len = len(self.event_info.input_features['Source'])
+        feature_len = len(self.event_info.generations['Neutrinos'])
+
+        assert source_len == feature_len, "Mismatch in feature length, check Generation[Neutrinos] block in event_info"
+
+        x_inv = np.zeros((self.total_length, max_num_neutrinos, feature_len), dtype=np.float32)
+        x_inv_mask = np.zeros((self.total_length, max_num_neutrinos), dtype=bool)
+
+        i_raw = 0
+        for keys in self.raw_data.keys():
+            if keys.startswith("REGRESSIONS") and "/v/MASK" in keys:
+                x_inv_mask[:, i_raw] = self.raw_data[keys]
+
+                for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
+                    if norm == "empty": continue
+
+                    if 'log' in norm:
+                        x_inv[:, i_raw, idx] = np.log1p(self.raw_data[keys.replace("/MASK", f"/{key}")])
+                    else:
+                        x_inv[:, i_raw, idx] = self.raw_data[keys.replace("/MASK", f"/{key}")]
+
+                i_raw += 1
+                if i_raw >= max_num_neutrinos:
+                    break
+
+        num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * i_raw
+        num_valid_invisible = np.sum(x_inv_mask, axis=-1)
+
+        return {
+            "invisible-data": x_inv,
+            "invisible-mask": x_inv_mask,
+            "invisible-num-valid": num_valid_invisible,
+            "invisible-num-raw": num_raw_invisible,
+        }
