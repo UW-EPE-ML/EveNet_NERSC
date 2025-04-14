@@ -67,7 +67,6 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     invariant_mass[~is_valid_event] = float(-999)
     return invariant_mass
 
-
 def get_assignment_necessaries(
         event_info: EventInfo,
 ):
@@ -107,7 +106,6 @@ def get_assignment_necessaries(
             'product_symbolic_groups': event_info.product_symbolic_groups,
         }
     }
-
 
 @time_decorator(name="[Assignment] predict")
 def predict(assignments: List[Tensor],
@@ -153,8 +151,7 @@ def predict(assignments: List[Tensor],
             detection_prob = softmax(detection_result)
 
             assignment_tmp = torch.stack([assignments_indices[element] for element in symmetry_element])
-            assignment_probability_tmp = torch.stack(
-                [assignment_probabilities[element] for element in symmetry_element])
+            assignment_probability_tmp = torch.stack([assignment_probabilities[element] for element in symmetry_element])
 
             sort_index = torch.argsort(-1 * assignment_probability_tmp, dim=0)
             expanded_sort_index = sort_index.unsqueeze(2)
@@ -561,79 +558,8 @@ class SingleProcessAssignmentMetrics:
                     return_log[variable_name] = dict()
                 return_log[variable_name][f"{self.process}/{name}"] = log
 
+
         return return_plot, return_log
-
-    def plot_score_func(self,
-                        correct_score,
-                        false_score,
-                        train_correct_score=None,
-                        train_false_score=None
-                        ):
-        fig, ax = plt.subplots(figsize=(8, 6))
-        bin_widths = np.diff(self.bins_score)
-        ax.bar(
-            self.bin_centers_score,
-            correct_score / np.maximum(1.0, np.sum(correct_score) * bin_widths),
-            width=bin_widths,
-            color='C0',
-            alpha=0.85,
-            label='Correct assign',
-            edgecolor='black'
-        )
-        ax.bar(
-            self.bin_centers_score,
-            false_score / np.maximum(1.0, np.sum(false_score) * bin_widths),
-            width=bin_widths,
-            color='C1',
-            alpha=0.65,
-            label='Wrong assign',
-            edgecolor='black'
-        )
-        # Plot training histogram (b
-        if train_correct_score is not None:
-            train_bin_widths = np.diff(self.bins_score)
-            ax.plot(self.bin_centers_score,
-                    train_correct_score / np.maximum(1, train_correct_score.sum() * train_bin_widths),
-                    linestyle='None',
-                    marker='o',
-                    linewidth=3,
-                    markersize=6,
-                    label='Correct assign (train)',
-                    color='C0')
-            ax.plot(self.bin_centers_score,
-                    train_false_score / np.maximum(1, train_false_score.sum() * train_bin_widths),
-                    linestyle='None',
-                    marker='o',
-                    linewidth=3,
-                    markersize=3,
-                    label='Wrong assign (train)',
-                    color='C1'
-                    )
-
-        ax.set_xlabel("Score")
-        ax.set_ylabel("Density")
-        ax.set_title("Score Distribution")
-        ax.legend(loc="best")
-        ax.grid(True)
-        fig.tight_layout()
-
-        return fig
-
-    def plot_score(self, target="detection_score"):
-        return_plot = dict()
-        for name, _ in self.truth_metrics.items():
-            return_plot[f"{name}"] = self.plot_score_func(
-                self.predict_metrics_correct[name][target],
-                self.predict_metrics_wrong[name][target],
-                self.train_metrics_correct[name][target] if self.train_metrics_correct is not None else None,
-                self.train_metrics_wrong[name][target] if self.train_metrics_wrong is not None else None,
-                hist["mass"],
-                self.predict_metrics_correct[name]["mass"],
-                self.predict_metrics_wrong[name]["mass"],
-                self.train_metrics_correct[name]["mass"] if self.train_metrics_correct is not None else None,
-                self.train_metrics_wrong[name]["mass"] if self.train_metrics_wrong is not None else None,
-            )
-        return return_plot
 
     def plot_score_func(self,
                         correct_score,
@@ -687,6 +613,8 @@ class SingleProcessAssignmentMetrics:
 
         return fig
 
+
+
     def plot_score(self, target="detection_score"):
         return_plot = dict()
         for name, _ in self.truth_metrics.items():
@@ -698,9 +626,11 @@ class SingleProcessAssignmentMetrics:
             )
         return return_plot
 
+
     @staticmethod
     def permute_arrays(self, array_list, permutation):
         return [array_list[index] for index in permutation]
+
 
     def sort_outputs(self, predictions, targets):
         """
@@ -822,11 +752,11 @@ def shared_epoch_end(
             )
 
             figs, logs = metrics_valid[process].plot_mass_spectrum()
-            for name in logs:
-                logger.log(
-                    logs[name],
-                    step=epoch
-                )
+            for name, log_set in logs.items():
+                for set_name, log in log_set.items():
+                    logger.log({
+                        f"{set_name}/{name}": log
+                    })
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
                 # f"assignment_reco_mass/{process}/{name}": fig
@@ -851,21 +781,7 @@ def shared_epoch_end(
             for _, fig in figs.items():
                 plt.close(fig)
 
-            figs = metrics_valid[process].plot_score(target="detection_score")
-            wandb.log({
-                f"assignment_reco_detection/{process}/{name}": wandb.Image(fig)
-                for name, fig in figs.items()
-            })
-            for _, fig in figs.items():
-                plt.close(fig)
 
-            figs = metrics_valid[process].plot_score(target="assignment_score")
-            wandb.log({
-                f"assignment_score/{process}/{name}": wandb.Image(fig)
-                for name, fig in figs.items()
-            })
-            for _, fig in figs.items():
-                plt.close(fig)
 
     for _, metric in metrics_valid.items():
         metric.reset()
