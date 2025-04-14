@@ -614,7 +614,6 @@ class SingleProcessAssignmentMetrics:
         return fig
 
 
-
     def plot_score(self, target="detection_score"):
         return_plot = dict()
         for name, _ in self.truth_metrics.items():
