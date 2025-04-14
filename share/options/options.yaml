@@ -16,6 +16,7 @@ Training:
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
+      warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -24,6 +25,7 @@ Training:
     PET:
       learning_rate: *lr
       optimizer_group: "body"
+      warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -32,6 +34,7 @@ Training:
     ObjectEncoder:
       learning_rate: *lr
       optimizer_group: "object_encoder"
+      warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -40,6 +43,7 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
+      warm_up: false
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
       freeze:
@@ -50,6 +54,7 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
+      warm_up: false
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
       freeze:
@@ -60,6 +65,7 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
+      warm_up: false
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
       include: false # whether to build in network
@@ -71,6 +77,7 @@ Training:
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generator"
+      warm_up: false
       include: false # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -80,11 +87,34 @@ Training:
     EventGeneration:
       learning_rate: *lr
       optimizer_group: "generator"
+      warm_up: false
       include: false # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
+
+  ProgressiveTraining:
+    - name: "warmup"
+      epoch_ratio: 0.2
+      components:
+        - body
+        - object_encoder
+        - classification
+    - name: "assignment"
+      epoch_ratio: 0.6
+      components:
+        - body
+        - object_encoder
+        - assignment
+    - name: "finetune"
+      epoch_ratio: 0.2
+      components:
+        - body
+        - object_encoder
+        - classification
+        - regression
+        - assignment
 
 Dataset:
   dataset_limit: 1.0

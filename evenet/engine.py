@@ -124,6 +124,10 @@ class EveNetEngine(L.LightningModule):
         ###### For general log ######
         self.general_log = GenericMetrics()
 
+        ###### Progressive Training ######
+        self.progressive_training = global_config.options.Training.get("ProgressiveTraining", [])
+        self.progressive_index = 0
+
         ###### Last ######
         # self.save_hyperparameters()
 
@@ -234,12 +238,28 @@ class EveNetEngine(L.LightningModule):
         for name, val in loss_head.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
-        for name,val in loss_dict.items():
+        for name, val in loss_dict.items():
             for n, v in val.items():
                 self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
+        # Get all optimizers and schedulers
         optimizers = list(self.optimizers())
-        # Yulei TODO: considering add Gradient Surgery
+        schedulers = self.lr_schedulers()
+
+        if len(self.progressive_training) > 0:
+            active_progress = self.progressive_training[0]
+
+            optimizers = [
+                optimizers[idx]
+                for idx, name in enumerate(self.model_parts.keys())
+                if name in active_progress['components']
+            ]
+            schedulers = [
+                schedulers[idx]
+                for idx, name in enumerate(self.model_parts.keys())
+                if name in active_progress['components']
+            ]
+
         # === Manual optimization ===
         for opt in optimizers:
             opt.zero_grad()
@@ -250,13 +270,8 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.step()
 
-        # Step all schedulers
-        schedulers = self.lr_schedulers()
-        if isinstance(schedulers, list):
-            for sch in schedulers:
-                sch.step()
-        else:
-            schedulers.step()
+        for sch in schedulers:
+            sch.step()
 
         return loss.mean()
 
@@ -321,7 +336,6 @@ class EveNetEngine(L.LightningModule):
 
             self.assignment_metrics_train = make_assignment_metrics()
             self.assignment_metrics_valid = make_assignment_metrics()
-
 
         if self.generation_cfg.include:
             self.generation_metrics_train = GenerationMetrics(
@@ -414,6 +428,15 @@ class EveNetEngine(L.LightningModule):
     @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
+
+        self.log("progress", self.progressive_index, prog_bar=True, sync_dist=False)
+
+        if len(self.progressive_training) > 0:
+            print(f"--> Current Epoch: {self.current_epoch}, Target: {self.progressive_training[0]['epoch']}")
+            if self.current_epoch + 1 == self.progressive_training[0]['epoch']:
+                self.progressive_training.pop(0)
+                self.progressive_index += 1
+
         pass
 
     @time_decorator()
@@ -447,13 +470,19 @@ class EveNetEngine(L.LightningModule):
         # Distributed training info
         world_size = self.world_size
         dataset_size = self.total_events
-        steps_per_epoch = dataset_size // batch_size // world_size
+        steps_per_epoch = math.ceil(dataset_size / (batch_size * world_size))
         warmup_steps = warm_up_factor * steps_per_epoch
         total_steps = epochs * steps_per_epoch
 
+        print("word_size: ", world_size)
+        print("dataset_size: ", dataset_size)
+        print("steps_per_epoch: ", steps_per_epoch)
+        print("warmup_steps: ", warmup_steps)
+        print("total_steps: ", total_steps)
+
         betas = (0.95, 0.99)
 
-        def create_optim_schedule(p, base_lr):
+        def create_optim_schedule(p, base_lr, warm_up: bool = True):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
             optimizer = Lion(
                 p,
@@ -462,7 +491,7 @@ class EveNetEngine(L.LightningModule):
             )
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=warmup_steps,
+                num_warmup_steps=warmup_steps if warm_up else 0,
                 num_training_steps=total_steps,
                 num_cycles=0.5
             )
@@ -481,7 +510,7 @@ class EveNetEngine(L.LightningModule):
                 print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
                 continue
 
-            opt, sch = create_optim_schedule(params, base_lr=modules['lr'])
+            opt, sch = create_optim_schedule(params, base_lr=modules['lr'], warm_up=modules['warm_up'])
             optimizers.append(opt)
             schedulers.append({
                 "scheduler": sch,
@@ -547,11 +576,28 @@ class EveNetEngine(L.LightningModule):
             if group not in self.model_parts:
                 self.model_parts[group] = {
                     'lr': cfg['learning_rate'],
+                    'warm_up': cfg.get('warm_up', True),
                     'modules': [],
                 }
             self.model_parts[group]['modules'].append(key)
 
         print("model parts: ", self.model_parts)
+
+        ### Progressive Training ###
+        print("--> Progressive Training:")
+        sum_epochs = 0
+        for i, progress in enumerate(self.progressive_training):
+            ratio = int(self.progressive_training[i]['epoch_ratio'] * self.hyper_par_cfg['epoch'])
+            self.progressive_training[i]['epoch'] = ratio + sum_epochs
+            sum_epochs += ratio
+
+            print(f"{progress['name']}: {ratio: .0f} epochs, total {sum_epochs: .0f} epochs")
+            for component in progress['components']:
+                optimizer_exists = self.model_parts.get(component, None)
+                if optimizer_exists:
+                    print(f"  --> Optimizer: {component} ✅")
+                else:
+                    print(f"  --> Optimizer: {component} ❌")
 
     def on_save_checkpoint(self, checkpoint):
         # Get the original model if it's torch.compile'd

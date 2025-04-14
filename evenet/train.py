@@ -85,7 +85,7 @@ def train_func(cfg):
     )
     early_stop_callback = EarlyStopping(
         monitor="val/loss",
-        patience=5,  # epochs to wait for improvement
+        patience=10,  # epochs to wait for improvement
         mode="min",  # "min" if lower is better (e.g. for loss)
         verbose=True,  # optional: prints when triggered
         min_delta=0.001,  # minimum change to qualify as improvement

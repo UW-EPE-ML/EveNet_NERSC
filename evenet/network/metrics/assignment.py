@@ -67,6 +67,7 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     invariant_mass[~is_valid_event] = float(-999)
     return invariant_mass
 
+
 def get_assignment_necessaries(
         event_info: EventInfo,
 ):
@@ -106,6 +107,7 @@ def get_assignment_necessaries(
             'product_symbolic_groups': event_info.product_symbolic_groups,
         }
     }
+
 
 @time_decorator(name="[Assignment] predict")
 def predict(assignments: List[Tensor],
@@ -151,7 +153,8 @@ def predict(assignments: List[Tensor],
             detection_prob = softmax(detection_result)
 
             assignment_tmp = torch.stack([assignments_indices[element] for element in symmetry_element])
-            assignment_probability_tmp = torch.stack([assignment_probabilities[element] for element in symmetry_element])
+            assignment_probability_tmp = torch.stack(
+                [assignment_probabilities[element] for element in symmetry_element])
 
             sort_index = torch.argsort(-1 * assignment_probability_tmp, dim=0)
             expanded_sort_index = sort_index.unsqueeze(2)
@@ -558,7 +561,6 @@ class SingleProcessAssignmentMetrics:
                     return_log[variable_name] = dict()
                 return_log[variable_name][f"{self.process}/{name}"] = log
 
-
         return return_plot, return_log
 
     def plot_score_func(self,
@@ -569,20 +571,24 @@ class SingleProcessAssignmentMetrics:
                         ):
         fig, ax = plt.subplots(figsize=(8, 6))
         bin_widths = np.diff(self.bins_score)
-        ax.bar(self.bin_centers_score,
-               correct_score / np.maximum(1.0, np.sum(correct_score) * bin_widths),
-               width=bin_widths,
-               color='C0',
-               alpha=0.85,
-               label='Correct assign',
-               edgecolor='black')
-        ax.bar(self.bin_centers_score,
-               false_score / np.maximum(1.0, np.sum(false_score) * bin_widths),
-               width=bin_widths,
-               color='C1',
-               alpha=0.65,
-               label='Wrong assign',
-               edgecolor='black')
+        ax.bar(
+            self.bin_centers_score,
+            correct_score / np.maximum(1.0, np.sum(correct_score) * bin_widths),
+            width=bin_widths,
+            color='C0',
+            alpha=0.85,
+            label='Correct assign',
+            edgecolor='black'
+        )
+        ax.bar(
+            self.bin_centers_score,
+            false_score / np.maximum(1.0, np.sum(false_score) * bin_widths),
+            width=bin_widths,
+            color='C1',
+            alpha=0.65,
+            label='Wrong assign',
+            edgecolor='black'
+        )
         # Plot training histogram (b
         if train_correct_score is not None:
             train_bin_widths = np.diff(self.bins_score)
@@ -612,7 +618,6 @@ class SingleProcessAssignmentMetrics:
         fig.tight_layout()
 
         return fig
-
 
     def plot_score(self, target="detection_score"):
         return_plot = dict()
@@ -682,7 +687,6 @@ class SingleProcessAssignmentMetrics:
 
         return fig
 
-
     def plot_score(self, target="detection_score"):
         return_plot = dict()
         for name, _ in self.truth_metrics.items():
@@ -694,11 +698,9 @@ class SingleProcessAssignmentMetrics:
             )
         return return_plot
 
-
     @staticmethod
     def permute_arrays(self, array_list, permutation):
         return [array_list[index] for index in permutation]
-
 
     def sort_outputs(self, predictions, targets):
         """
@@ -823,7 +825,7 @@ def shared_epoch_end(
             for name in logs:
                 logger.log(
                     logs[name],
-                    step = epoch
+                    step=epoch
                 )
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
