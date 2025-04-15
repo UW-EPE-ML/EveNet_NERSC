@@ -302,7 +302,12 @@ class EveNetEngine(L.LightningModule):
         epoch = self.current_epoch
         # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
 
-        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=[])
+        active_components = []
+        if len(self.progressive_training) > 0:
+            active_progress = self.progressive_training[0]
+            active_components = active_progress['components']
+
+        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=active_components)
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
