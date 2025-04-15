@@ -80,10 +80,10 @@ class EveNetEngine(L.LightningModule):
 
         #######  Initialize Diffusion Settings ##########
         self.diffusion_every_n_epochs = global_config.options.Training.diffusion_every_n_epochs
-        self.diffusion_every_n_steps  = global_config.options.Training.diffusion_every_n_steps
+        self.diffusion_every_n_steps = global_config.options.Training.diffusion_every_n_steps
 
         self.global_diffusion_steps = self.component_cfg.GlobalGeneration.diffusion_steps
-        self.point_cloud_diffusion_steps =  self.component_cfg.EventGeneration.diffusion_steps
+        self.point_cloud_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
 
         ###### Initialize Loss ######
         self.cls_loss = None
@@ -227,9 +227,12 @@ class EveNetEngine(L.LightningModule):
                 device=device,
                 num_steps_global=self.global_diffusion_steps,
                 num_steps_point_cloud=self.point_cloud_diffusion_steps,
-                diffusion_on= (not (self.training)
-                               and ((self.current_epoch%self.diffusion_every_n_epochs) == (self.diffusion_every_n_epochs-1))
-                               and ((self.global_step%self.diffusion_every_n_steps) == 0))
+                diffusion_on=(
+                        not self.training
+                        and ((self.current_epoch % self.diffusion_every_n_epochs) == (
+                            self.diffusion_every_n_epochs - 1))
+                        and ((self.global_step % self.diffusion_every_n_steps) == 0)
+                )
             )
             loss_head_dict["generation"] = scaled_gen_loss
             loss = loss + scaled_gen_loss

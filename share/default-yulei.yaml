@@ -19,19 +19,50 @@ options:
 
   # overwrites
   Training:
-    epochs: 10
+    epochs: 20
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
     model_checkpoint_load_path: null
 
     pretrain_model_load_path: null
 
     Components:
+      Classification:
+        include: true
+
       Regression:
         include: false
 
       Assignment:
         include: true
-        detection_loss_scale: 1.0
+        learning_rate: 0.00003
+
+      GlobalGeneration:
+        include: false
+
+      EventGeneration:
+        include: false
+
+    ProgressiveTraining:
+      - name: "warmup"
+        epoch_ratio: 0.2
+        components:
+          - body
+          - object_encoder
+          - classification
+      - name: "assignment"
+        epoch_ratio: 0.6
+        components:
+          - body
+          - object_encoder
+          - assignment
+      - name: "finetune"
+        epoch_ratio: 0.2
+        components:
+          - body
+          - object_encoder
+          - classification
+          - assignment
+
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny/normalization.pt"
