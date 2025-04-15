@@ -34,7 +34,7 @@ options:
 
       Assignment:
         include: true
-        learning_rate: 0.00003
+        learning_rate: 0.00006
 
       GlobalGeneration:
         include: false
@@ -44,7 +44,7 @@ options:
 
     ProgressiveTraining:
       - name: "warmup"
-        epoch_ratio: 0.2
+        epoch_ratio: 0.1
         components:
           - body
           - object_encoder
@@ -56,7 +56,7 @@ options:
           - object_encoder
           - assignment
       - name: "finetune"
-        epoch_ratio: 0.2
+        epoch_ratio: 0.3
         components:
           - body
           - object_encoder
