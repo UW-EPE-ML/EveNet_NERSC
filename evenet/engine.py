@@ -145,7 +145,7 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def shared_step(self, batch: Any, *args: Any, **kwargs: Any):
+    def shared_step(self, batch: Any, active_components: list[str]):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -174,7 +174,8 @@ class EveNetEngine(L.LightningModule):
                 device=device,
             )
 
-            loss = loss + scaled_cls_loss
+            if "classification" in active_components or active_components == []:
+                loss = loss + scaled_cls_loss
 
         if self.regression_cfg.include:
             target_regression = batch[self.target_regression_key].to(device=device)
@@ -215,7 +216,8 @@ class EveNetEngine(L.LightningModule):
             )
             loss_head_dict['assignment'] = scaled_ass_loss
 
-            loss = loss + scaled_ass_loss
+            if "assignment" in active_components or active_components == []:
+                loss = loss + scaled_ass_loss
 
         if self.generation_cfg.include:
             scaled_gen_loss, detailed_gen_loss = gen_step(
@@ -230,35 +232,28 @@ class EveNetEngine(L.LightningModule):
                 diffusion_on=(
                         not self.training
                         and ((self.current_epoch % self.diffusion_every_n_epochs) == (
-                            self.diffusion_every_n_epochs - 1))
+                        self.diffusion_every_n_epochs - 1))
                         and ((self.global_step % self.diffusion_every_n_steps) == 0)
                 )
             )
             loss_head_dict["generation"] = scaled_gen_loss
-            loss = loss + scaled_gen_loss
+
+            if "generation" in active_components or active_components == []:
+                loss = loss + scaled_gen_loss
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
 
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts
 
     @time_decorator()
-    def training_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
+    def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
         step = self.global_step
         epoch = self.current_epoch
-
-        loss, loss_head, loss_dict, _ = self.shared_step(*args, **kwargs)
-
-        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
-        for name, val in loss_head.items():
-            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
-
-        for name, val in loss_dict.items():
-            for n, v in val.items():
-                self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         # Get all optimizers and schedulers
         optimizers = list(self.optimizers())
         schedulers = self.lr_schedulers()
+        active_components = []
 
         if len(self.progressive_training) > 0:
             active_progress = self.progressive_training[0]
@@ -273,6 +268,17 @@ class EveNetEngine(L.LightningModule):
                 for idx, name in enumerate(self.model_parts.keys())
                 if name in active_progress['components']
             ]
+            active_components = active_progress['components']
+
+        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=active_components)
+
+        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
+        for name, val in loss_head.items():
+            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            for n, v in val.items():
+                self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         # === Manual optimization ===
         for opt in optimizers:
@@ -290,13 +296,13 @@ class EveNetEngine(L.LightningModule):
         return loss.mean()
 
     # @time_decorator
-    def validation_step(self, *args: Any, **kwargs: Any) -> STEP_OUTPUT:
+    def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
         # Implement your validation step logic here
         step = self.global_step
         epoch = self.current_epoch
         # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
 
-        loss, loss_head, loss_dict, _ = self.shared_step(*args, **kwargs)
+        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=[])
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
@@ -455,12 +461,12 @@ class EveNetEngine(L.LightningModule):
 
     @time_decorator()
     def backward(self, loss, *args, **kwargs):
+        super().backward(loss, *args, **kwargs)
         for name, param in self.named_parameters():
             if param.grad is not None:
                 if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
                     print(f"🚨 Gradient in {name} is NaN or Inf!")
                     raise ValueError("Gradient check failed.")
-        super().backward(loss, *args, **kwargs)
 
     # @time_decorator()
     def safe_manual_backward(self, loss, optimizers: list, retain_graph=False):
@@ -568,11 +574,19 @@ class EveNetEngine(L.LightningModule):
                 print("--> Unexpected keys:", unexpected)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
+        for heads in [
+            self.model.Assignment.multiprocess_assign_head,
+            # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
+            # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
+            # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
+            # self.model.Assignment.multiprocess_assign_head.HadronicTop,
+        ]:
+            self.logger.experiment.watch(heads, log="gradients", log_freq=10, log_graph=False)
 
         # Define Freezing
-        self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
-        self.model.freeze_module("Regression", self.regression_cfg.get("freeze", {}))
-        self.model.freeze_module("Assignment", self.assignment_cfg.get("freeze", {}))
+        # self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
+        # self.model.freeze_module("Regression", self.regression_cfg.get("freeze", {}))
+        # self.model.freeze_module("Assignment", self.assignment_cfg.get("freeze", {}))
 
         # Define model part groups
         self.model_parts = {}

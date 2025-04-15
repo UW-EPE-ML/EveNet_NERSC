@@ -80,7 +80,7 @@ Training:
 
     GlobalGeneration:
       learning_rate: *lr
-      optimizer_group: "generator"
+      optimizer_group: "generation"
       warm_up: false
       include: false # whether to build in network
       diffusion_steps: 20
@@ -91,7 +91,7 @@ Training:
 
     EventGeneration:
       learning_rate: *lr
-      optimizer_group: "generator"
+      optimizer_group: "generation"
       warm_up: false
       include: false # whether to build in network
       diffusion_steps: 100
@@ -101,26 +101,16 @@ Training:
         random_freeze_fraction: 0.0
 
   ProgressiveTraining:
-    - name: "warmup"
-      epoch_ratio: 0.2
-      components:
-        - body
-        - object_encoder
-        - classification
-    - name: "assignment"
-      epoch_ratio: 0.6
-      components:
-        - body
-        - object_encoder
-        - assignment
-    - name: "finetune"
-      epoch_ratio: 0.2
+    - name: "vanilla"
+      epoch_ratio: 1.0
       components:
         - body
         - object_encoder
         - classification
         - regression
         - assignment
+        - generation
+
 
 Dataset:
   dataset_limit: 1.0
