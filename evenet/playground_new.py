@@ -37,6 +37,7 @@ debugger_enable = False
 device = "cpu"
 
 workspacedir = "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
+datasetdir = "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
 
 global_config.load_yaml("/Users/avencastmini/PycharmProjects/EveNet/share/local_test.yaml")
 num_classes = global_config.event_info.class_label['EVENT']['signal'][0]
@@ -49,7 +50,7 @@ particle_balance_dict = None # normalization_dict['particle_balance']
 
 # Load the Parquet file locally
 df = pq.read_table(
-    f"{datasetdir}/data_Run_2.Dec20_run_yulei_20.parquet").to_pandas()
+    f"{datasetdir}/data_run_yulei_12.parquet").to_pandas()
 # Optional: Subsample for speed
 
 df.sample(frac=1).reset_index(drop=True)
