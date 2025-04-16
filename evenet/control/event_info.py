@@ -130,9 +130,10 @@ class EventInfo:
         self.class_label = class_label
         self.num_classes = dict()
         self.num_classes_total = 0
-        for name in class_label['EVENT']:
-            self.num_classes[name] = (np.array(class_label['EVENT'][name])).shape[-1]
-            self.num_classes_total += self.num_classes[name]
+        if 'EVENT' in class_label:
+            for name in class_label['EVENT']:
+                self.num_classes[name] = (np.array(class_label['EVENT'][name])).shape[-1]
+                self.num_classes_total += self.num_classes[name]
 
         self.pairing_topology = OrderedDict()
         self.pairing_topology_category = OrderedDict()
