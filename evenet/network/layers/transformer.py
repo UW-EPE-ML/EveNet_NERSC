@@ -1,5 +1,6 @@
 import torch.nn as nn
 from torch import Tensor
+import torch
 
 from evenet.network.layers.utils import TalkingHeadAttention, StochasticDepth, LayerScale
 from evenet.network.layers.linear_block import GRUGate, GRUBlock
@@ -38,14 +39,25 @@ class TransformerBlockModule(nn.Module):
             self.layer_scale1 = LayerScale(layer_scale_init, projection_dim)
             self.layer_scale2 = LayerScale(layer_scale_init, projection_dim)
 
-    def forward(self, x, mask):
+    def forward(self, x, mask, attn_mask=None):
         # TransformerBlock input shapes: x: torch.Size([B, P, 128]), mask: torch.Size([B, P, 1])
         padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None  # [batch_size, num_objects]
         if self.talking_head:
-            updates, _ = self.attn(self.norm1(x), int_matrix=None, mask=mask)
+
+            if attn_mask is None:
+                int_matrix = None
+            else:
+                # Step 1: Create additive attention bias (float) with -inf where masked
+                int_matrix = torch.zeros_like(attn_mask, dtype=torch.float32)  # (N, N)
+                int_matrix[attn_mask] = float('-inf')  # or -1e9 if you prefer finite
+
+                # Step 2: Broadcast to (B, num_heads, N, N)
+                int_matrix = int_matrix.unsqueeze(0).unsqueeze(0).expand(x.shpae[0], self.num_heads, attn_mask.shape[0], attn_mask.shape[1])
+            updates, _ = self.attn(self.norm1(x), int_matrix=int_matrix, mask=mask) # TODO: check if attn_mask is correct
         else:
             updates, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x),
-                                   key_padding_mask=padding_mask)
+                                   key_padding_mask=padding_mask,
+                                   attn_mask=attn_mask)
 
         if self.layer_scale_flag:
             # Input updates: torch.Size([B, P, 128]), mask: torch.Size([B, P])
@@ -261,7 +273,7 @@ class GeneratorTransformerBlockModule(nn.Module):
             self.layer_scale1 = LayerScale(layer_scale_init, projection_dim)
             self.layer_scale2 = LayerScale(layer_scale_init, projection_dim)
 
-    def forward(self, x, cond_token, mask=None):
+    def forward(self, x, cond_token, mask=None, attn_mask=None):
         """
         :param x: point_cloud (batch_size, num_objects, projection_dim)
         :param cond_token: (batch_size, 1, projection_dim)
@@ -269,7 +281,7 @@ class GeneratorTransformerBlockModule(nn.Module):
         """
         x1 = self.norm1(x)
         padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None
-        updates, _ = self.attn(x1, x1, x1, key_padding_mask=padding_mask)
+        updates, _ = self.attn(x1, x1, x1, key_padding_mask=padding_mask, attn_mask=attn_mask)
 
         if self.layer_scale_flag:
             updates = self.layer_scale1(updates, mask)

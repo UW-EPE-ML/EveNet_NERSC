@@ -28,6 +28,7 @@ class EveNetModel(nn.Module):
             classification: bool = True,
             regression: bool = False,
             generation: bool = False,
+            neutrino_generation: bool = False,
             assignment: bool = False,
             normalization_dict: dict = None,
     ):
@@ -40,6 +41,7 @@ class EveNetModel(nn.Module):
         self.include_classification = classification
         self.include_regression = regression
         self.include_generation = generation
+        self.include_neutrino_generation = neutrino_generation
         self.include_assignment = assignment
         self.device = device
 
@@ -73,10 +75,18 @@ class EveNetModel(nn.Module):
             inv_cdf_index=self.event_info.sequential_inv_cdf_index
         )
 
+        global_normalizer_info = input_normalizers_setting.get(
+            "GLOBAL",
+            {
+                "norm_mask": torch.ones(1, dtype=torch.bool).to(self.device),
+                "mean": torch.zeros(1).to(self.device),
+                "std": torch.ones(1).to(self.device)
+            }
+        )
         self.global_normalizer = Normalizer(
-            norm_mask=input_normalizers_setting["GLOBAL"]["norm_mask"].to(self.device),
-            mean=input_normalizers_setting["GLOBAL"]["mean"].to(self.device),
-            std=input_normalizers_setting["GLOBAL"]["std"].to(self.device),
+            norm_mask=global_normalizer_info["norm_mask"].to(self.device),
+            mean=global_normalizer_info["mean"].to(self.device),
+            std=global_normalizer_info["std"].to(self.device),
         )
 
         self.num_point_cloud_normalizer = Normalizer(
@@ -85,7 +95,7 @@ class EveNetModel(nn.Module):
             norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool)
         )
 
-        self.global_input_dim = input_normalizers_setting["GLOBAL"]["norm_mask"].size()[-1]
+        self.global_input_dim = global_normalizer_info["norm_mask"].size()[-1]
         self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
         self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
 
@@ -244,7 +254,11 @@ class EveNetModel(nn.Module):
                 drop_probability=self.network_cfg.EventGeneration.drop_probability,
                 feature_drop=self.network_cfg.EventGeneration.feature_drop
             )
-        self.generation_extend_batch = self.network_cfg.EventGeneration.extend_batch
+        self.schedule_flags = [
+            (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
+            (self.include_generation, "generation"),
+            (self.include_neutrino_generation, "neutrino_generation"),
+        ]
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> dict[str, dict[Any, Any] | Any]:
         """
@@ -272,6 +286,9 @@ class EveNetModel(nn.Module):
             - x['assignment_mask']: assignment mask, shape (batch_size, num_resonances)
                 - 1: valid assignment
                 - 0: invalid assignment
+
+            - x['x_invisible']: invisible point cloud, shape (batch_size, num_objects, num_features)
+            - x['x_invisible_mask']: Mask for invisible point cloud, shape (batch_size, num_objects)
         """
 
         #############
@@ -283,12 +300,31 @@ class EveNetModel(nn.Module):
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
         global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
 
-
-        class_label = x['classification'].unsqueeze(-1) if 'classification' in x else torch.zeros_like(x['conditions_mask']).long()  # (batch_size, 1)
-
+        class_label = x['classification'].unsqueeze(-1) if 'classification' in x else torch.zeros_like(
+            x['conditions_mask']).long()  # (batch_size, 1)
         num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
-        batch_size = input_point_cloud.shape[0]
+        invisible_point_cloud = x['x_invisible'] if 'x_invisible' in x else torch.zeros_like(
+            input_point_cloud[:, [0], :])
+        invisible_point_cloud_mask = x['x_invisible_mask'].unsqueeze(
+            -1) if 'x_invisible_mask' in x else torch.zeros_like(input_point_cloud_mask[:, [0], :]).bool()
+
+        #######################################################
+        ##  Produce visible + invisible point cloud masking  ##
+        #######################################################
+
+        # Requirement: input_point_cloud and invisible_point_cloud should have the same features
+
+        # Create attention mask
+        n_vis = input_point_cloud_mask.shape[1]
+        n_invis = invisible_point_cloud_mask.shape[1]
+        is_invisible_query = torch.cat([
+            torch.zeros(n_vis, dtype=torch.bool, device=self.device),
+            torch.ones(n_invis, dtype=torch.bool, device=self.device)
+        ], dim=0)  # (L,)
+        # Rule: visible query (False) cannot attend to invisible key (True)
+        invisible_attn_mask = (~is_invisible_query[:, None]) & is_invisible_query[None, :]  # (L, L) , Q->K
+
         #########################
         ## Input normalization ##
         #########################
@@ -297,6 +333,12 @@ class EveNetModel(nn.Module):
             x=input_point_cloud,
             mask=input_point_cloud_mask,
         )
+
+        invisible_point_cloud = self.sequential_normalizer(
+            x=invisible_point_cloud,
+            mask=invisible_point_cloud_mask
+        )
+
         global_conditions = self.global_normalizer(
             x=global_conditions,
             mask=global_conditions_mask
@@ -324,138 +366,148 @@ class EveNetModel(nn.Module):
                 "truth": truth_num_point_cloud_vector
             }
 
-        ####################
-        ##  Inject noise  ##
-        ####################
+        outputs = dict()
+        for flag, schedule_name in self.schedule_flags:
+            if not flag:
+                continue
 
-        diffusion_mask = torch.zeros_like(time).bool()
-        truth_input_point_cloud_vector = None
-        if self.include_generation:
-            input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
-            if self.generation_extend_batch:
-                # Extend the batch by 2 times without noise and with noise.
-                input_point_cloud = torch.cat([input_point_cloud, input_point_cloud_noised], dim=0)
-                num_point_cloud = torch.cat([num_point_cloud, num_point_cloud], dim=0)
-                input_point_cloud_mask = torch.cat([input_point_cloud_mask, input_point_cloud_mask], dim=0)
-                global_conditions = torch.cat([global_conditions, global_conditions], dim=0)
-                global_conditions_mask = torch.cat([global_conditions_mask, global_conditions_mask], dim=0)
-                class_label = torch.cat([class_label, class_label], dim=0)
-                diffusion_mask = torch.cat([torch.zeros_like(time).bool(), torch.ones_like(time).bool()], dim=0)
-                time = torch.cat([torch.zeros_like(time), time], dim=0)
-                truth_input_point_cloud_vector = torch.cat(
-                    [torch.zeros_like(truth_input_point_cloud_vector), truth_input_point_cloud_vector], dim=0)
+            ####################
+            ##  Inject noise  ##
+            ####################
+
+            if schedule_name == "deterministic":
+                full_input_point_cloud = input_point_cloud.contiguous()
+                full_input_point_cloud_mask = input_point_cloud_mask.contiguous()
+                full_attn_mask = None
+                full_time = torch.zeros_like(time)
+                time_masking = torch.zeros_like(full_input_point_cloud_mask).float()
+            elif schedule_name == "generation":
+                input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
+                full_input_point_cloud = input_point_cloud_noised.contiguous()
+                full_input_point_cloud_mask = input_point_cloud_mask.contiguous()
+                full_attn_mask = None
+                full_time = time.contiguous()
+                time_masking = full_input_point_cloud_mask.float()
             else:
-                diffusion_boundary = input_point_cloud.shape[0] // 2
-                input_point_cloud = torch.cat(
-                    [input_point_cloud[:diffusion_boundary], input_point_cloud_noised[diffusion_boundary:]], dim=0)
-                diffusion_mask = torch.cat([torch.zeros_like(time).bool()[:diffusion_boundary],
-                                            torch.ones_like(time).bool()[diffusion_boundary:]], dim=0)
-                time = torch.cat([torch.zeros_like(time)[:diffusion_boundary], time[diffusion_boundary:]], dim=0)
-                truth_input_point_cloud_vector = torch.cat(
-                    [torch.zeros_like(truth_input_point_cloud_vector)[:diffusion_boundary],
-                     truth_input_point_cloud_vector[diffusion_boundary:]], dim=0)
+                invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(invisible_point_cloud,time)
+                full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
+                full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
+                full_attn_mask = invisible_attn_mask.contiguous()
+                full_time = time.contiguous()
+                time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1).float()
 
-        #############################
-        ## Central embedding (PET) ##
-        #############################
+            #############################
+            ## Central embedding (PET) ##
+            #############################
 
-        global_conditions = self.GlobalEmbedding(
-            x=global_conditions,
-            mask=global_conditions_mask
-        )
-
-        # tihsu: debug
-        # global_conditions = torch.randn_like(global_conditions)
-        # event_token_debug = self.global_embedding_debug(global_conditions)
-        # event_token_debug = event_token_debug.squeeze(1)
-
-        # # debug:
-        # # embeddings_debug = self.point_cloud_embedding(input_point_cloud)
-        # # event_token_debug = self.point_cloud_transformer(embeddings_debug)
-
-        local_points = input_point_cloud[..., self.local_feature_indices]
-        input_point_cloud = self.PET(
-            input_features=input_point_cloud,
-            input_points=local_points,
-            mask=input_point_cloud_mask,
-            time=time
-        )
-
-        # event_token_debug = self.point_cloud_transformer_debug(input_point_cloud + global_conditions)
-
-        ######################################
-        ## Embedding for deterministic task ##
-        ######################################
-
-        embeddings, embedded_global_conditions, event_token = self.ObjectEncoder(
-            encoded_vectors=input_point_cloud,
-            mask=input_point_cloud_mask,
-            condition_vectors=global_conditions,
-            condition_mask=global_conditions_mask
-        )
-
-        # event_token_debug = event_token
-
-        # ########################################
-        # ## Output Head for deterministic task ##
-        # ########################################
-
-        # Assignment head
-        # Create output lists for each particle in event.
-        assignments = dict()
-        detections = dict()
-        #
-        if self.include_assignment:
-            assignments, detections, event_token = self.Assignment(
-                x=embeddings,
-                x_mask=input_point_cloud_mask,
-                global_condition=embedded_global_conditions,
-                global_condition_mask=global_conditions_mask,
-                event_token=event_token,
-                return_type="process_base"
+            full_global_conditions = self.GlobalEmbedding(
+                x=global_conditions,
+                mask=global_conditions_mask
             )
 
-        # Classification head
-        classifications = None
-        if self.include_classification:
-            classifications = self.Classification(event_token)
-            # classifications = {"signal": self.debug_classifier(event_token_debug)}
-
-        # Regression head
-        regressions = None
-        if self.include_regression:
-            regressions = self.Regression(event_token)
-
-        #######################################
-        ##  Output Head For Diffusion Model  ##
-        #######################################
-
-        if self.include_generation:
-            pred_point_cloud_vector = self.EventGeneration(
-                x=input_point_cloud,
-                x_mask=input_point_cloud_mask,
-                global_cond=global_conditions,
-                global_cond_mask=global_conditions_mask,
-                num_x=num_point_cloud,
-                time=time,
-                label=class_label
+            local_points = full_input_point_cloud[..., self.local_feature_indices]
+            full_input_point_cloud = self.PET(
+                input_features=full_input_point_cloud,
+                input_points=local_points,
+                mask=full_input_point_cloud_mask,
+                attn_mask=full_attn_mask,
+                time=full_time,
+                time_masking=time_masking
             )
-            generations["point_cloud"] = {
-                "vector": pred_point_cloud_vector[diffusion_mask],
-                "truth": truth_input_point_cloud_vector[diffusion_mask]
-            }
+
+            if schedule_name == "deterministic" or schedule_name == "generation":
+
+                ######################################
+                ## Embedding for deterministic task ##
+                ######################################
+
+                embeddings, embedded_global_conditions, event_token = self.ObjectEncoder(
+                    encoded_vectors=full_input_point_cloud,
+                    mask=full_input_point_cloud_mask,
+                    condition_vectors=full_global_conditions,
+                    condition_mask=global_conditions_mask
+                )
+
+                ########################################
+                ## Output Head for deterministic task ##
+                ########################################
+
+                # Assignment head
+                # Create output lists for each particle in event.
+                assignments = dict()
+                detections = dict()
+                if self.include_assignment:
+                    assignments, detections, event_token = self.Assignment(
+                        x=embeddings,
+                        x_mask=full_input_point_cloud_mask,
+                        global_condition=embedded_global_conditions,
+                        global_condition_mask=global_conditions_mask,
+                        event_token=event_token,
+                        return_type="process_base"
+                    )
+
+                # Classification head
+                classifications = None
+                if self.include_classification:
+                    classifications = self.Classification(event_token)
+                    # classifications = {"signal": self.debug_classifier(event_token_debug)}
+
+                # Regression head
+                regressions = None
+                if self.include_regression:
+                    regressions = self.Regression(event_token)
+
+                outputs[schedule_name] = {
+                    "classification": classifications,
+                    "regression": regressions,
+                    "assignments": assignments,
+                    "detections": detections
+                }
+
+            if schedule_name == "neutrino_generation" or schedule_name == "generation":
+
+                #######################################
+                ##  Output Head For Diffusion Model  ##
+                #######################################
+
+                if self.include_generation:
+                    pred_point_cloud_vector = self.EventGeneration(
+                        x=full_input_point_cloud,
+                        x_mask=full_input_point_cloud_mask,
+                        global_cond=full_global_conditions,
+                        global_cond_mask=global_conditions_mask,
+                        num_x=num_point_cloud,
+                        time=full_time,
+                        label=class_label,
+                        attn_mask=full_attn_mask,
+                        time_masking=time_masking
+                    )
+
+                    if schedule_name == "neutrino_generation":
+                        generations["neutrino"] = {
+                            "vector": pred_point_cloud_vector[:, is_invisible_query, :],
+                            "truth": truth_invisible_point_cloud_vector
+                        }
+                    else:
+                        generations["point_cloud"] = {
+                            "vector": pred_point_cloud_vector,
+                            "truth": truth_input_point_cloud_vector
+                        }
 
         return {
-            "classification": gather_index(classifications, ~diffusion_mask),
-            "regression": gather_index(regressions, ~diffusion_mask),
-            "assignments": gather_index(assignments, ~diffusion_mask),
-            "detections": gather_index(detections, ~diffusion_mask),
-            "classification-noised": gather_index(classifications, diffusion_mask),
-            "regression-noised": gather_index(regressions, diffusion_mask),
+            "classification": outputs.get("deterministic", {}).get("classification", None),
+            "regression": outputs.get("deterministic", {}).get("regression", None),
+            "assignments": outputs.get("deterministic", {}).get("assignments", None),
+            "detections": outputs.get("deterministic", {}).get("detections", None),
+            "classification-noised": outputs.get("generation", {}).get("classification", None),
+            "regression-noised": outputs.get("generation", {}).get("regression", None),
             "generations": generations
         }
 
-    def predict_diffusion_vector(self, noise_x: Tensor, cond_x: Dict[str, Tensor], time: Tensor, mode: str, noise_mask: Optional[Tensor] = None):
+    def predict_diffusion_vector(
+            self, noise_x: Tensor, cond_x: Dict[str, Tensor], time: Tensor, mode: str,
+            noise_mask: Optional[Tensor] = None
+    ):
 
         """
         Predict the number of point clouds in the batch.
@@ -518,8 +570,6 @@ class EveNetModel(nn.Module):
                 label=class_label
             )
             return pred_point_cloud_vector
-
-
 
         return None
 

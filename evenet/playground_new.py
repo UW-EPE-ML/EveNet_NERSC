@@ -115,7 +115,8 @@ model = EveNetModel(
     device=torch.device(device),
     normalization_dict=normalization_dict,
     assignment=True,
-    generation=False
+    generation=True,
+    neutrino_generation=True
 ).to(device)
 
 # model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))

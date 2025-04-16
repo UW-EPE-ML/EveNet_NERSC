@@ -67,7 +67,16 @@ class EventGenerationHead(nn.Module):
         ])
         self.generator = nn.Linear(projection_dim, output_dim)
 
-    def forward(self, x, global_cond,global_cond_mask, num_x, x_mask, time, label):
+    def forward(self,
+                x,
+                global_cond,
+                global_cond_mask,
+                num_x,
+                x_mask,
+                time,
+                label,
+                attn_mask=None,
+                time_masking=None):
         """
         x: [B, T, D] <- Noised Input
         global_cond: [B, 1, D] <- Global Condition
@@ -77,10 +86,12 @@ class EventGenerationHead(nn.Module):
         time: [B,] <- Time
         label: [B, 1] <- Conditional Label, one-hot in function
         """
-        time_emb = self.time_embedding(time).unsqueeze(1) # [B, 1, proj_dim]
+        time_emb = self.time_embedding(time).unsqueeze(1).expand(-1, x.shape[1], -1) # [B, 1, proj_dim]
+        if time_masking is not None:
+            time_emb = time_emb * time_masking
+
         cond_token = self.cond_token(
-            torch.cat([time_emb, self.bridge_global_cond(global_cond) * global_cond_mask],
-            dim=-1)
+            torch.cat([time_emb, (self.bridge_global_cond(global_cond) * global_cond_mask).expand(-1, x.shape[1],-1)], dim=-1),
         )  # After MLP, cond_token shape: torch.Size([B, 1, proj_dim])
         x = self.bridge_point_cloud(x) * x_mask
         if num_x is not None:
@@ -96,11 +107,9 @@ class EventGenerationHead(nn.Module):
         else:
             print("ERROR: In Generation Head, Label is None, skipping label embedding")
 
-        cond_token = cond_token.expand(-1, x.shape[1], -1) * x_mask
-
         for transformer_block in self.gen_transformer_blocks:
             concatenated = cond_token + x
-            out_x, cond_token = transformer_block(concatenated, cond_token, x_mask)
+            out_x, cond_token = transformer_block(concatenated, cond_token, x_mask, attn_mask=attn_mask)
         x = cond_token + x
         x = F.layer_norm(x, [x.size(-1)])
         x = self.generator(x)

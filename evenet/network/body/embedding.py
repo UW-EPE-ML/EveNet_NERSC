@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from torch import nn, Tensor
 import torch.nn.functional as F
@@ -300,13 +300,20 @@ class PETBody(nn.Module):
             for _ in range(num_layers)
         ])
 
-    def forward(self, input_features: Tensor, input_points: Tensor, mask: Tensor, time=Tensor) -> Tensor:
+    def forward(self,
+                input_features: Tensor,
+                input_points: Tensor,
+                mask: Tensor,
+                time: Tensor,
+                attn_mask: Optional[Tensor]=None,
+                time_masking: Optional[Tensor]=None) -> Tensor:
         """
 
         :param input_features: input features (batch_size, num_objects, num_features)
         :param input_points: subset of input features that used to do edge calculation (batch_size, num_objects, num_local_features)
         :param mask:  input features mask (batch_size, num_objects, 1)
         :param time: time input for diffusion model usage.
+        :param time_masking: time masking for diffusion model usage (batch_size, num_objects, 1)
         :return:
         """
         encoded = self.random_drop(input_features)
@@ -315,6 +322,10 @@ class PETBody(nn.Module):
         time_emb = self.time_embedding(time)
         time_emb = time_emb.squeeze(1).unsqueeze(1).repeat(1, encoded.shape[1], 1)
         time_emb = time_emb * mask
+
+        if time_masking is not None:
+            time_emb = time_emb * time_masking
+
         time_emb = self.time_embed_linear(time_emb)
         scale, shift = torch.chunk(time_emb, 2, dim=-1)
 
@@ -334,7 +345,8 @@ class PETBody(nn.Module):
         for transformer_block in self.transformer_blocks:
             encoded = transformer_block(
                 x=encoded,
-                mask=mask
+                mask=mask,
+                attn_mask=attn_mask
             )
 
         return torch.add(encoded, skip_connection)
