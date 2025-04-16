@@ -98,14 +98,6 @@ processed_batch = process_event_batch(
     unflatten=unflatten_dict
 )
 
-l_model = EveNetEngine(
-    global_config=global_config,
-)
-
-l_model.configure_model()
-from lightning.pytorch.utilities.model_summary import summarize
-s = summarize(l_model, max_depth=2)
-print(s)
 # Convert to torch
 torch_batch = convert_batch_to_torch_tensor(processed_batch)
 torch_batch = {
@@ -124,9 +116,6 @@ model = EveNetModel(
     assignment=True,
     generation=False
 ).to(device)
-
-if checkpoint_path is not None:
-    model.load_state_dict(checkpoint['state_dict'], strict=False)
 
 # model.freeze_module("Classification", global_config.options.Training.Components.Classification.get("freeze", {}))
 # model.freeze_module("Regression", global_config.options.Training.Components.Regression.get("freeze", {}))

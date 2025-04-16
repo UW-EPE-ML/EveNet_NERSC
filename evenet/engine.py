@@ -145,8 +145,7 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def shared_step(self, batch: Any, active_components: list[str]):
-    def shared_step(self, batch: Any, batch_idx: int, *args: Any, **kwargs: Any):
+    def shared_step(self, batch: Any, batch_idx: int, active_components: list[str]):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -234,8 +233,6 @@ class EveNetEngine(L.LightningModule):
                         not self.training
                         and ((self.current_epoch % self.diffusion_every_n_epochs) == (
                         self.diffusion_every_n_epochs - 1))
-                        and ((self.global_step % self.diffusion_every_n_steps) == 0)
-                            self.diffusion_every_n_epochs - 1))
                         and ((batch_idx % self.diffusion_every_n_steps) == 0)
                 )
             )
@@ -273,7 +270,9 @@ class EveNetEngine(L.LightningModule):
             ]
             active_components = active_progress['components']
 
-        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=active_components)
+        loss, loss_head, loss_dict, _ = self.shared_step(
+            batch=batch, batch_idx=batch_idx, active_components=active_components
+        )
 
         self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
         for name, val in loss_head.items():
@@ -310,7 +309,9 @@ class EveNetEngine(L.LightningModule):
             active_progress = self.progressive_training[0]
             active_components = active_progress['components']
 
-        loss, loss_head, loss_dict, _ = self.shared_step(batch=batch, active_components=active_components)
+        loss, loss_head, loss_dict, _ = self.shared_step(
+            batch=batch, batch_idx=batch_idx, active_components=active_components
+        )
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 

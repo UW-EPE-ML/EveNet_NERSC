@@ -19,8 +19,6 @@ from torch import Tensor, nn
 from typing import Dict, Optional, Any
 import re
 
-from collections import OrderedDict, _KT, _VT
-
 
 class EveNetModel(nn.Module):
     def __init__(

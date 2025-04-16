@@ -27,11 +27,6 @@ class SymmetricEvaluator:
             clusters.append((cluster_name, names, orbit))
 
             cluster_group = self.target_groups[names[0]]
-            for name in names:
-                assert (
-                    self.target_groups[name] == cluster_group,
-                    "Invalid Symmetry Group. Invariant targets have different structures."
-                )
 
             cluster_groups.append((cluster_name, names, cluster_group))
 
