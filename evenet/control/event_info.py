@@ -105,9 +105,11 @@ class EventInfo:
                     if max_indices > self.max_event_particles:
                         self.max_event_particles = max_indices
 
-
         self.regressions = regressions
-        self.regression_types = {"/".join([SpecialKey.Event] + [target.name]): target.type for target in regressions[SpecialKey.Event]}
+        self.regression_types = {
+            "/".join([SpecialKey.Event] + [target.name]): target.type
+            for target in regressions[SpecialKey.Event]
+        }
         for process in self.product_particles:
             if process in regressions:
                 for particle in regressions[process]:
@@ -115,19 +117,21 @@ class EventInfo:
                         for product in regressions[process][particle]:
                             for target in regressions[process][particle][product]:
                                 key = "/".join([process, particle, product] + [target.name])
-                                self.regression_types[key] =  target.type
+                                self.regression_types[key] = target.type
                     else:
                         for target in regressions[process][particle]:
                             key = "/".join([process, particle] + [target.name])
                             self.regression_types[key] = target.type
 
-        self.regression_names     = self.regression_types.keys()
+        self.regression_names = self.regression_types.keys()
         self.num_regressions = len(self.regression_names)
 
-
         self.classifications = classifications
-        self.classification_names = ['/'.join([SpecialKey.Event, target]) for target in self.classifications[SpecialKey.Event]]
-        self.class_label = class_label
+        self.classification_names = [
+            '/'.join([SpecialKey.Event, target]) for target in
+            self.classifications[SpecialKey.Event]
+        ]
+        self.class_label = class_label if len(class_label) > 0 else {}
         self.num_classes = dict()
         self.num_classes_total = 0
         if 'EVENT' in class_label:
@@ -223,8 +227,6 @@ class EventInfo:
                             self.ptetaphimass_index.append(sequential_index)
                             break
                         sequential_index += 1
-
-
 
     def normalized_features(self, input_name: str) -> NDArray[bool]:
         return np.array([feature.normalize for feature in self.input_features[input_name]])

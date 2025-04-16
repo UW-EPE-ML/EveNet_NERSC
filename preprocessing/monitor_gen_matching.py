@@ -291,7 +291,8 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
             if last_particle in neutrino_representation:
                 store_valid_components(
                     data_dict, output_name, momentum, data_dict[f"{output_name}/MASK"],
-                    ("px", "py", "pz")
+                    # ("px", "py", "pz")
+                    ("pt", "eta", "phi")
                 )
             elif last_particle in resonance_representation:
                 store_valid_components(

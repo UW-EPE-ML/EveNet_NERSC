@@ -279,7 +279,7 @@ class SingleProcessAssignmentMetrics:
             for mask_count, (cluster_name, _, _) in zip(event_counts, self.clusters):
                 mask_count = "*" if mask_count < 0 else str(mask_count)
                 event_mask_name = event_mask_name + mask_count + cluster_name
-                if not(mask_count == 0):
+                if not (mask_count == 0):
                     cluster_candidate.append(cluster_name)
             self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"] = {
                 "num": 0,
@@ -294,8 +294,6 @@ class SingleProcessAssignmentMetrics:
                     "num": 0,
                     "den": 0,
                 }
-
-
 
     def update(
             self,
@@ -322,7 +320,7 @@ class SingleProcessAssignmentMetrics:
             event_mask = total_particle_counts >= 0
 
             for particle_count, event_count in zip(particle_counts, event_counts):
-                if (event_count >=0):
+                if event_count >= 0:
                     event_mask = event_mask & (particle_count == event_count)
                 else:
                     event_mask = event_mask & (total_particle_counts > 0)
@@ -336,14 +334,16 @@ class SingleProcessAssignmentMetrics:
                 event_mask_name = event_mask_name + mask_count + cluster_name
 
             event_purity_num, event_purity_den = self.event_purity(masked_predictions_correct, masked_target_masks)
-            cluster_purity_num, cluster_purity_den = self.cluster_purity(masked_predictions_correct, masked_target_masks)
+            cluster_purity_num, cluster_purity_den = self.cluster_purity(masked_predictions_correct,
+                                                                         masked_target_masks)
             self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"]["num"] += event_mask.sum().item()
             self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"]["den"] += event_mask.size()[0]
             self.full_log[f"{self.process}/Purity/{event_mask_name}/event_purity"]["num"] += event_purity_num
             self.full_log[f"{self.process}/Purity/{event_mask_name}/event_purity"]["den"] += event_purity_den
 
-            for mask_count, (cluster_name, _, _), purity_num, purity_den in zip(event_counts, self.clusters, cluster_purity_num, cluster_purity_den):
-                if (mask_count == 0):
+            for mask_count, (cluster_name, _, _), purity_num, purity_den in zip(event_counts, self.clusters,
+                                                                                cluster_purity_num, cluster_purity_den):
+                if mask_count == 0:
                     continue
                 self.full_log[f"{self.process}/Purity/{event_mask_name}/{cluster_name}_purity"]["num"] += purity_num
                 self.full_log[f"{self.process}/Purity/{event_mask_name}/{cluster_name}_purity"]["den"] += purity_den
@@ -356,8 +356,9 @@ class SingleProcessAssignmentMetrics:
             truth_masking = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             prediction = torch.stack([best_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             predict_detection = torch.stack([detection_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0)
-            predict_assign_score = torch.stack([assignment_probabilities[iorbit] for iorbit in list(sorted(orbit))],
-                                               dim=0)
+            predict_assign_score = torch.stack(
+                [assignment_probabilities[iorbit] for iorbit in list(sorted(orbit))], dim=0
+            )
             correct_reco = torch.stack([correct_assigned[iorbit] for iorbit in list(sorted(orbit))], dim=0)
 
             for num_resonance in range(len(names)):
@@ -717,10 +718,9 @@ class SingleProcessAssignmentMetrics:
         return_log = dict()
 
         for name, log in self.full_log.items():
-            purity = log["num"]/log["den"] if log["den"] > 0 else 0
+            purity = log["num"] / log["den"] if log["den"] > 0 else 0
             return_log[name] = purity
         return return_log
-
 
     @staticmethod
     def permute_arrays(self, array_list, permutation):
@@ -756,8 +756,8 @@ class SingleProcessAssignmentMetrics:
         total_particle_counts = target_masks.sum(0)
 
         particle_counts = [target_masks[list(cluster_indices)].sum(0)
-                            for _, _, cluster_indices in self.clusters]
-        particle_max = [len(cluster_indices) for _,_, cluster_indices in self.clusters]
+                           for _, _, cluster_indices in self.clusters]
+        particle_max = [len(cluster_indices) for _, _, cluster_indices in self.clusters]
 
         return total_particle_counts, particle_counts, particle_max
 
@@ -785,7 +785,6 @@ class SingleProcessAssignmentMetrics:
         event_accuracy_num = (event_prediction_correct.sum(0) == num_particles_in_event)
         event_accuracy_den = num_particles_in_event.size()[0]
         return event_accuracy_num.sum().item(), event_accuracy_den
-
 
 
 @time_decorator(name="[Assignment] shared_step")

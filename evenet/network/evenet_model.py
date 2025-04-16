@@ -158,7 +158,7 @@ class EveNetModel(nn.Module):
             cls_cfg = self.network_cfg.Classification
             self.Classification = ClassificationHead(
                 input_dim=obj_encoder_cfg.hidden_dim,
-                class_label=self.event_info.class_label["EVENT"],
+                class_label=self.event_info.class_label.get("EVENT", None),
                 event_num_classes=self.event_info.num_classes,
                 num_layers=cls_cfg.num_classification_layers,
                 hidden_dim=cls_cfg.hidden_dim,

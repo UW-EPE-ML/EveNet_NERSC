@@ -72,4 +72,4 @@ PARTICLE_PROPERTIES:
   - Product_LeptonCharge
 
 GENERATIONS:
-  Conditions:
+  Conditions: {}

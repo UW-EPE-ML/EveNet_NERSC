@@ -159,7 +159,7 @@ class EveNetDataConverter:
         self.raw_data = data_selected
         self.total_length = n_event_current
 
-    def load_invisible(self, max_num_neutrinos: int = 2):
+    def load_invisible(self, max_num_neutrinos: int):
 
         source_len = len(self.event_info.input_features['Source'])
         feature_len = len(self.event_info.generations['Neutrinos'])
@@ -178,7 +178,9 @@ class EveNetDataConverter:
                     if norm == "empty": continue
 
                     if 'log' in norm:
-                        x_inv[:, i_raw, idx] = np.log1p(self.raw_data[keys.replace("/MASK", f"/{key}")])
+                        x_inv[:, i_raw, idx] = np.log1p(
+                            np.clip(self.raw_data[keys.replace("/MASK", f"/{key}")], min=1e-10)
+                        )
                     else:
                         x_inv[:, i_raw, idx] = self.raw_data[keys.replace("/MASK", f"/{key}")]
 

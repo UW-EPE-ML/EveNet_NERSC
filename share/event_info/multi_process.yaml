@@ -303,6 +303,7 @@ CLASSIFICATIONS:
   EVENT:
     - signal
 
+
 CLASSLABEL:
   EVENT:
     signal:
@@ -323,9 +324,9 @@ GENERATIONS:
 
   Neutrinos:
     mass: empty
-    px: normalize
-    py: normalize
-    pz: normalize
+    pt: log_normalize
+    eta: normalize
+    phi: normalize_uniform
     btag: empty
     isLepton: empty
     charge: empty

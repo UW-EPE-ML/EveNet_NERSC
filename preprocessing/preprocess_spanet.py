@@ -184,7 +184,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             'x': sources['sources-0-data'],
             'x_mask': sources['sources-0-mask'],
             'conditions': sources['sources-1-data'],
-            'conditions_mask': sources['sources-1-mask'][:, np.newaxis],
+            'conditions_mask': sources['sources-1-mask'],
 
             'classification': classifications['classification-EVENT/signal'],
 

@@ -12,6 +12,7 @@ from lion_pytorch import Lion
 from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
+from evenet.dataset.types import FeatureInfo
 from evenet.network.evenet_model import EveNetModel
 
 from evenet.network.metrics.general_comparison import GenericMetrics
@@ -24,6 +25,17 @@ from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
+
+
+def get_total_gradient(module, norm_type="l1"):
+    total = 0.0
+    for param in module.parameters():
+        if param.grad is not None:
+            if norm_type == "l1":
+                total += param.grad.abs().sum().item()
+            elif norm_type == "l2":
+                total += (param.grad ** 2).sum().item()
+    return total
 
 
 class EveNetEngine(L.LightningModule):
@@ -42,8 +54,9 @@ class EveNetEngine(L.LightningModule):
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
-        self.num_classes: list[str] = global_config.event_info.class_label['EVENT']['signal'][0]  # list [process_name]
         self.pretrain_ckpt_path = global_config.options.Training.pretrain_model_load_path
+
+        self.num_classes: list[str] = global_config.event_info.class_label.get('EVENT', {}).get('signal', [0])[0]
 
         ###### Initialize Keys for Data Inputs #####
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
@@ -63,9 +76,9 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict['class_balance']
-        self.assignment_weight = self.normalization_dict['particle_balance']
-        self.subprocess_balance = self.normalization_dict['subprocess_balance']
+        self.class_weight = self.normalization_dict["class_balance"]
+        self.assignment_weight = self.normalization_dict["particle_balance"]
+        self.subprocess_balance = self.normalization_dict["subprocess_balance"]
 
         print(f"{self.__class__.__name__} normalization dicts initialized")
 
@@ -151,7 +164,6 @@ class EveNetEngine(L.LightningModule):
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
-            # if key in self.input_keys
         }
 
         outputs = self.model.shared_step(
@@ -286,8 +298,9 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        # self.backward(loss.mean())
         self.safe_manual_backward(loss.mean(), optimizers=optimizers)
+
+        self.check_gradient()
 
         for opt in optimizers:
             opt.step()
@@ -324,15 +337,34 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
+    def check_gradient(self):
+        # Define the heads you want to track
+        gradient_heads = {}
+
+        if self.classification_cfg.include:
+            gradient_heads["classification"] = self.model.classification_head
+
+        if self.regression_cfg.include:
+            gradient_heads["regression"] = self.model.regression_head
+
+        if self.generation_cfg.include:
+            gradient_heads["generation"] = self.model.generation_head
+
+        if self.assignment_cfg.include:
+            assignment_heads = self.model.Assignment.multiprocess_assign_head
+            gradient_heads.update({
+                f'assignment_{name}': assignment_heads[name]
+                for name in assignment_heads.keys()
+            })
+
+        for name, module in gradient_heads.items():
+            grad_mag = get_total_gradient(module)
+            num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
+            grad_avg = grad_mag / num_params if num_params > 0 else 0.0
+            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
+
     # @time_decorator
     def on_fit_start(self) -> None:
-
-        # # Sync all params
-        # torch.distributed.barrier()
-        # for param in self.model.parameters():
-        #     torch.distributed.broadcast(param.data, src=0)
-        #
-        # self.model = torch.compile(model=self.model, fullgraph=True)
 
         for i, (name, param) in enumerate(self.model.named_parameters()):
             if param.requires_grad:
@@ -561,7 +593,7 @@ class EveNetEngine(L.LightningModule):
         print(f"{self.__class__.__name__} configure model on device {self.device}")
         if self.model is not None:
             return
-        # compile model here
+
         self.model = EveNetModel(
             config=self.config,
             device=self.device,
@@ -584,7 +616,7 @@ class EveNetEngine(L.LightningModule):
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
         for heads in [
-            self.model.Assignment.multiprocess_assign_head,
+            # self.model.Assignment.multiprocess_assign_head,
             # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
             # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
             # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
