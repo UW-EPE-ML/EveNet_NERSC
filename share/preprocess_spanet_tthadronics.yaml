@@ -1,0 +1,17 @@
+process_info:
+  default: process_info/spanet_tthadronics.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info/spanet_tthadronics.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance/standard_model.yaml
+
+  # overwrites
+  # ...

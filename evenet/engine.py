@@ -146,6 +146,7 @@ class EveNetEngine(L.LightningModule):
 
     @time_decorator()
     def shared_step(self, batch: Any, active_components: list[str]):
+    def shared_step(self, batch: Any, batch_idx: int, *args: Any, **kwargs: Any):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -234,6 +235,8 @@ class EveNetEngine(L.LightningModule):
                         and ((self.current_epoch % self.diffusion_every_n_epochs) == (
                         self.diffusion_every_n_epochs - 1))
                         and ((self.global_step % self.diffusion_every_n_steps) == 0)
+                            self.diffusion_every_n_epochs - 1))
+                        and ((batch_idx % self.diffusion_every_n_steps) == 0)
                 )
             )
             loss_head_dict["generation"] = scaled_gen_loss

@@ -48,7 +48,7 @@ class EveNetDataConverter:
             i += 1
         return output_dict
 
-    def load_assignments(self, assignment_names, assignment_map):
+    def load_assignments(self, assignment_names, assignment_map, direct_from_spanet=False):
         label = "TARGETS"
         output_dict = OrderedDict()
 
@@ -69,7 +69,7 @@ class EveNetDataConverter:
                 print(f"[WARN] No daughters for {process}/{product}, skipping.")
                 continue
 
-            target_prefix = f"{label}/{process}/{product}"
+            target_prefix = f"{label}/{process}/{product}" if not direct_from_spanet else f"{label}/{product}"
             daughter_fields = [f"{target_prefix}/{d}" for d in daughters]
 
             try:
