@@ -269,6 +269,34 @@ class SingleProcessAssignmentMetrics:
         self.train_metrics_correct = None
         self.train_metrics_wrong = None
 
+        self.full_log = dict()
+        self.particle_max = [len(cluster_indices) for _, _, cluster_indices in self.clusters]
+        self.particle_ranges = [list(range(-1, pmax + 1)) for pmax in self.particle_max]
+
+        for event_counts in product(*self.particle_ranges):
+            event_mask_name = ""
+            cluster_candidate = []
+            for mask_count, (cluster_name, _, _) in zip(event_counts, self.clusters):
+                mask_count = "*" if mask_count < 0 else str(mask_count)
+                event_mask_name = event_mask_name + mask_count + cluster_name
+                if not(mask_count == 0):
+                    cluster_candidate.append(cluster_name)
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"] = {
+                "num": 0,
+                "den": 0
+            }
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_purity"] = {
+                "num": 0,
+                "den": 0
+            }
+            for cluster in cluster_candidate:
+                self.full_log[f"{self.process}/Purity/{event_mask_name}/{cluster}_purity"] = {
+                    "num": 0,
+                    "den": 0,
+                }
+
+
+
     def update(
             self,
             best_indices,
@@ -288,6 +316,39 @@ class SingleProcessAssignmentMetrics:
             truth_masks
         )
 
+        # Log purity
+        total_particle_counts, particle_counts, _ = self.particle_count_info(truth_masks)
+        for event_counts in product(*self.particle_ranges):
+            event_mask = total_particle_counts >= 0
+
+            for particle_count, event_count in zip(particle_counts, event_counts):
+                if (event_count >=0):
+                    event_mask = event_mask & (particle_count == event_count)
+                else:
+                    event_mask = event_mask & (total_particle_counts > 0)
+
+            masked_predictions_correct = [p[event_mask] for p in correct_assigned]
+            masked_target_masks = [p[event_mask] for p in truth_masks]
+
+            event_mask_name = ""
+            for mask_count, (cluster_name, _, _) in zip(event_counts, self.clusters):
+                mask_count = "*" if mask_count < 0 else str(mask_count)
+                event_mask_name = event_mask_name + mask_count + cluster_name
+
+            event_purity_num, event_purity_den = self.event_purity(masked_predictions_correct, masked_target_masks)
+            cluster_purity_num, cluster_purity_den = self.cluster_purity(masked_predictions_correct, masked_target_masks)
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"]["num"] += event_mask.sum().item()
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_proportion"]["den"] += event_mask.size()[0]
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_purity"]["num"] += event_purity_num
+            self.full_log[f"{self.process}/Purity/{event_mask_name}/event_purity"]["den"] += event_purity_den
+
+            for mask_count, (cluster_name, _, _), purity_num, purity_den in zip(event_counts, self.clusters, cluster_purity_num, cluster_purity_den):
+                if (mask_count == 0):
+                    continue
+                self.full_log[f"{self.process}/Purity/{event_mask_name}/{cluster_name}_purity"]["num"] += purity_num
+                self.full_log[f"{self.process}/Purity/{event_mask_name}/{cluster_name}_purity"]["den"] += purity_den
+
+        # Log mass distribution
         for cluster_name, names, orbit in self.clusters:
 
             truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
@@ -397,6 +458,10 @@ class SingleProcessAssignmentMetrics:
             for key in hist.keys():
                 self.predict_metrics_wrong[name][key] = np.zeros(self.num_bins)
 
+        for name in self.full_log:
+            for key in self.full_log[name].keys():
+                self.full_log[name][key] = 0
+
         self.train_metrics_correct = None
         self.train_metrics_wrong = None
 
@@ -419,6 +484,12 @@ class SingleProcessAssignmentMetrics:
                     tensor = torch.tensor(hist[key], dtype=torch.long, device=self.device)
                     torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
                     self.predict_metrics_wrong[name][key] = tensor.cpu().numpy()
+
+            for name, log in self.full_log.items():
+                for key in log.keys():
+                    tensor = torch.tensor(log[key], dtype=torch.long, device=self.device)
+                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.full_log[name][key] = tensor.cpu().numpy()
 
     def assign_train_result(self,
                             train_metrics_correct=None,
@@ -642,6 +713,15 @@ class SingleProcessAssignmentMetrics:
             )
         return return_plot
 
+    def summary_log(self):
+        return_log = dict()
+
+        for name, log in self.full_log.items():
+            purity = log["num"]/log["den"] if log["den"] > 0 else 0
+            return_log[name] = purity
+        return return_log
+
+
     @staticmethod
     def permute_arrays(self, array_list, permutation):
         return [array_list[index] for index in permutation]
@@ -663,6 +743,49 @@ class SingleProcessAssignmentMetrics:
                 targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
                 predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
         return predictions, targets
+
+    def particle_count_info(self, target_masks):
+        """
+        return:
+            total_particle_counts: [B,]: total valid resonance particles
+            particle_counts: [[B,] x num_clusters]: valid resonance particles in each cluster
+            particle_max: [x num_clusters] : max resonance particles in each cluster
+        """
+        target_masks = torch.stack(target_masks, dim=0)
+
+        total_particle_counts = target_masks.sum(0)
+
+        particle_counts = [target_masks[list(cluster_indices)].sum(0)
+                            for _, _, cluster_indices in self.clusters]
+        particle_max = [len(cluster_indices) for _,_, cluster_indices in self.clusters]
+
+        return total_particle_counts, particle_counts, particle_max
+
+    def cluster_purity(self, prediction_correct, target_masks):
+
+        results_num = []
+        results_den = []
+        for cluster_name, cluster_particles, cluster_indices in self.clusters:
+            cluster_prediction_correct = torch.stack([prediction_correct[i] for i in cluster_indices])
+            cluster_target_masks = torch.stack([target_masks[i] for i in cluster_indices])
+            total_particles = cluster_target_masks.sum()
+            if total_particles > 0:
+                results_num.append(cluster_prediction_correct.sum().item())
+                results_den.append(total_particles.sum().item())
+            else:
+                results_num.append(0)
+                results_den.append(0)
+
+        return results_num, results_den
+
+    def event_purity(self, prediction_correct, target_masks):
+        target_masks = torch.stack(target_masks, dim=0)
+        num_particles_in_event = target_masks.sum(0)
+        event_prediction_correct = torch.stack(prediction_correct, dim=0)
+        event_accuracy_num = (event_prediction_correct.sum(0) == num_particles_in_event)
+        event_accuracy_den = num_particles_in_event.size()[0]
+        return event_accuracy_num.sum().item(), event_accuracy_den
+
 
 
 @time_decorator(name="[Assignment] shared_step")
@@ -760,6 +883,18 @@ def shared_epoch_end(
     if global_rank == 0:
 
         for process in metrics_valid:
+
+            logs = metrics_valid[process].summary_log()
+            logger.log(logs)
+
+            # if metrics_train[process] is not None:
+            #     training_logs = metrics_train[process].summary_log()
+            #     training_logs = {
+            #         f"{name}-train": log
+            #         for name, log in training_logs.items()
+            #     }
+            #     logger.log(training_logs)
+
             metrics_valid[process].assign_train_result(
                 metrics_train[process].predict_metrics_correct,
                 metrics_train[process].predict_metrics_wrong,

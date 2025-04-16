@@ -16,10 +16,10 @@ from evenet.utilities.group_theory import complete_indices
 from evenet.utilities.diffusion_sampler import add_noise
 from evenet.utilities.tool import gather_index
 from torch import Tensor, nn
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 import re
 
-from collections import OrderedDict
+from collections import OrderedDict, _KT, _VT
 
 
 class EveNetModel(nn.Module):
@@ -248,7 +248,7 @@ class EveNetModel(nn.Module):
             )
         self.generation_extend_batch = self.network_cfg.EventGeneration.extend_batch
 
-    def forward(self, x: Dict[str, Tensor], time: Tensor) -> Dict[str, Tensor]:
+    def forward(self, x: Dict[str, Tensor], time: Tensor) -> dict[str, dict[Any, Any] | Any]:
         """
 
         :param x:
@@ -283,9 +283,10 @@ class EveNetModel(nn.Module):
         input_point_cloud = x['x']
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
-        global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1) TODO: check
+        global_conditions_mask = x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
 
-        class_label = x['classification'].unsqueeze(-1)  # (batch_size, 1)
+
+        class_label = x['classification'].unsqueeze(-1) if 'classification' in x else torch.zeros_like(x['conditions_mask']).long()  # (batch_size, 1)
 
         num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
