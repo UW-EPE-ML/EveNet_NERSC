@@ -38,5 +38,10 @@ srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --
 sleep 5
 ##############################################################################################
 
+# export the parent directory of the script to the PYTHONPATH
+export PYTHONPATH=$(dirname $(dirname $(realpath $0))):$PYTHONPATH
+
+shifter python3 ../evenet/train.py ../shared/default-yulei.yaml
+
 #### call your code below
 exit

@@ -27,7 +27,7 @@ options:
 
     Components:
       Classification:
-        include: true
+        include: false
 
       Regression:
         include: false
@@ -43,13 +43,13 @@ options:
       EventGeneration:
         include: false
 
-#    ProgressiveTraining:
-#      - name: "assignment"
-#        epoch_ratio: 1.0
-#        components:
-#          - body
-#          - object_encoder
-#          - assignment
+    ProgressiveTraining:
+      - name: "assignment"
+        epoch_ratio: 1.0
+        components:
+          - body
+          - object_encoder
+          - assignment
 #          - classification
 #      - name: "finetune"
 #        epoch_ratio: 0.3
