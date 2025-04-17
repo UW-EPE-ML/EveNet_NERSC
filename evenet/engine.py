@@ -342,13 +342,15 @@ class EveNetEngine(L.LightningModule):
         gradient_heads = {}
 
         if self.classification_cfg.include:
-            gradient_heads["classification"] = self.model.classification_head
+            gradient_heads["classification"] = self.model.Classification
 
         if self.regression_cfg.include:
-            gradient_heads["regression"] = self.model.regression_head
+            gradient_heads["regression"] = self.model.Regression
 
         if self.generation_cfg.include:
-            gradient_heads["generation"] = self.model.generation_head
+            gradient_heads["generation-global"] = self.model.GlobalGeneration
+            gradient_heads["generation-event"] = self.model.EventGeneration
+
 
         if self.assignment_cfg.include:
             assignment_heads = self.model.Assignment.multiprocess_assign_head
