@@ -100,8 +100,6 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
-
-
   ProgressiveTraining:
     - name: "vanilla"
       epoch_ratio: 1.0
@@ -113,6 +111,9 @@ Training:
         - assignment
         - generation
 
+  GradientNorm:
+    alpha: 0.12
+    learning_rate: 0.0001
 
 Dataset:
   dataset_limit: 1.0

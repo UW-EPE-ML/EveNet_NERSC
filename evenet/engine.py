@@ -1,5 +1,4 @@
 import math
-import re
 from functools import partial
 from typing import Any, Dict, Union
 
@@ -23,6 +22,7 @@ from evenet.network.metrics.assignment import shared_step as ass_step, shared_ep
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
+from evenet.network.loss.grad_norm import GradNormController
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
 
@@ -54,7 +54,7 @@ class EveNetEngine(L.LightningModule):
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
-        self.pretrain_ckpt_path = global_config.options.Training.pretrain_model_load_path
+        self.pretrain_ckpt_path: str = global_config.options.Training.pretrain_model_load_path
 
         self.num_classes: list[str] = global_config.event_info.class_label.get('EVENT', {}).get('signal', [0])[0]
 
@@ -75,7 +75,7 @@ class EveNetEngine(L.LightningModule):
         self.generation_cfg = self.component_cfg.GlobalGeneration
 
         ###### Initialize Normalizations and Balance #####
-        self.normalization_dict = torch.load(self.config.options.Dataset.normalization_file)
+        self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
         self.class_weight = self.normalization_dict["class_balance"]
         self.assignment_weight = self.normalization_dict["particle_balance"]
         self.subprocess_balance = self.normalization_dict["subprocess_balance"]
@@ -99,6 +99,8 @@ class EveNetEngine(L.LightningModule):
         self.point_cloud_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
 
         ###### Initialize Loss ######
+        self.grad_norm: Union[GradNormController, None] = None
+
         self.cls_loss = None
         if self.classification_cfg.include:
             import evenet.network.loss.classification as cls_loss
@@ -145,7 +147,7 @@ class EveNetEngine(L.LightningModule):
         self.general_log = GenericMetrics()
 
         ###### Progressive Training ######
-        self.progressive_training = global_config.options.Training.get("ProgressiveTraining", [])
+        self.progressive_training: list = global_config.options.Training.get("ProgressiveTraining", [])
         self.progressive_index = 0
 
         ###### Last ######
@@ -350,7 +352,6 @@ class EveNetEngine(L.LightningModule):
         if self.generation_cfg.include:
             gradient_heads["generation-global"] = self.model.GlobalGeneration
             gradient_heads["generation-event"] = self.model.EventGeneration
-
 
         if self.assignment_cfg.include:
             assignment_heads = self.model.Assignment.multiprocess_assign_head
@@ -660,12 +661,24 @@ class EveNetEngine(L.LightningModule):
                 else:
                     print(f"  --> Optimizer: {component} ❌")
 
+        ### Initialize Gradient Norm ###
+        if self.grad_norm is None and self.config.options.Training.get("GradientNorm", False):
+            self.grad_norm = GradNormController(
+                task_names=[
+                    "classification",
+                    "regression",
+                    *[name for name in self.config.resonance],
+                ],
+                **self.config.options.Training.GradientNorm,
+            )
+            self.register_module("grad_norm", self.grad_norm)
+
+            print(f"{self.__class__.__name__} GRADIENT NORM Applied!")
+            print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
+
     def on_save_checkpoint(self, checkpoint):
-        # Get the original model if it's torch.compile'd
         orig_model = getattr(self.model, "_orig_mod", self.model)
-        # Get the state_dict and add "model." prefix to all keys
         new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
-        # Replace the checkpoint state_dict
         checkpoint["state_dict"] = new_sd
 
         pass

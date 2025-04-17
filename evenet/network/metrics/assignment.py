@@ -70,7 +70,7 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
 
 def get_assignment_necessaries(
         event_info: EventInfo,
-):
+) -> dict:
     permutation_indices = dict()
     num_targets = dict()
     event_particles = dict()

@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from itertools import chain, permutations
 from functools import cache
 import re
@@ -29,6 +29,34 @@ def key_with_default(database, key, default):
 
     value = database[key]
     return default if value is None else value
+
+
+def normalize_child_key(child: str) -> str:
+    # Remove trailing digits, e.g., 'q1' -> 'q', 'l2' -> 'l'
+    return re.sub(r'\d+$', '', child)
+
+
+def build_topology_key(resonance: str, children: dict[str, int]) -> str:
+    base = re.sub(r'\d+', '', resonance)
+    norm_keys = ''.join(sorted(normalize_child_key(child) for child in children))
+    return f'{base}/{norm_keys}'
+
+
+def compute_head_weights_per_process(product_mappings, pairing_topology) -> dict[str, dict[str, float]]:
+    process_to_head_weights = {}
+    for process, particles in product_mappings.items():
+        head_count = defaultdict(int)
+        for resonance_name, child_map in particles.items():
+            topology_key = build_topology_key(resonance_name, child_map)
+            if topology_key in pairing_topology:
+                category = pairing_topology[topology_key]["pairing_topology_category"]
+                head_count[category] += 1
+            else:
+                print(f"[warn] '{topology_key}' not found in pairing_topology")
+        total = sum(head_count.values())
+        weights = {cat: count / total for cat, count in head_count.items()} if total > 0 else {}
+        process_to_head_weights[process] = weights
+    return process_to_head_weights
 
 
 class EventInfo:
@@ -227,6 +255,11 @@ class EventInfo:
                             self.ptetaphimass_index.append(sequential_index)
                             break
                         sequential_index += 1
+
+        ### Process to Topology Dictionary ###
+        self.process_to_topology: dict[str, dict[str, float]] = compute_head_weights_per_process(
+            self.product_mappings, self.pairing_topology
+        )
 
     def normalized_features(self, input_name: str) -> NDArray[bool]:
         return np.array([feature.normalize for feature in self.input_features[input_name]])

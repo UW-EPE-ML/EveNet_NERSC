@@ -573,7 +573,7 @@ class EveNetModel(nn.Module):
 
         return None
 
-    def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> Dict[str, Tensor]:
+    def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> dict:
         time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
         output = self.forward(batch, time)
         return output
