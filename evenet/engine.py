@@ -363,7 +363,7 @@ class EveNetEngine(L.LightningModule):
             grad_mag = get_total_gradient(module)
             num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
             grad_avg = grad_mag / num_params if num_params > 0 else 0.0
-            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
+            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=False)
 
     # @time_decorator
     def on_fit_start(self) -> None:
