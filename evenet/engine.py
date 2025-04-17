@@ -300,7 +300,7 @@ class EveNetEngine(L.LightningModule):
 
         self.safe_manual_backward(loss.mean(), optimizers=optimizers)
 
-        # self.check_gradient()
+        self.check_gradient()
 
         for opt in optimizers:
             opt.step()
@@ -363,7 +363,7 @@ class EveNetEngine(L.LightningModule):
             grad_mag = get_total_gradient(module)
             num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
             grad_avg = grad_mag / num_params if num_params > 0 else 0.0
-            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=False)
+            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
 
     # @time_decorator
     def on_fit_start(self) -> None:
