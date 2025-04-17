@@ -5,8 +5,6 @@ from torch import Tensor
 import torch.nn.functional as F
 from typing import List, Tuple, Dict, Union
 
-from torchgen.dest.ufunc import eligible_for_binary_scalar_specialization
-
 from evenet.utilities.debug_tool import time_decorator
 
 
