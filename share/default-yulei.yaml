@@ -43,20 +43,21 @@ options:
       EventGeneration:
         include: false
 
-    ProgressiveTraining:
-      - name: "assignment"
-        epoch_ratio: 0.7
-        components:
-          - body
-          - object_encoder
-          - assignment
-      - name: "finetune"
-        epoch_ratio: 0.3
-        components:
-          - body
-          - object_encoder
-          - classification
-          - assignment
+#    ProgressiveTraining:
+#      - name: "assignment"
+#        epoch_ratio: 1.0
+#        components:
+#          - body
+#          - object_encoder
+#          - assignment
+#          - classification
+#      - name: "finetune"
+#        epoch_ratio: 0.3
+#        components:
+#          - body
+#          - object_encoder
+#          - classification
+#          - assignment
 
   Dataset:
     dataset_limit: 1.0
