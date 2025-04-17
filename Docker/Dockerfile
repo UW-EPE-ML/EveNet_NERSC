@@ -2,7 +2,7 @@
 FROM python:3.12-slim as builder
 
 # Copy requirements.txt from host to the builder stage
-COPY requirements.txt /requirements.txt
+COPY ../requirements.txt /requirements.txt
 
 # Install all dependencies from requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
