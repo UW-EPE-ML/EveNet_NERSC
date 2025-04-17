@@ -42,7 +42,7 @@ sleep 5
 PYTHONPATH=$(dirname "$(dirname "$(realpath "$0")")"):$PYTHONPATH
 export PYTHONPATH
 
-shifter python3 ../evenet/train.py ../shared/default-yulei.yaml
+shifter python3 ../evenet/train.py ../share/default-yulei.yaml
 
 #### call your code below
 exit
