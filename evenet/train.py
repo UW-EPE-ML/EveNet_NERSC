@@ -34,9 +34,6 @@ from evenet.network.callbacks.ema import EMACallback
 from preprocessing.preprocess import unflatten_dict
 import json
 
-from rich.console import Console
-import lightning.pytorch.utilities.model_summary
-
 
 def train_func(cfg):
     batch_size = cfg['batch_size']
@@ -58,6 +55,7 @@ def train_func(cfg):
     dataset_configs = {
         'batch_size': batch_size,
         'prefetch_batches': prefetch_batches,
+        'local_shuffle_buffer_size': batch_size * prefetch_batches,
     }
 
     # Fetch the Dataset shards

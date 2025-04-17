@@ -39,7 +39,8 @@ sleep 5
 ##############################################################################################
 
 # export the parent directory of the script to the PYTHONPATH
-export PYTHONPATH=$(dirname $(dirname $(realpath $0))):$PYTHONPATH
+PYTHONPATH=$(dirname "$(dirname "$(realpath "$0")")"):$PYTHONPATH
+export PYTHONPATH
 
 shifter python3 ../evenet/train.py ../shared/default-yulei.yaml
 
