@@ -81,29 +81,29 @@ TT2L_mlm:
   process_id: 1
   diagram: *TT2L
 
-ttW_FullHadronics:
-  category: ttW
-  process_id: 2
-  diagram:
-    t1: *top_had
-    t2: *top_had
-    W: *W_had
-    SYMMETRY: [ t1, t2 ]
-
-ttZ_FullHadronics:
-  category: ttZ
-  process_id: 3
-  diagram:
-    t1: *top_had
-    t2: *top_had
-    Z: *Z_had
-    SYMMETRY: [ t1, t2 ]
-
-ttZ_Leptonic:
-  category: ttZ
-  process_id: 3
-  diagram:
-    t1: *top_had
-    t2: *top_had
-    Z: *Z_lep
-    SYMMETRY: [ t1, t2 ]
+#ttW_FullHadronics:
+#  category: ttW
+#  process_id: 2
+#  diagram:
+#    t1: *top_had
+#    t2: *top_had
+#    W: *W_had
+#    SYMMETRY: [ t1, t2 ]
+#
+#ttZ_FullHadronics:
+#  category: ttZ
+#  process_id: 3
+#  diagram:
+#    t1: *top_had
+#    t2: *top_had
+#    Z: *Z_had
+#    SYMMETRY: [ t1, t2 ]
+#
+#ttZ_Leptonic:
+#  category: ttZ
+#  process_id: 3
+#  diagram:
+#    t1: *top_had
+#    t2: *top_had
+#    Z: *Z_lep
+#    SYMMETRY: [ t1, t2 ]

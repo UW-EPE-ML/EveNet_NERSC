@@ -55,44 +55,44 @@ EVENT:
       - b
       - l-
 
-  ttW_FullHadronics:
-    t1:
-      - b
-      - q1
-      - q2
-    t2:
-      - b
-      - q1
-      - q2
-    W:
-      - q1
-      - q2
+#  ttW_FullHadronics:
+#    t1:
+#      - b
+#      - q1
+#      - q2
+#    t2:
+#      - b
+#      - q1
+#      - q2
+#    W:
+#      - q1
+#      - q2
 
-  ttZ_FullHadronics:
-    t1:
-      - b
-      - q1
-      - q2
-    t2:
-      - b
-      - q1
-      - q2
-    Z:
-      - q1
-      - q2
-
-  ttZ_Leptonic:
-    t1:
-      - b
-      - q1
-      - q2
-    t2:
-      - b
-      - q1
-      - q2
-    Z:
-      - l1
-      - l2
+#  ttZ_FullHadronics:
+#    t1:
+#      - b
+#      - q1
+#      - q2
+#    t2:
+#      - b
+#      - q1
+#      - q2
+#    Z:
+#      - q1
+#      - q2
+#
+#  ttZ_Leptonic:
+#    t1:
+#      - b
+#      - q1
+#      - q2
+#    t2:
+#      - b
+#      - q1
+#      - q2
+#    Z:
+#      - l1
+#      - l2
 
 # ---------------------------------------------------------
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
@@ -114,35 +114,35 @@ PERMUTATIONS:
   TT2L:
     - [ ]
 
-  ttW_FullHadronics:
-    EVENT:
-      - [ t1, t2 ]
-    t1:
-      - [ q1, q2 ]
-    t2:
-      - [ q1, q2 ]
-    W:
-      - [ q1, q2 ]
-
-  ttZ_FullHadronics:
-    EVENT:
-      - [ t1, t2 ]
-    t1:
-      - [ q1, q2 ]
-    t2:
-      - [ q1, q2 ]
-    Z:
-      - [ q1, q2 ]
-
-  ttZ_Leptonic:
-    EVENT:
-      - [ t1, t2 ]
-    t1:
-      - [ q1, q2 ]
-    t2:
-      - [ q1, q2 ]
-    Z:
-      - [ l1, l2 ]
+#  ttW_FullHadronics:
+#    EVENT:
+#      - [ t1, t2 ]
+#    t1:
+#      - [ q1, q2 ]
+#    t2:
+#      - [ q1, q2 ]
+#    W:
+#      - [ q1, q2 ]
+#
+#  ttZ_FullHadronics:
+#    EVENT:
+#      - [ t1, t2 ]
+#    t1:
+#      - [ q1, q2 ]
+#    t2:
+#      - [ q1, q2 ]
+#    Z:
+#      - [ q1, q2 ]
+#
+#  ttZ_Leptonic:
+#    EVENT:
+#      - [ t1, t2 ]
+#    t1:
+#      - [ q1, q2 ]
+#    t2:
+#      - [ q1, q2 ]
+#    Z:
+#      - [ l1, l2 ]
 
 
 # ------------------------------------------------------------------------------
@@ -177,7 +177,8 @@ CLASSIFICATIONS:
 CLASSLABEL:
   EVENT:
     signal:
-      - [ QCD, TT, ttW, ttZ]
+      - [ QCD, TT]
+#      - [ QCD, TT, ttW, ttZ ]
 
 PARTICLE_PROPERTIES:
   - Mass
