@@ -511,17 +511,6 @@ class EveNetEngine(L.LightningModule):
                     print(f"🚨 Gradient in {name} is NaN or Inf!")
                     raise ValueError("Gradient check failed.")
 
-    # @time_decorator()
-    def safe_manual_backward(self, loss, optimizers: list, retain_graph=False):
-        self.manual_backward(loss, retain_graph=retain_graph)
-
-        # Check gradients for all involved optimizers
-        # for opt in optimizers:
-        #     for group in opt.param_groups:
-        #         for param in group['params']:
-        #             if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
-        #                 raise ValueError("🚨 Gradient is NaN or Inf!")
-
     # @time_decorator
     def configure_optimizers(self):
         cfg = self.hyper_par_cfg
