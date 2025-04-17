@@ -856,11 +856,11 @@ def shared_step(
         loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
         loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]
 
-        assignment_loss = (assignment_loss + symmetric_losses["assignment"][process]) / num_processes
-        detected_loss = (detected_loss + symmetric_losses["detection"][process]) / num_processes
+        assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
+        detected_loss = detected_loss + symmetric_losses["detection"][process]
 
-    loss_dict['assignment'] = assignment_loss
-    loss_dict['detection'] = detected_loss
+    loss_dict['assignment'] = assignment_loss / num_processes
+    loss_dict['detection'] = detected_loss / num_processes
 
     total_loss = assignment_loss_scale * assignment_loss + detection_loss_scale * detected_loss
 
