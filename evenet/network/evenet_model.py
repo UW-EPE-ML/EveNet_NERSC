@@ -160,7 +160,9 @@ class EveNetModel(nn.Module):
             num_linear_layers=obj_encoder_cfg.num_embedding_layers,
             num_encoder_layers=obj_encoder_cfg.num_encoder_layers,
             dropout=obj_encoder_cfg.dropout,
-            conditioned=False
+            conditioned=False,
+            skip_connection=obj_encoder_cfg.skip_connection,
+            encoder_skip_connection=obj_encoder_cfg.encoder_skip_connection,
         )
 
         # [3] Classification Head
@@ -219,6 +221,8 @@ class EveNetModel(nn.Module):
                 combinatorial_scale=self.network_cfg.Assignment.combinatorial_scale,
                 encode_event_token=self.network_cfg.Assignment.encode_event_token,
                 activation=self.network_cfg.Assignment.activation,
+                skip_connection=self.network_cfg.Assignment.skip_connection,
+                encoder_skip_connection=self.network_cfg.Assignment.encoder_skip_connection,
                 device=self.device
             )
 
@@ -389,12 +393,14 @@ class EveNetModel(nn.Module):
                 full_time = time.contiguous()
                 time_masking = full_input_point_cloud_mask.float()
             else:
-                invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(invisible_point_cloud,time)
+                invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(invisible_point_cloud,
+                                                                                             time)
                 full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
                 full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
                 full_attn_mask = invisible_attn_mask.contiguous()
                 full_time = time.contiguous()
-                time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1).float()
+                time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask],
+                                         dim=1).float()
 
             #############################
             ## Central embedding (PET) ##
@@ -507,7 +513,7 @@ class EveNetModel(nn.Module):
     def predict_diffusion_vector(
             self, noise_x: Tensor, cond_x: Dict[str, Tensor], time: Tensor, mode: str,
             noise_mask: Optional[Tensor] = None
-    ):
+    ) -> Tensor:
 
         """
         Predict the number of point clouds in the batch.
@@ -534,6 +540,7 @@ class EveNetModel(nn.Module):
                 label=class_label
             )
             return predict_num_point_cloud_vector
+
         elif mode == "event":
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
@@ -571,6 +578,75 @@ class EveNetModel(nn.Module):
             )
             return pred_point_cloud_vector
 
+        elif mode == "neutrino":
+            global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
+            global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
+            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
+            input_point_cloud = cond_x['x']
+            input_point_cloud_mask = cond_x['x_mask'].unsqueeze(-1)
+
+            input_point_cloud = self.sequential_normalizer(
+                x=input_point_cloud,
+                mask=input_point_cloud_mask,
+            )
+
+            global_conditions = self.global_normalizer(
+                x=global_conditions,
+                mask=global_conditions_mask
+            )
+
+            num_point_cloud = self.num_point_cloud_normalizer(
+                x=num_point_cloud,
+                mask=None
+            )
+
+            invisible_point_cloud_noised = noise_x
+            invisible_point_cloud_mask = noise_mask
+
+            # Create attention mask
+            n_vis = input_point_cloud_mask.shape[1]
+            n_invis = invisible_point_cloud_mask.shape[1]
+            is_invisible_query = torch.cat([
+                torch.zeros(n_vis, dtype=torch.bool, device=self.device),
+                torch.ones(n_invis, dtype=torch.bool, device=self.device)
+            ], dim=0)  # (L,)
+            # Rule: visible query (False) cannot attend to invisible key (True)
+            invisible_attn_mask = (~is_invisible_query[:, None]) & is_invisible_query[None, :]  # (L, L) , Q->K
+
+            full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
+            full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
+            full_attn_mask = invisible_attn_mask.contiguous()
+            full_time = time.contiguous()
+            time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask],
+                                     dim=1).float()
+            full_global_conditions = self.GlobalEmbedding(
+                x=global_conditions,
+                mask=global_conditions_mask
+            )
+
+            local_points = full_input_point_cloud[..., self.local_feature_indices]
+            full_input_point_cloud = self.PET(
+                input_features=full_input_point_cloud,
+                input_points=local_points,
+                mask=full_input_point_cloud_mask,
+                attn_mask=full_attn_mask,
+                time=full_time,
+                time_masking=time_masking
+            )
+
+            pred_point_cloud_vector = self.EventGeneration(
+                x=full_input_point_cloud,
+                x_mask=full_input_point_cloud_mask,
+                global_cond=full_global_conditions,
+                global_cond_mask=global_conditions_mask,
+                num_x=num_point_cloud,
+                time=full_time,
+                label=class_label,
+                attn_mask=full_attn_mask,
+                time_masking=time_masking
+            )
+            return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
 
     def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> dict:

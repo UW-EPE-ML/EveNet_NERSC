@@ -127,7 +127,9 @@ class GatedTransformer(nn.Module):
                  num_heads: int,
                  transformer_activation: str,
                  transformer_dim_scale: float,
-                 dropout: float):
+                 dropout: float,
+                 drop_probability: float = 0.0,
+                 skip_connection: bool = False):
         super(GatedTransformer, self).__init__()
         self.num_layers = num_layers
 
@@ -136,6 +138,8 @@ class GatedTransformer(nn.Module):
         self.num_heads = num_heads
         self.transformer_activation = transformer_activation
         self.transformer_dim_scale = transformer_dim_scale
+        self.skip_connection = skip_connection
+        self.drop_probability = drop_probability
 
         self.layers = nn.ModuleList([
             GTrXL(hidden_dim=self.hidden_dim,
@@ -145,6 +149,15 @@ class GatedTransformer(nn.Module):
             for _ in range(num_layers)
         ])
 
+        if self.skip_connection:
+            self.norm = nn.LayerNorm(self.hidden_dim)
+            self.drop_path = StochasticDepth(drop_probability)
+            self.mlp = nn.Sequential(
+                nn.Linear(self.hidden_dim, 2 * self.hidden_dim),
+                nn.GELU(approximate='none'),
+                nn.Dropout(dropout),
+                nn.Linear(2 * self.hidden_dim, self.hidden_dim),
+            )
     def forward(self, x: Tensor, padding_mask: Tensor, sequence_mask: Tensor) -> Tensor:
         """
         :param x: (batch_size, num_objects, hidden_dim)
@@ -154,13 +167,20 @@ class GatedTransformer(nn.Module):
         """
 
         output = x
-
         for layer in self.layers:
-            output = layer(
+            updates = layer(
                 x=output,
                 padding_mask=padding_mask,
                 sequence_mask=sequence_mask
             )
+
+            if self.skip_connection:
+                x2 = output + self.drop_path(updates)
+                x3 = self.norm(x2) * sequence_mask
+                output = x2 + self.drop_path(self.mlp(x3))
+                output = output * sequence_mask
+            else:
+                output = updates * sequence_mask
 
         return output
 
@@ -168,11 +188,12 @@ class GatedTransformer(nn.Module):
 def create_transformer(
         transformer_type: str,
         num_layers: int,
-        hidden_dim,
-        num_heads,
-        transformer_activation,
-        transformer_dim_scale,
-        dropout) -> nn.Module:
+        hidden_dim: int,
+        num_heads: int,
+        transformer_activation: str,
+        transformer_dim_scale: float,
+        dropout: float,
+        skip_connection: bool) -> nn.Module:
     """
     Create a transformer model with the specified options.
 
@@ -187,7 +208,8 @@ def create_transformer(
             num_heads=num_heads,
             transformer_activation=transformer_activation,
             transformer_dim_scale=transformer_dim_scale,
-            dropout=dropout
+            dropout=dropout,
+            skip_connection=skip_connection
         )
 
 

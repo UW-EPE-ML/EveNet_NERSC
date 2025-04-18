@@ -117,7 +117,7 @@ class EveNetEngine(L.LightningModule):
             import evenet.network.loss.assignment as ass_loss
             assignment_loss_partial = partial(
                 ass_loss.loss,
-                focal_gamma=0.1,
+                focal_gamma=self.assignment_cfg.focal_gamma,
                 particle_balance=self.assignment_weight,
                 process_balance=self.subprocess_balance,
                 **self.ass_args['loss']

@@ -21,6 +21,8 @@ class ObjectEncoder(nn.Module):
             num_linear_layers: int,
             num_encoder_layers: int,
             dropout: float,
+            skip_connection: bool = False,
+            encoder_skip_connection: bool = False,
             conditioned: bool = False
     ):
         super(ObjectEncoder, self).__init__()
@@ -52,7 +54,8 @@ class ObjectEncoder(nn.Module):
             num_heads=num_heads,
             transformer_activation="gelu",
             transformer_dim_scale=transformer_dim_scale,
-            dropout=dropout
+            dropout=dropout,
+            skip_connection=encoder_skip_connection,
         )
         self.embedding = nn.ModuleList([
             create_linear_block(
@@ -63,7 +66,7 @@ class ObjectEncoder(nn.Module):
                 normalization_type="LayerNorm",
                 activation_type="gelu",
                 dropout=dropout,
-                skip_connection=False
+                skip_connection=skip_connection,
             ) for _ in range(num_linear_layers)])
 
         self.output_bridge = create_residual_connection(

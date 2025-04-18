@@ -41,7 +41,9 @@ class AssignmentHead(nn.Module):
             product_names: List[str],
             product_symmetries: Symmetries,
             detection_output_dim: int = 1,
-            softmax_output: bool = True
+            softmax_output: bool = True,
+            skip_connection: bool = False,
+            encoder_skip_connection: bool = False,
     ):
         super(AssignmentHead, self).__init__()
         # Take hadronic top decay for example (t->bq1q2, symmetry [q1, q2])
@@ -62,7 +64,10 @@ class AssignmentHead(nn.Module):
             num_linear_layers=num_linear_layers,
             num_encoder_layers=num_encoder_layers,
             dropout=dropout,
-            conditioned=True)
+            conditioned=True,
+            skip_connection=skip_connection,
+            encoder_skip_connection=encoder_skip_connection,
+        )
 
         attention_layer = SymmetricAttentionSplit if split_attention else SymmetricAttentionFull
         self.attention = attention_layer(
@@ -257,6 +262,8 @@ class SharedAssignmentHead(nn.Module):
             split_attention: bool,
             encode_event_token: bool,
             activation: str,
+            skip_connection: bool,
+            encoder_skip_connection: bool,
             device: str,
     ):
         super(SharedAssignmentHead, self).__init__()
@@ -321,6 +328,8 @@ class SharedAssignmentHead(nn.Module):
                 product_symmetries=pairing_topology_category[topology_name]["product_symmetry"],
                 softmax_output=True,
                 detection_output_dim=num_max_event_particles + 1,
+                skip_connection=skip_connection,
+                encoder_skip_connection=encoder_skip_connection
             )
             for topology_name in pairing_topology_category
         })
