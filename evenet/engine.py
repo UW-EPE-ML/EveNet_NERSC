@@ -523,6 +523,10 @@ class EveNetEngine(L.LightningModule):
         print("steps_per_epoch: ", steps_per_epoch)
         print("warmup_steps: ", warmup_steps)
         print("total_steps: ", total_steps)
+        print("batch_size: ", batch_size)
+        print("warm_up_factor: ", warm_up_factor)
+        print("weight_decay: ", weight_decay)
+        print("decoupled_weight_decay: ", decoupled_weight_decay)
 
         betas = (0.95, 0.99)
 
