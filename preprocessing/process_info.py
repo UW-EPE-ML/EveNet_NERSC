@@ -31,7 +31,9 @@ for pdg_ in PDG_Dict:
     if is_resonance_particle: resonance_representation.append(pdg_)
 
 
-def return_last_product(process_diagram, last_product=dict()):
+def return_last_product(process_diagram, last_product=None):
+    if last_product is None:
+        last_product = dict()
     for product in process_diagram:
         if product == 'SYMMETRY': continue
         if process_diagram[product] is None:
@@ -80,7 +82,9 @@ def select_by_rank(Daughter, Mother, rank=0):
     return Daughter, Mother
 
 
-def select_by_products(parton, candidate_array, products, candidate_name, process_summary=dict(), rank=None):
+def select_by_products(parton, candidate_array, products, candidate_name, process_summary=None, rank=None):
+    if process_summary is None:
+        process_summary = dict()
     if products is None:
         return candidate_array, process_summary
 
@@ -171,7 +175,7 @@ def assign_Reco_LorentzVector(Event_dict, products, parton, candidate_name, reco
             reconstructed_momentum_dict[product_name] = ak.fill_none(
                 ak.pad_none(parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
                             1, axis=-1)[..., 0],
-                default_reco_v4)  #  TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
+                default_reco_v4)  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
             # print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
 
         if candidate_name not in reconstructed_momentum_dict:

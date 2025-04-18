@@ -5,6 +5,7 @@ from typing import Any, Dict, Union
 import wandb
 import lightning as L
 import torch
+from torch.nn.utils import clip_grad_norm_
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 from lightning.pytorch.utilities.model_summary import summarize
 from lion_pytorch import Lion
@@ -294,6 +295,8 @@ class EveNetEngine(L.LightningModule):
             opt.zero_grad()
 
         self.safe_manual_backward(loss.mean())
+
+        clip_grad_norm_(self.model.parameters(), 1.0)
 
         self.check_gradient(gradient_heads)
 
