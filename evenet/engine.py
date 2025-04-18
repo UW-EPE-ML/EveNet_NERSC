@@ -11,7 +11,6 @@ from lion_pytorch import Lion
 from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
-from evenet.dataset.types import FeatureInfo
 from evenet.network.evenet_model import EveNetModel
 
 from evenet.network.metrics.general_comparison import GenericMetrics
