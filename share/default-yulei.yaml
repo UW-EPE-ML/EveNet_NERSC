@@ -17,7 +17,6 @@ wandb:
 options:
   default: options/options.yaml
 
-  # overwrites
   Training:
     epochs: 20
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
@@ -27,14 +26,14 @@ options:
 
     Components:
       Classification:
-        include: false
+        include: true
+        warm_up: true
 
       Regression:
         include: false
 
       Assignment:
         include: true
-#        learning_rate: 0.00003
         warm_up: true
 
       GlobalGeneration:
@@ -50,14 +49,7 @@ options:
           - body
           - object_encoder
           - assignment
-#          - classification
-#      - name: "finetune"
-#        epoch_ratio: 0.3
-#        components:
-#          - body
-#          - object_encoder
-#          - classification
-#          - assignment
+          - classification
 
   Dataset:
     dataset_limit: 1.0
