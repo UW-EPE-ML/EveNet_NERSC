@@ -276,9 +276,9 @@ REGRESSIONS:
       - eta
       - phi
     t2/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
 
   TT2L:
     t1:
@@ -286,17 +286,17 @@ REGRESSIONS:
       - eta
       - phi
     t1/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
     t2:
       - pt
       - eta
       - phi
     t2/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
 
   WJetsToQQ:
     W:
@@ -332,9 +332,9 @@ REGRESSIONS:
       - eta
       - phi
     W/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
     Z:
       - pt
       - eta
@@ -346,9 +346,9 @@ REGRESSIONS:
       - eta
       - phi
     W1/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
     W2:
       - pt
       - eta
@@ -370,9 +370,9 @@ REGRESSIONS:
       - eta
       - phi
     W/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
     Z:
       - pt
       - eta
@@ -380,9 +380,9 @@ REGRESSIONS:
 
   WJetsToLNu:
     W/v:
-      - px
-      - py
-      - pz
+      - pt
+      - eta
+      - phi
 
 # -----------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
