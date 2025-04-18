@@ -18,7 +18,7 @@ options:
   default: options/options.yaml
 
   Training:
-    epochs: 20
+    epochs: 50
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints"
     model_checkpoint_load_path: null
 
