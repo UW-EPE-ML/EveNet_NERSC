@@ -507,6 +507,8 @@ class EveNetEngine(L.LightningModule):
         batch_size = cfg['batch_size']
         epochs = cfg['epoch']
         warm_up_factor = cfg.get('warm_up_factor', 0.5)
+        weight_decay = cfg.get('weight_decay', 0)
+        decoupled_weight_decay = cfg.get('decoupled_weight_decay', False)
 
         # Distributed training info
         world_size = self.world_size
@@ -529,7 +531,9 @@ class EveNetEngine(L.LightningModule):
             optimizer = Lion(
                 p,
                 lr=scaled_lr,
-                betas=betas
+                betas=betas,
+                weight_decay=weight_decay,
+                decoupled_weight_decay=decoupled_weight_decay,
             )
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
