@@ -1,12 +1,12 @@
 Training:
-  epochs: 200
+  epochs: 500
 
   model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
 
   pretrain_model_load_path: null
 
-  learning_rate: &lr 0.00005
+  learning_rate: &lr 0.0001
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
   weight_decay: 1e-2
@@ -20,6 +20,7 @@ Training:
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
+      optimizer_type: "AdamW"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -29,6 +30,7 @@ Training:
     PET:
       learning_rate: *lr
       optimizer_group: "body"
+      optimizer_type: "AdamW"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -38,6 +40,7 @@ Training:
     ObjectEncoder:
       learning_rate: *lr
       optimizer_group: "object_encoder"
+      optimizer_type: "AdamW"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -47,7 +50,8 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
-      warm_up: false
+      optimizer_type: "AdamW"
+      warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: false # whether to build in network
       freeze:
@@ -58,7 +62,8 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
-      warm_up: false
+      optimizer_type: "AdamW"
+      warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: false # whether to build in network
       freeze:
@@ -69,7 +74,8 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      warm_up: false
+      optimizer_type: "AdamW"
+      warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
       focal_gamma: 0.0
@@ -81,8 +87,9 @@ Training:
 
     GlobalGeneration:
       learning_rate: *lr
-      optimizer_group: "generator"
-      warm_up: false
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
       include: false # whether to build in network
       diffusion_steps: 20
       freeze:
@@ -92,8 +99,9 @@ Training:
 
     EventGeneration:
       learning_rate: *lr
-      optimizer_group: "generator"
-      warm_up: false
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
       include: false # whether to build in network
       diffusion_steps: 100
       freeze:

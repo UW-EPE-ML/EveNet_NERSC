@@ -16,11 +16,11 @@ wandb:
   tags: [ "Pretrain", "Parquet", "Mac" ]
 
 options:
-  default: options/spanet_tthadronics.yaml
+  default: configs/options.yaml
 
   # overwrites
   Training:
-    epochs: 200
+    epochs: 500
     classification_loss_scale: 0.0
     regression_loss_scale: 0.0
     feature_generation_loss_scale: 0.0
@@ -30,19 +30,19 @@ options:
     normalization_file: "/pscratch/sd/t/tihsu/database/SPANet_comparison/TTHadronics/EveNet_Input/normalization.pt"
 
 network:
-  default: network/spanet_tthadronics.yaml
+  default: configs/model.yaml
 
   # overwrites
   # ...
 
 event_info:
-  default: event_info/spanet_tthadronics.yaml
+  default: configs/event_info.yaml
 
   # overwrites
   # ...
 
 resonance:
-  default: resonance/standard_model.yaml
+  default: configs/resonance.yaml
 
   # overwrites
   # ...
