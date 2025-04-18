@@ -11,14 +11,10 @@ from evenet.utilities.debug_tool import time_decorator
 from typing import Dict
 import wandb
 
-class GenerationMetrics:
-    def __init__(self, device, class_names, feature_names, hist_xmin = -15, hist_xmax = 15, num_bins=60, point_cloud_generation=False, neutrino_generation=False):
-
+class NeutrinoGenerationMetrics:
+    def __init__(self, device, class_names, feature_names, hist_xmin = -15, hist_xmax = 15, num_bins=60):
         self.sampler = DDIMSampler(device)
         self.device = device
-
-        self.point_cloud_generation = point_cloud_generation
-        self.neutrino_generation = neutrino_generation
 
         # Default values for histogram
         self.num_bins = num_bins
@@ -39,98 +35,41 @@ class GenerationMetrics:
     def update(self,
                model,
                input_set,
-               num_steps_global=20,
-               num_steps_point_cloud=40,
-               num_steps_neutrino=40,
+               num_steps=40,
                eta=1.0):
+
         model.eval()
 
         predict_distribution = dict()
         truth_distribution = dict()
 
+        #####################################
+        ## Generate invisible point cloud  ##
+        #####################################
 
-        if self.point_cloud_generation:
-            ####################################
-            ##  Step 1: Generate num vectors  ##
-            ####################################
+        data_shape = input_set['x_invisible'].shape
+        process_id = input_set['classification']
 
-            predict_for_num_vectors = partial(
-                model.predict_diffusion_vector,
-                cond_x=input_set,
-                mode="global"
-            )
-
-            data_shape = [input_set['num_sequential_vectors'].shape[0], 1]
-            process_id = input_set['classification']
-            generated_distribution = self.sampler.sample(
-                data_shape = data_shape,
-                pred_fn = predict_for_num_vectors,
-                normalize_fn = model.num_point_cloud_normalizer,
-                num_steps = num_steps_global,
-                eta = eta
-            )
-
-            predict_distribution["num_vectors"] = torch.floor(generated_distribution.flatten() + 0.5)
-            truth_distribution["num_vectors"] = input_set['num_sequential_vectors'].flatten()
-
-            ####################################
-            ##  Step 2: Generate point cloud  ##
-            ####################################
-
-            data_shape = input_set['x'].shape
-            process_id = input_set['classification']
-
-            predict_for_point_cloud = partial(
-                model.predict_diffusion_vector,
-                mode = "event",
-                cond_x=input_set,
-                noise_mask = input_set["x_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
-            ) # TODO: add stuff from previous step.
+        predict_for_neutrino = partial(
+            model.predict_diffusion_vector,
+            mode = "neutrino",
+            cond_x=input_set,
+            noise_mask = input_set["x_invisible_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
+        )
 
 
-            generated_distribution = self.sampler.sample(
-                data_shape=data_shape,
-                pred_fn=predict_for_point_cloud,
-                normalize_fn=model.sequential_normalizer,
-                eta=eta,
-                num_steps=num_steps_point_cloud,
-                noise_mask=input_set["x_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
-            )
+        generated_distribution = self.sampler.sample(
+            data_shape=data_shape,
+            pred_fn=predict_for_neutrino,
+            normalize_fn=model.sequential_normalizer,
+            eta=eta,
+            num_steps=num_steps,
+        )
 
-            masking = input_set["x_mask"]
-            for i in range(data_shape[-1]):
-                predict_distribution[f"point cloud-{self.feature_names[i]}"] = generated_distribution[..., i]
-                truth_distribution[f"point cloud-{self.feature_names[i]}"] = input_set['x'][..., i]
-
-        if self.neutrino_generation:
-            #####################################
-            ## Generate invisible point cloud  ##
-            #####################################
-
-            data_shape = input_set['x_invisible'].shape
-            process_id = input_set['classification']
-
-            predict_for_neutrino = partial(
-                model.predict_diffusion_vector,
-                mode = "neutrino",
-                cond_x=input_set,
-                noise_mask = input_set["x_invisible_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
-            )
-
-
-            generated_distribution = self.sampler.sample(
-                data_shape=data_shape,
-                pred_fn=predict_for_neutrino,
-                normalize_fn=model.sequential_normalizer,
-                eta=eta,
-                num_steps=num_steps_neutrino,
-            )
-
-            masking = input_set["x_invisible_mask"]
-            for i in range(data_shape[-1]):
-                predict_distribution[f"neutrino-{self.feature_names[i]}"] = generated_distribution[..., i]
-                truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
-
+        masking = input_set["x_invisible_mask"]
+        for i in range(data_shape[-1]):
+            predict_distribution[f"neutrino-{self.feature_names[i]}"] = generated_distribution[..., i]
+            truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
 
         #--------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():

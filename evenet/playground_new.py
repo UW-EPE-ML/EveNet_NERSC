@@ -117,8 +117,8 @@ torch_batch = {
 
 num_splits = df_number // 128
 classification = False
-assignment = True
-generation = False
+assignment = False
+generation = True
 neutrino_generation = False
 
 # Run forward

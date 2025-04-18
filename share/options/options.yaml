@@ -120,6 +120,8 @@ Training:
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       diffusion_steps: 100
+      generate_point_cloud: true
+      generate_neutrino: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]

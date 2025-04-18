@@ -101,6 +101,7 @@ class EveNetEngine(L.LightningModule):
 
         self.global_diffusion_steps = self.component_cfg.GlobalGeneration.diffusion_steps
         self.point_cloud_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
+        self.neutrino_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
 
         ###### Initialize Loss ######
         self.grad_norm: Union[GradNormController, None] = None
@@ -692,6 +693,7 @@ class EveNetEngine(L.LightningModule):
             classification=self.classification_cfg.include,
             regression=self.regression_cfg.include,
             generation=self.generation_cfg.include,
+            neutrino_generation=self.generation_cfg.include,
             assignment=self.assignment_cfg.include,
             normalization_dict=self.normalization_dict,
         )
