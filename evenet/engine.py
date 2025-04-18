@@ -533,16 +533,33 @@ class EveNetEngine(L.LightningModule):
 
         betas = (0.9, 0.99)
 
-        def create_optim_schedule(p, base_lr, warm_up: bool = True):
+        def create_optim_schedule(p, base_lr, warm_up: bool = True, optimizer_type: str= "lion"):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
             scaled_weight_decay = weight_decay / math.sqrt(world_size) * lr_factor
-            optimizer = Lion(
-                p,
-                lr=scaled_lr,
-                betas=betas,
-                weight_decay=scaled_weight_decay,
-                decoupled_weight_decay=decoupled_weight_decay,
-            )
+
+            if optimizer_type.lower() == "adamw":
+                optimizer = torch.optim.AdamW(
+                    p,
+                    lr=scaled_lr,
+                    betas=betas,
+                    weight_decay=scaled_weight_decay
+                )
+            elif optimizer_type.lower() == "lion":
+                optimizer = Lion(
+                    p,
+                    lr=scaled_lr,
+                    betas=betas,
+                    weight_decay=scaled_weight_decay,
+                    decoupled_weight_decay=decoupled_weight_decay,
+                )
+            else: # Default using Lion
+                optimizer = Lion(
+                    p,
+                    lr=scaled_lr,
+                    betas=betas,
+                    weight_decay=scaled_weight_decay,
+                    decoupled_weight_decay=decoupled_weight_decay,
+                )
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=warmup_steps if warm_up else 0,
@@ -564,7 +581,7 @@ class EveNetEngine(L.LightningModule):
                 print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
                 continue
 
-            opt, sch = create_optim_schedule(params, base_lr=modules['lr'], warm_up=modules['warm_up'])
+            opt, sch = create_optim_schedule(params, base_lr=modules['lr'], warm_up=modules['warm_up'], optimizer_type=modules["optimizer_type"])
             optimizers.append(opt)
             schedulers.append({
                 "scheduler": sch,
@@ -639,6 +656,7 @@ class EveNetEngine(L.LightningModule):
                 self.model_parts[group] = {
                     'lr': cfg['learning_rate'],
                     'warm_up': cfg.get('warm_up', True),
+                    'optimizer_type': cfg.get('optimizer_type', 'lion'),
                     'modules': [],
                 }
             self.model_parts[group]['modules'].append(key)

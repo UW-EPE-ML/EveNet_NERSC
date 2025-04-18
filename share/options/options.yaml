@@ -20,6 +20,7 @@ Training:
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
+      optimizer_type: "lion"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -29,6 +30,7 @@ Training:
     PET:
       learning_rate: *lr
       optimizer_group: "body"
+      optimizer_type: "lion"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -38,6 +40,7 @@ Training:
     ObjectEncoder:
       learning_rate: *lr
       optimizer_group: "object_encoder"
+      optimizer_type: "lion"
       warm_up: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -47,6 +50,7 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
+      optimizer_type: "lion"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
@@ -58,6 +62,7 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
+      optimizer_type: "lion"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
@@ -69,6 +74,7 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
+      optimizer_type: "lion"
       warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
@@ -82,6 +88,7 @@ Training:
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
+      optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
       diffusion_steps: 20
@@ -93,6 +100,7 @@ Training:
     EventGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
+      optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
       diffusion_steps: 100
