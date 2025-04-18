@@ -47,7 +47,7 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
-      warm_up: false
+      warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
       freeze:
@@ -58,7 +58,7 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
-      warm_up: false
+      warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
       freeze:
@@ -69,7 +69,7 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      warm_up: false
+      warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
       include: false # whether to build in network
@@ -81,7 +81,7 @@ Training:
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
-      warm_up: false
+      warm_up: true
       include: false # whether to build in network
       diffusion_steps: 20
       freeze:
@@ -92,7 +92,7 @@ Training:
     EventGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
-      warm_up: false
+      warm_up: true
       include: false # whether to build in network
       diffusion_steps: 100
       freeze:
