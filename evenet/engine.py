@@ -300,7 +300,7 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        self.safe_manual_backward(loss.mean(), optimizers=optimizers)
+        self.safe_manual_backward(loss.mean())
 
         self.check_gradient()
 
@@ -504,8 +504,8 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def backward(self, loss, *args, **kwargs):
-        super().backward(loss, *args, **kwargs)
+    def safe_manual_backward(self, loss, *args, **kwargs):
+        super().manual_backward(loss, *args, **kwargs)
         for name, param in self.named_parameters():
             if param.grad is not None:
                 if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
