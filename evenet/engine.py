@@ -160,7 +160,7 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def shared_step(self, batch: Any, batch_idx: int, active_components: list[str]):
+    def shared_step(self, batch: Any, batch_idx: int, active_components: list[str], loss_head_dict: dict):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -174,7 +174,6 @@ class EveNetEngine(L.LightningModule):
         )
 
         loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
-        loss_head_dict = {}
         loss_detailed_dict = {}
         if self.classification_cfg.include:
             scaled_cls_loss = cls_step(
@@ -200,7 +199,7 @@ class EveNetEngine(L.LightningModule):
                 reg_output,
                 target_regression.float(),
                 target_regression_mask.float(),
-            )
+            ).mean()
             loss = loss + reg_loss * self.regression_cfg.loss_scale
 
             loss_head_dict["regression"] = reg_loss
@@ -228,7 +227,6 @@ class EveNetEngine(L.LightningModule):
                 subprocess_id=inputs["subprocess_id"],
                 **self.ass_args['step']
             )
-            loss_head_dict['assignment'] = scaled_ass_loss
 
             if "assignment" in active_components or active_components == []:
                 loss = loss + scaled_ass_loss
@@ -284,17 +282,13 @@ class EveNetEngine(L.LightningModule):
             ]
             active_components = active_progress['components']
 
+        gradient_heads, loss_head = self.prepare_heads_loss()
+
         loss, loss_head, loss_dict, _ = self.shared_step(
-            batch=batch, batch_idx=batch_idx, active_components=active_components
+            batch=batch, batch_idx=batch_idx,
+            active_components=active_components,
+            loss_head_dict=loss_head
         )
-
-        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
-        for name, val in loss_head.items():
-            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
-
-        for name, val in loss_dict.items():
-            for n, v in val.items():
-                self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         # === Manual optimization ===
         for opt in optimizers:
@@ -302,13 +296,24 @@ class EveNetEngine(L.LightningModule):
 
         self.safe_manual_backward(loss.mean())
 
-        self.check_gradient()
+        self.check_gradient(gradient_heads)
 
         for opt in optimizers:
             opt.step()
 
         for sch in schedulers:
             sch.step()
+
+        # -------------------------------------
+        # logging
+        # -------------------------------------
+        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
+        for name, val in loss_head.items():
+            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            for n, v in val.items():
+                self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         return loss.mean()
 
@@ -324,8 +329,12 @@ class EveNetEngine(L.LightningModule):
             active_progress = self.progressive_training[0]
             active_components = active_progress['components']
 
+        _, loss_head = self.prepare_heads_loss()
+
         loss, loss_head, loss_dict, _ = self.shared_step(
-            batch=batch, batch_idx=batch_idx, active_components=active_components
+            batch=batch, batch_idx=batch_idx,
+            active_components=active_components,
+            loss_head_dict=loss_head
         )
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
@@ -339,27 +348,7 @@ class EveNetEngine(L.LightningModule):
 
         return loss.mean()
 
-    def check_gradient(self):
-        # Define the heads you want to track
-        gradient_heads = {}
-
-        if self.classification_cfg.include:
-            gradient_heads["classification"] = self.model.Classification
-
-        if self.regression_cfg.include:
-            gradient_heads["regression"] = self.model.Regression
-
-        if self.generation_cfg.include:
-            gradient_heads["generation-global"] = self.model.GlobalGeneration
-            gradient_heads["generation-event"] = self.model.EventGeneration
-
-        if self.assignment_cfg.include:
-            assignment_heads = self.model.Assignment.multiprocess_assign_head
-            gradient_heads.update({
-                f'assignment_{name}': assignment_heads[name]
-                for name in assignment_heads.keys()
-            })
-
+    def check_gradient(self, gradient_heads: dict[str, torch.nn.Module]):
         for name, module in gradient_heads.items():
             grad_mag = get_total_gradient(module)
             num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
@@ -662,18 +651,19 @@ class EveNetEngine(L.LightningModule):
                     print(f"  --> Optimizer: {component} ❌")
 
         ### Initialize Gradient Norm ###
+        ### DISABLED for now ###
         if self.grad_norm is None and self.config.options.Training.get("GradientNorm", False):
             self.grad_norm = GradNormController(
                 task_names=[
                     "classification",
                     "regression",
-                    *[name for name in self.config.resonance],
+                    *[f"assignment_{name}" for name in self.config.resonance],
                 ],
                 **self.config.options.Training.GradientNorm,
             )
             self.register_module("grad_norm", self.grad_norm)
 
-            print(f"{self.__class__.__name__} GRADIENT NORM Applied!")
+            print(f"{self.__class__.__name__} GRADIENT NORM Applied [Currently DISABLED for development]!")
             print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
 
     def on_save_checkpoint(self, checkpoint):
@@ -681,4 +671,35 @@ class EveNetEngine(L.LightningModule):
         new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
         checkpoint["state_dict"] = new_sd
 
-        pass
+    def prepare_heads_loss(self):
+        # Define the heads you want to track
+        gradient_heads = {}
+        loss_heads = {}
+
+        if self.classification_cfg.include:
+            gradient_heads["classification"] = self.model.Classification
+            loss_heads["classification"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.regression_cfg.include:
+            gradient_heads["regression"] = self.model.Regression
+            loss_heads["regression"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.generation_cfg.include:
+            gradient_heads["generation-global"] = self.model.GlobalGeneration
+            gradient_heads["generation-event"] = self.model.EventGeneration
+
+            loss_heads["generation-global"] = torch.zeros(1, device=self.device, requires_grad=True)
+            loss_heads["generation-event"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.assignment_cfg.include:
+            assignment_heads = self.model.Assignment.multiprocess_assign_head
+            gradient_heads.update({
+                f'assignment_{name}': assignment_heads[name]
+                for name in assignment_heads.keys()
+            })
+            loss_heads.update({
+                f'assignment_{name}': torch.zeros(1, device=self.device, requires_grad=True)
+                for name in assignment_heads.keys()
+            })
+
+        return gradient_heads, loss_heads

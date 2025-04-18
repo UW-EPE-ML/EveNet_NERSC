@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class GradNormController(nn.Module):
-    def __init__(self, task_names: list[str], alpha: float = 0.12, lr: float = 1e-3):
+    def __init__(self, task_names: list[str], alpha: float = 0.12, learning_rate: float = 1e-3):
         """
         Args:
             task_names (list[str]): Names of loss heads/tasks
@@ -20,7 +20,7 @@ class GradNormController(nn.Module):
         })
 
         self.loss_weight_optimizer: torch.optim.Optimizer = torch.optim.Adam(
-            self.loss_weights.parameters(), lr=lr
+            self.loss_weights.parameters(), lr=learning_rate
         )
 
         self.initial_losses: dict[str, torch.Tensor] = {}
@@ -56,11 +56,16 @@ class GradNormController(nn.Module):
                 k: v.detach().clone() for k, v in loss_dict.items()
             }
 
+        print(self.initial_losses)
+        print(head_modules.keys())
+
         grads: dict[str, torch.Tensor] = {}
         weighted_losses: dict[str, torch.Tensor] = {
             name: self.loss_weights[name] * loss_dict[name]
             for name in head_modules.keys()
         }
+
+        print(weighted_losses)
 
         for name, weighted_loss in weighted_losses.items():
             head_modules[name].zero_grad(set_to_none=True)
@@ -89,9 +94,9 @@ class GradNormController(nn.Module):
 
         G: torch.Tensor = torch.stack([grads[k] for k in head_modules])
         T: torch.Tensor = torch.stack([targets[k] for k in head_modules])
-        gradnorm_loss: torch.Tensor = nn.functional.l1_loss(G, T)
+        grad_norm_loss: torch.Tensor = nn.functional.l1_loss(G, T)
 
-        return total_weighted_loss, gradnorm_loss, grads
+        return total_weighted_loss, grad_norm_loss, grads
 
     def step(self, grad_norm_loss: torch.Tensor) -> None:
         self.loss_weight_optimizer.zero_grad()

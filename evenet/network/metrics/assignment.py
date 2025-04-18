@@ -105,6 +105,7 @@ def get_assignment_necessaries(
             'event_particles': event_particles,
             'event_permutations': event_info.event_permutations,
             'product_symbolic_groups': event_info.product_symbolic_groups,
+            'process_to_topology': event_info.process_to_topology
         }
     }
 
@@ -808,7 +809,8 @@ def shared_step(
         point_cloud,
         point_cloud_mask,
         subprocess_id,
-        metrics: dict[str, SingleProcessAssignmentMetrics]
+        metrics: dict[str, SingleProcessAssignmentMetrics],
+        process_to_topology: dict[str, dict[str, float]],
 ):
     num_processes = len(event_permutations)
 
@@ -833,8 +835,9 @@ def shared_step(
         num_targets=num_targets
     )
 
-    assignment_loss = torch.zeros(batch_size, device=device, requires_grad=True)
-    detected_loss = torch.zeros(batch_size, device=device, requires_grad=True)
+    assignment_loss = torch.zeros(1, device=device, requires_grad=True)
+    detected_loss = torch.zeros(1, device=device, requires_grad=True)
+    active_heads_sum = {k: 0 for k in loss_dict.keys() if 'assignment_' in k}
     for process in process_names:
         assignment_predict[process] = predict(
             assignments=assignments[process],
@@ -859,10 +862,21 @@ def shared_step(
         assignment_loss = assignment_loss + symmetric_losses["assignment"][process]
         detected_loss = detected_loss + symmetric_losses["detection"][process]
 
-    loss_dict['assignment'] = assignment_loss / num_processes
-    loss_dict['detection'] = detected_loss / num_processes
+        for topology, topo_weight in process_to_topology[process].items():
+            ass_name = f'assignment_{topology}'
+            ass_total = symmetric_losses["assignment"][process] + symmetric_losses["detection"][process]
+            loss_dict[ass_name] = loss_dict[ass_name] + topo_weight * ass_total
+            active_heads_sum[ass_name] += topo_weight
 
-    total_loss = assignment_loss_scale * assignment_loss + detection_loss_scale * detected_loss
+    loss_dict['assignment'] = assignment_loss / num_processes * assignment_loss_scale
+    loss_dict['detection'] = detected_loss / num_processes * detection_loss_scale
+
+    for actives, active_sum in active_heads_sum.items():
+        loss_dict[actives] = loss_dict[actives] / active_sum
+        # del loss_dict[actives]
+        # loss_dict[actives.replace("assignment_", "")] = value
+
+    total_loss = loss_dict['assignment'] + loss_dict['detection']
 
     return total_loss, assignment_predict
 
