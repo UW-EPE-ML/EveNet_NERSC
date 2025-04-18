@@ -671,7 +671,6 @@ class EveNetEngine(L.LightningModule):
         checkpoint["state_dict"] = new_sd
 
     def prepare_heads_loss(self):
-        # Define the heads you want to track
         gradient_heads = {}
         loss_heads = {}
 
