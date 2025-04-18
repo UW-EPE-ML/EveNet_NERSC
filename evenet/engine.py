@@ -528,7 +528,7 @@ class EveNetEngine(L.LightningModule):
         print("weight_decay: ", weight_decay)
         print("decoupled_weight_decay: ", decoupled_weight_decay)
 
-        betas = (0.95, 0.99)
+        betas = (0.9, 0.99)
 
         def create_optim_schedule(p, base_lr, warm_up: bool = True):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
