@@ -256,39 +256,127 @@ PERMUTATIONS:
 # ------------------------------------------------------------------------------
 REGRESSIONS:
 
+  TTHadronics:
+    t1:
+      - pt
+      - eta
+      - phi
+    t2:
+      - pt
+      - eta
+      - phi
+
   TT1L:
+    t1:
+      - pt
+      - eta
+      - phi
+    t2:
+      - pt
+      - eta
+      - phi
     t2/v:
       - px
       - py
       - pz
 
   TT2L:
+    t1:
+      - pt
+      - eta
+      - phi
     t1/v:
       - px
       - py
       - pz
+    t2:
+      - pt
+      - eta
+      - phi
     t2/v:
       - px
       - py
       - pz
 
+  WJetsToQQ:
+    W:
+      - pt
+      - eta
+      - phi
+
+  ZJetsToQQ:
+    Z:
+      - pt
+      - eta
+      - phi
+
+  ZJetsToLL:
+    Z:
+      - pt
+      - eta
+      - phi
+
+  ZZ_2L:
+    Z1:
+      - pt
+      - eta
+      - phi
+    Z2:
+      - pt
+      - eta
+      - phi
+
   WZ_1L:
+    W:
+      - pt
+      - eta
+      - phi
     W/v:
       - px
       - py
       - pz
+    Z:
+      - pt
+      - eta
+      - phi
 
   WW_1L:
+    W1:
+      - pt
+      - eta
+      - phi
     W1/v:
       - px
       - py
       - pz
+    W2:
+      - pt
+      - eta
+      - phi
+
+  WZ_2L:
+    W:
+      - pt
+      - eta
+      - phi
+    Z:
+      - pt
+      - eta
+      - phi
 
   WZ_3L:
+    W:
+      - pt
+      - eta
+      - phi
     W/v:
       - px
       - py
       - pz
+    Z:
+      - pt
+      - eta
+      - phi
 
   WJetsToLNu:
     W/v:

@@ -108,7 +108,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
     shape_metadata = None
 
     for process in global_config.process_info:
-    # for process in ["TT1L", "TT2L", "WZ_3L"]:
+        # for process in ["TT1L", "TT2L", "WZ_3L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -175,7 +175,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
 
         assignment_mask_per_process = {}
-        assignment_idx = {key:i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
+        assignment_idx = {key: i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
         for key, i in assignment_idx.items():
             particle = key.split('/')[2]
             assignment_mask_per_process[particle] = assignments['assignments-mask'][:, i]
@@ -201,11 +201,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
-        
+
     if len(converted_data) == 0:
         print(f"[WARNING] No data found for any of the processes in {in_dir}")
         return None
-    
+
     final_table = pa.concat_tables(converted_data)
 
     shuffle_indices = np.random.default_rng(31).permutation(final_table.num_rows)
@@ -287,7 +287,7 @@ def main(cfg):
         if norm_stats is None:
             print(f"[WARNING] No data found for {cfg.in_dir}. Skipping this run.")
             return
-        
+
         PostProcessor.merge(
             [norm_stats],
             regression_names=global_config.event_info.regression_names,
