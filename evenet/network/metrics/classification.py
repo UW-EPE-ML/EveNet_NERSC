@@ -237,6 +237,7 @@ def shared_step(
         cls_output,
         target_classification,
         class_weight=class_weight.to(device=device),
+        reduction="mean",
     )
     loss = cls_loss * loss_scale
     loss_dict["classification"] = cls_loss
