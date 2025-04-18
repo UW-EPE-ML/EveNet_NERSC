@@ -507,7 +507,7 @@ class EveNetEngine(L.LightningModule):
         batch_size = cfg['batch_size']
         epochs = cfg['epoch']
         warm_up_factor = cfg.get('warm_up_factor', 0.5)
-        weight_decay = cfg.get('weight_decay', 0)
+        weight_decay = float(cfg.get('weight_decay', 0))
         decoupled_weight_decay = cfg.get('decoupled_weight_decay', False)
 
         # Distributed training info
