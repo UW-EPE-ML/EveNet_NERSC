@@ -163,6 +163,66 @@ def register_dataset(
     return ds, total_events
 
 
+def prepare_datasets(
+        base_dir,
+        process_event_batch_partial,
+        platform_info,
+        load_all_in_ram: bool = False,
+) -> tuple[Dataset, Dataset, int, int]:
+    """
+    Prepares train and validation datasets based on args.load_all.
+    """
+    # Collect and sort all parquet files
+    parquet_files: list[str] = sorted(map(str, base_dir.glob("*.parquet")))
+    np.random.seed(42)
+    np.random.shuffle(parquet_files)
+
+    # Read and split by file or load into RAM
+    if load_all_in_ram:
+        # Load all files into memory first
+        ds = ray.data.read_parquet(
+            parquet_files,
+            override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
+            ray_remote_args={"num_cpus": 0.5},
+        )
+
+        dataset_limit = global_config.options.Dataset.dataset_limit
+        total_events = ds.count()
+        ds = ds.limit(int(total_events * dataset_limit))
+
+        # Shuffle rows (not files!)
+        ds = ds.random_shuffle(seed=42)
+
+        # Split into train/val by rows
+        train_ratio = global_config.options.Dataset.train_validation_split
+        train_ds, val_ds = ds.split_proportionately([train_ratio])
+
+        # Process batches
+        train_ds = train_ds.map_batches(
+            process_event_batch_partial,
+            zero_copy_batch=True,
+            batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
+        )
+        val_ds = val_ds.map_batches(
+            process_event_batch_partial,
+            zero_copy_batch=True,
+            batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
+        )
+
+        return train_ds, val_ds, train_ds.count(), val_ds.count()
+
+    else:
+        split_index = int(global_config.options.Dataset.train_validation_split * len(parquet_files))
+        train_files = parquet_files[:split_index]
+        val_files = parquet_files[split_index:]
+
+        dataset_limit = global_config.options.Dataset.dataset_limit
+        train_ds, train_count = register_dataset(train_files, process_event_batch_partial, platform_info, dataset_limit)
+        val_ds, val_count = register_dataset(val_files, process_event_batch_partial, platform_info, dataset_limit)
+
+        return train_ds, val_ds, train_count, val_count
+
+
 def main(args):
     assert (
             "WANDB_API_KEY" in os.environ
@@ -190,23 +250,30 @@ def main(args):
 
     process_event_batch_partial = partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
 
-    # Collect all .parquet file paths
-    parquet_files = sorted(base_dir.glob("*.parquet"))  # sort for reproducibility
-    parquet_files = list(map(str, parquet_files))  # convert to str if needed
+    train_ds, valid_ds, total_events, val_count = prepare_datasets(
+        base_dir,
+        process_event_batch_partial,
+        platform_info,
+        args.load_all,
+    )
 
-    # Shuffle the file list
-    np.random.seed(42)
-    np.random.shuffle(parquet_files)
-
-    # Split the file list
-    split_index = int(global_config.options.Dataset.train_validation_split * len(parquet_files))
-    train_files = parquet_files[:split_index]
-    val_files = parquet_files[split_index:]
-
-    # Create Ray datasets
-    dataset_limit = global_config.options.Dataset.dataset_limit
-    train_ds, total_events = register_dataset(train_files, process_event_batch_partial, platform_info, dataset_limit)
-    valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info, dataset_limit)
+    # # Collect all .parquet file paths
+    # parquet_files = sorted(base_dir.glob("*.parquet"))  # sort for reproducibility
+    # parquet_files = list(map(str, parquet_files))  # convert to str if needed
+    #
+    # # Shuffle the file list
+    # np.random.seed(42)
+    # np.random.shuffle(parquet_files)
+    #
+    # # Split the file list
+    # split_index = int(global_config.options.Dataset.train_validation_split * len(parquet_files))
+    # train_files = parquet_files[:split_index]
+    # val_files = parquet_files[split_index:]
+    #
+    # # Create Ray datasets
+    # dataset_limit = global_config.options.Dataset.dataset_limit
+    # train_ds, total_events = register_dataset(train_files, process_event_batch_partial, platform_info, dataset_limit)
+    # valid_ds, _ = register_dataset(val_files, process_event_batch_partial, platform_info, dataset_limit)
 
     run_config = RunConfig(
         name="EveNet-Training",
@@ -250,6 +317,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="EveNet Training Program")
     parser.add_argument("config", help="Path to config file")
+    # argument for loading all dataset files into RAM
+    parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
 
     args, _ = parser.parse_known_args()
 
