@@ -532,11 +532,12 @@ class EveNetEngine(L.LightningModule):
 
         def create_optim_schedule(p, base_lr, warm_up: bool = True):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
+            scaled_weight_decay = weight_decay / math.sqrt(world_size) * lr_factor
             optimizer = Lion(
                 p,
                 lr=scaled_lr,
                 betas=betas,
-                weight_decay=weight_decay,
+                weight_decay=scaled_weight_decay,
                 decoupled_weight_decay=decoupled_weight_decay,
             )
             scheduler = get_cosine_schedule_with_warmup(
