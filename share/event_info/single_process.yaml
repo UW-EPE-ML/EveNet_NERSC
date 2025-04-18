@@ -7,13 +7,13 @@ INPUTS:
   # -----------------------------------------------------------------------------
   SEQUENTIAL:
     Source:
-#      mass: log_normalize
+      mass: log_normalize
       pt: log_normalize
-#      eta: normalize
-      phi: normalize_uniform
-#      btag: none
-#      isLepton: none
-#      charge: none
+      eta: normalize
+      phi: normalize
+      btag: none
+      isLepton: none
+      charge: none
 
   # ---------------------------------------------------------------------
   # REQUIRED - GLOBAL - inputs which will have a single vector per event.
@@ -29,7 +29,7 @@ INPUTS:
 # ----------------------------------------------------------------------
 EVENT:
 
-  TTHadronics:
+  ttZ_FullHadronics:
     t1:
       - b
       - q1
@@ -38,44 +38,24 @@ EVENT:
       - b
       - q1
       - q2
-
-  TT1L:
-    t1:
-      - b
-      - q1
-      - q2
-    t2:
-      - b
-      - l
-
-
-  ZJetsToLL:
     Z:
-      - l1
-      - l2
+      - q1
+      - q2
 
 
 # ---------------------------------------------------------
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
 # ---------------------------------------------------------
 PERMUTATIONS:
-
-  TTHadronics:
+  ttZ_FullHadronics:
     EVENT:
       - [ t1, t2 ]
     t1:
       - [ q1, q2 ]
     t2:
       - [ q1, q2 ]
-
-  TT1L:
-    t1:
-      - [ q1, q2 ]
-
-
-  ZJetsToLL:
     Z:
-      - [ l1, l2 ]
+      - [ q1, q2 ]
 
 
 
@@ -84,32 +64,17 @@ PERMUTATIONS:
 # ------------------------------------------------------------------------------
 REGRESSIONS:
 
-  TT1L:
-    t1:
-      - pt
-      - eta
-      - phi
-    t2:
-      - pt
-      - eta
-      - phi
-    t2/v:
-      - px
-      - py
-      - pz
-
 
 # -----------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
 # -----------------------------------------------------------------------------
 CLASSIFICATIONS:
-  EVENT:
-    - signal
+
 
 CLASSLABEL:
   EVENT:
     signal:
-      - [ TT, ZJets ]
+      - [ ttZ ]
 
 PARTICLE_PROPERTIES:
   - Mass
@@ -123,12 +88,3 @@ GENERATIONS:
   Conditions:
     - met
     - met_phi
-
-  Neutrinos:
-#    mass: empty
-#    px: normalize
-    py: normalize
-    pz: normalize
-#    btag: empty
-#    isLepton: empty
-#    charge: empty

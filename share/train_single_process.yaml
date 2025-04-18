@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet/tiny_onlyptphi//"
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet/ttZ"
   number_of_workers: 4
   resources_per_worker: {
     "CPU": 30,
@@ -9,7 +9,7 @@ platform:
   prefetch_batches: 2
 
 wandb:
-  project: "Generation-test"
+  project: "Pretrain-tiny"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
   tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node" ]
@@ -19,28 +19,20 @@ options:
 
   # overwrites
   Training:
-    epochs: 200
-    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet/v2/"
+    epochs: 40
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet/ttZ/checkpoints"
     model_checkpoint_load_path: null
-    learning_rate: 1e-4
 
     Components:
       Regression:
         include: false
 
       Assignment:
-        include: false
-        detection_loss_scale: 0.0
-
-      GlobalGeneration:
         include: true
-        loss_scale: 1.0
-        diffusion_steps: 40
-
-
+        detection_loss_scale: 1.0
   Dataset:
     dataset_limit: 1.0
-    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet/tiny_onlyptphi//normalization.pt"
+    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet/ttZ/normalization.pt"
 
 network:
   default: network/pretrain_tiny.yaml
@@ -49,7 +41,7 @@ network:
   # ...
 
 event_info:
-  default: event_info/multi_process_tiny.yaml
+  default: event_info/single_process.yaml
 
   # overwrites
   # ...

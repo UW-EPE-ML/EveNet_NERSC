@@ -1,0 +1,17 @@
+process_info:
+  default: process_info/single_process.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info/single_process.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance/standard_model.yaml
+
+  # overwrites
+  # ...
