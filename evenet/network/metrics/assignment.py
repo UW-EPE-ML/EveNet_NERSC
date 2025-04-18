@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 import wandb
+from matplotlib.lines import Line2D
 
 
 @time_decorator(name="[Assignment] reconstruct_mass_peak")
@@ -205,6 +206,8 @@ class SingleProcessAssignmentMetrics:
         self.detection_WP = detection_WP
         self.ptetaphimass_index = ptetaphimass_index
         self.process = process
+        self.detection_cut = 0.0
+
         clusters = []
         cluster_groups = []
 
@@ -305,7 +308,10 @@ class SingleProcessAssignmentMetrics:
             truth_masks,
             inputs,
             inputs_mask,
+            detection_cut=0.5
     ):
+
+        self.detection_cut = detection_cut # Update the self property
 
         best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
 
@@ -367,8 +373,9 @@ class SingleProcessAssignmentMetrics:
                 hist_name = f"{num_resonance + 1}{cluster_name}"
                 for local_resonance in range(len(names)):
                     truth_local = truth[local_resonance, :, :]
-                    truth_mask_local = truth_mask & truth_masking[local_resonance, :]
+                    truth_mask_local = truth_mask
                     truth_local = truth_local[truth_mask_local]
+                    truth_masking_local = truth_masking[local_resonance, truth_mask_local]
                     if not (truth_local.size()[0] > 0):
                         continue
 
@@ -377,7 +384,10 @@ class SingleProcessAssignmentMetrics:
                     jet = input[:, :, self.ptetaphimass_index]
 
                     # Fill truth metrics
-                    truth_mass = reconstruct_mass_peak(jet, truth_local, input_mask)
+                    truth_mass = reconstruct_mass_peak(
+                        jet[truth_masking_local],
+                        truth_local[truth_masking_local],
+                        input_mask[truth_masking_local])
                     hist, _ = np.histogram(truth_mass.detach().cpu().numpy(), bins=self.bins)
                     self.truth_metrics[hist_name]["mass"] += hist
 
@@ -390,17 +400,18 @@ class SingleProcessAssignmentMetrics:
                     predict_correct = prediction_local[correct_local]
                     detection_correct = detection_local[correct_local]
                     assign_score_correct = assign_score_local[correct_local]
+
                     if prediction_local.size()[0] > 0:
                         reco_mass_correct = reconstruct_mass_peak(
                             jet[correct_local], predict_correct, input_mask[correct_local]
                         )
-                        hist, _ = np.histogram(reco_mass_correct.detach().cpu().numpy(), bins=self.bins)
+                        hist, _ = np.histogram(reco_mass_correct[detection_correct>detection_cut].detach().cpu().numpy(), bins=self.bins)
                         self.predict_metrics_correct[hist_name]["mass"] += hist
 
                         hist, _ = np.histogram(detection_correct.detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_correct[hist_name]["detection_score"] += hist
 
-                        hist, _ = np.histogram(assign_score_correct.detach().cpu().numpy(), bins=self.bins_score)
+                        hist, _ = np.histogram(assign_score_correct[detection_correct>detection_cut].detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_correct[hist_name]["assignment_score"] += hist
 
                     prediction_false = prediction_local[~correct_local]
@@ -410,13 +421,13 @@ class SingleProcessAssignmentMetrics:
                         reco_mass_false = reconstruct_mass_peak(
                             jet[~correct_local], prediction_false, input_mask[~correct_local]
                         )
-                        hist, _ = np.histogram(reco_mass_false.detach().cpu().numpy(), bins=self.bins)
+                        hist, _ = np.histogram(reco_mass_false[detection_false>detection_cut].detach().cpu().numpy(), bins=self.bins)
                         self.predict_metrics_wrong[hist_name]["mass"] += hist
 
                         hist, _ = np.histogram(detection_false.detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_wrong[hist_name]["detection_score"] += hist
 
-                        hist, _ = np.histogram(assign_score_false.detach().cpu().numpy(), bins=self.bins_score)
+                        hist, _ = np.histogram(assign_score_false[detection_false>detection_cut].detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_wrong[hist_name]["assignment_score"] += hist
 
     def check_correct_assignment(
@@ -512,7 +523,11 @@ class SingleProcessAssignmentMetrics:
         fig, ax = plt.subplots(figsize=(9, 6))
         base_colors = plt.cm.Set2(np.linspace(0.2, 0.8, 2))
         lighter = lambda c: tuple(min(1.0, x + 0.3) for x in c)
-
+        efficiency_detection = (predict_correct.sum() + predict_wrong.sum()) / truth.sum()
+        text = f"* reco eff (WP: {self.detection_cut}): {efficiency_detection:.2f}"
+        # if train_predict_correct is not None:
+        #     efficiency_detection_train = (train_predict_correct.sum() + train_predict_wrong.sum())/truth.sum()
+        #     text += f"(train: {efficiency_detection_train:.2f})"
         ## Self plot
 
         total_pred = np.zeros_like(predict_wrong)
@@ -623,6 +638,9 @@ class SingleProcessAssignmentMetrics:
                 print("Prediction fit failed")
                 logs["train_mass"] = None
                 logs["train_resolution"] = None
+
+        custom_text = Line2D([], [], color='none', label=text)
+        ax.add_line(custom_text)
 
         ax.legend()
         fig.tight_layout()
@@ -917,8 +935,8 @@ def shared_epoch_end(
             for name, log_set in logs.items():
                 for set_name, log in log_set.items():
                     logger.log({
-                        f"{set_name}/{name}": log
-                    })
+                        f"{set_name}/{name}": log}
+                    )
             logger.log({
                 f"assignment_reco_mass/{process}/{name}": wandb.Image(fig)
                 for name, fig in figs.items()
