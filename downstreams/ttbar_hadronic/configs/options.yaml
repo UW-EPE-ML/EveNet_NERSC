@@ -1,15 +1,15 @@
 Training:
-  epochs: 100
+  epochs: 200
 
   model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
 
   pretrain_model_load_path: null
 
-  learning_rate: &lr 0.00001
+  learning_rate: &lr 0.00005
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
-  weight_decay: 1e-3
+  weight_decay: 1e-2
   decoupled_weight_decay: true
 
   diffusion_every_n_epochs: 20 # how often to run diffusion
@@ -47,9 +47,9 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
-      warm_up: true
+      warm_up: false
       loss_scale: 1.0 # loss coefficient
-      include: true # whether to build in network
+      include: false # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -58,9 +58,9 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
-      warm_up: true
+      warm_up: false
       loss_scale: 1.0 # loss coefficient
-      include: true # whether to build in network
+      include: false # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -69,10 +69,11 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      warm_up: true
+      warm_up: false
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
-      include: false # whether to build in network
+      focal_gamma: 0.0
+      include: true # whether to build in network
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -80,8 +81,8 @@ Training:
 
     GlobalGeneration:
       learning_rate: *lr
-      optimizer_group: "generation"
-      warm_up: true
+      optimizer_group: "generator"
+      warm_up: false
       include: false # whether to build in network
       diffusion_steps: 20
       freeze:
@@ -91,14 +92,16 @@ Training:
 
     EventGeneration:
       learning_rate: *lr
-      optimizer_group: "generation"
-      warm_up: true
+      optimizer_group: "generator"
+      warm_up: false
       include: false # whether to build in network
       diffusion_steps: 100
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
+
+
 
   ProgressiveTraining:
     - name: "vanilla"
@@ -111,11 +114,8 @@ Training:
         - assignment
         - generation
 
-  GradientNorm:
-    alpha: 0.12
-    learning_rate: 0.0001
 
 Dataset:
   dataset_limit: 1.0
   normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
-  train_validation_split: 0.7
+  train_validation_split: 0.9

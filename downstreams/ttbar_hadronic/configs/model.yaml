@@ -8,7 +8,7 @@ Body:
     linear_block_type: GRU
     transformer_dim_scale: 2.0
     initial_embedding_dim: 16
-    hidden_dim: 128
+    hidden_dim: 64
     normalization: LayerNorm
     linear_activation: GELU
     num_embedding_layers: 3
@@ -17,7 +17,7 @@ Body:
   PET:
     num_feature_keep: 0
     feature_drop: 0.0
-    hidden_dim: 128
+    hidden_dim: 64
     enable_local_embedding: true
     local_Krank: 5
     local_point_index:
@@ -34,13 +34,16 @@ Body:
     dropout: 0.1
 
   ObjectEncoder:
-    hidden_dim: 128
+    hidden_dim: 64
     position_embedding_dim: 32
     num_attention_heads: 4
     transformer_dim_scale: 2.0
     num_embedding_layers: 2
     num_encoder_layers: 4
     dropout: 0.1
+    skip_connection: true
+    encoder_skip_connection: true
+
 
 
 Classification:
@@ -58,9 +61,9 @@ Regression:
 Assignment:
   feature_drop: 0.0
   num_feature_keep: 0
-  hidden_dim: 128
+  hidden_dim: 64
   split_symmetric_attention: true
-  position_embedding_dim: 32
+  position_embedding_dim: 16
   num_attention_heads: 8
   transformer_dim_scale: 2.0
   num_jet_embedding_layers: 0
@@ -72,6 +75,8 @@ Assignment:
   activation: GELU
   num_encoder_layers: 4 # At least 1 layer, otherwise detection will not work
   num_linear_layers: 2
+  skip_connection: true
+  encoder_skip_connection: true
 
 GlobalGeneration:
   num_layers: 3
