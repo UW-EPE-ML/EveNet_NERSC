@@ -25,6 +25,7 @@ from evenet.network.metrics.generation import shared_step as gen_step, shared_ep
 from evenet.network.loss.grad_norm import GradNormController
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
+from evenet.utilities.tool import get_transition
 
 
 def get_total_gradient(module, norm_type="l1"):
@@ -41,6 +42,9 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.steps_per_epoch = None
+        self.total_steps = None
+        self.current_step = None  # hack global_step due to incorrect behavior in lightning for multiple optimizers
         self.optimizer_name_map = None
         self.optimizer_name_list = []
         self.classification_metrics_train = None
@@ -148,6 +152,7 @@ class EveNetEngine(L.LightningModule):
 
         ###### Progressive Training ######
         self.progressive_training: list = global_config.options.Training.get("ProgressiveTraining", [])
+        self.previous_progress: Union[dict, None] = None
         self.progressive_index = 0
 
         ###### Last ######
@@ -160,7 +165,10 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def shared_step(self, batch: Any, batch_idx: int, active_components: list[str], loss_head_dict: dict):
+    def shared_step(
+            self, batch: Any, batch_idx: int, active_components: dict[str, list[str]], loss_head_dict: dict,
+            transition_factor
+    ):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -173,7 +181,7 @@ class EveNetEngine(L.LightningModule):
             batch_size=batch_size,
         )
 
-        loss = torch.zeros(batch_size, device=self.device, requires_grad=True)
+        loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
         if self.classification_cfg.include:
             scaled_cls_loss = cls_step(
@@ -187,8 +195,7 @@ class EveNetEngine(L.LightningModule):
                 device=device,
             )
 
-            if "classification" in active_components or active_components == []:
-                loss = loss + scaled_cls_loss
+            loss_raw["classification"] = scaled_cls_loss
 
         if self.regression_cfg.include:
             target_regression = batch[self.target_regression_key].to(device=device)
@@ -200,9 +207,11 @@ class EveNetEngine(L.LightningModule):
                 target_regression.float(),
                 target_regression_mask.float(),
             ).mean()
-            loss = loss + reg_loss * self.regression_cfg.loss_scale
+            # loss = loss + reg_loss * self.regression_cfg.loss_scale
 
             loss_head_dict["regression"] = reg_loss
+
+            loss_raw["regression"] = reg_loss * self.regression_cfg.loss_scale
 
         ass_predicts = None
         if self.assignment_cfg.include:
@@ -228,8 +237,7 @@ class EveNetEngine(L.LightningModule):
                 **self.ass_args['step']
             )
 
-            if "assignment" in active_components or active_components == []:
-                loss = loss + scaled_ass_loss
+            loss_raw['assignment'] = scaled_ass_loss
 
         if self.generation_cfg.include:
             scaled_gen_loss, detailed_gen_loss = gen_step(
@@ -250,23 +258,51 @@ class EveNetEngine(L.LightningModule):
             )
             loss_head_dict["generation"] = scaled_gen_loss
 
-            if "generation" in active_components or active_components == []:
-                loss = loss + scaled_gen_loss
+            loss_raw["generation"] = scaled_gen_loss
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
+
+        loss_current = sum(
+            (
+                loss for name, loss in loss_raw.items()
+                if name in active_components['current'] or active_components['current'] == []
+            ),
+            start=torch.zeros(1, device=self.device, requires_grad=True)
+        )
+        self.log('progressive/loss-current', loss_current, prog_bar=False, sync_dist=True)
+
+        if not active_components['previous']:
+            loss = loss_current
+        else:
+            loss_previous = sum(
+                (
+                    loss for name, loss in loss_raw.items()
+                    if name in active_components['previous']
+                ),
+                start=torch.zeros(1, device=self.device, requires_grad=True)
+            )
+
+            loss = transition_factor * loss_current + (1 - transition_factor) * loss_previous
+            self.log('progressive/loss-previous', loss_previous, prog_bar=False, sync_dist=True)
+            self.log('progressive/loss-transition', transition_factor, prog_bar=False, sync_dist=True)
+
+        self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
 
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        step = self.global_step
+        step = self.current_step
         epoch = self.current_epoch
 
         # Get all optimizers and schedulers
         optimizers = list(self.optimizers())
         schedulers = self.lr_schedulers()
-        active_components = []
-
+        active_components = {
+            'previous': [],
+            'current': []
+        }
+        t = None
         if len(self.progressive_training) > 0:
             active_progress = self.progressive_training[0]
 
@@ -280,14 +316,23 @@ class EveNetEngine(L.LightningModule):
                 for idx, name in enumerate(self.model_parts.keys())
                 if name in active_progress['components']
             ]
-            active_components = active_progress['components']
+            active_components['current'] = active_progress['components']
+            if self.previous_progress is not None:
+                active_components['previous'] = self.previous_progress['components']
+
+                t = get_transition(
+                    global_step=step,
+                    start_step=active_progress['transition_start'] * self.steps_per_epoch,
+                    duration_steps=active_progress['transition_epoch'] * self.steps_per_epoch,
+                    device=self.device
+                )
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-
         loss, loss_head, loss_dict, _ = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
-            loss_head_dict=loss_head
+            loss_head_dict=loss_head,
+            transition_factor=t,
         )
 
         # === Manual optimization ===
@@ -317,26 +362,40 @@ class EveNetEngine(L.LightningModule):
             for n, v in val.items():
                 self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
+        self.current_step += 1
+
         return loss.mean()
 
     # @time_decorator
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        # Implement your validation step logic here
-        step = self.global_step
+        step = self.current_step
         epoch = self.current_epoch
-        # print(f"[Epoch {epoch} | Step {step}] {self.__class__.__name__} validation step")
 
-        active_components = []
+        active_components = {
+            'previous': [],
+            'current': []
+        }
+        t = None
         if len(self.progressive_training) > 0:
             active_progress = self.progressive_training[0]
-            active_components = active_progress['components']
+            active_components['current'] = active_progress['components']
+            if self.previous_progress is not None:
+                active_components['previous'] = self.previous_progress['components']
+
+                t = get_transition(
+                    global_step=step,
+                    start_step=active_progress['transition_start'] * self.steps_per_epoch,
+                    duration_steps=active_progress['transition_epoch'] * self.steps_per_epoch,
+                    device=self.device
+                )
 
         _, loss_head = self.prepare_heads_loss()
 
         loss, loss_head, loss_dict, _ = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
-            loss_head_dict=loss_head
+            loss_head_dict=loss_head,
+            transition_factor=t,
         )
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
@@ -359,13 +418,14 @@ class EveNetEngine(L.LightningModule):
 
     # @time_decorator
     def on_fit_start(self) -> None:
+        self.current_step = 0
 
-        for i, (name, param) in enumerate(self.model.named_parameters()):
-            if param.requires_grad:
-                print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
-
-            if i == 3:
-                break
+        # for i, (name, param) in enumerate(self.model.named_parameters()):
+        #     if param.requires_grad:
+        #         print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
+        #
+        #     if i == 3:
+        #         break
 
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
@@ -489,7 +549,7 @@ class EveNetEngine(L.LightningModule):
         if len(self.progressive_training) > 0:
             print(f"--> Current Epoch: {self.current_epoch}, Target: {self.progressive_training[0]['epoch']}")
             if self.current_epoch + 1 == self.progressive_training[0]['epoch']:
-                self.progressive_training.pop(0)
+                self.previous_progress = self.progressive_training.pop(0)
                 self.progressive_index += 1
 
         pass
@@ -510,32 +570,32 @@ class EveNetEngine(L.LightningModule):
         batch_size = cfg['batch_size']
         epochs = cfg['epoch']
         warm_up_factor = cfg.get('warm_up_factor', 0.5)
-        weight_decay = float(cfg.get('weight_decay', 0))
-        decoupled_weight_decay = cfg.get('decoupled_weight_decay', False)
 
         # Distributed training info
         world_size = self.world_size
         dataset_size = self.total_events
-        steps_per_epoch = math.ceil(dataset_size / (batch_size * world_size))
-        warmup_steps = warm_up_factor * steps_per_epoch
-        total_steps = epochs * steps_per_epoch
+        self.steps_per_epoch = math.ceil(dataset_size / (batch_size * world_size))
+        warmup_steps = warm_up_factor * self.steps_per_epoch
+        self.total_steps = epochs * self.steps_per_epoch
 
         print(f"--> Optimizer Configuration:")
         print("word_size: ", world_size)
         print("dataset_size: ", dataset_size)
-        print("steps_per_epoch: ", steps_per_epoch)
+        print("steps_per_epoch: ", self.steps_per_epoch)
         print("warmup_steps: ", warmup_steps)
-        print("total_steps: ", total_steps)
+        print("total_steps: ", self.total_steps)
         print("batch_size: ", batch_size)
         print("warm_up_factor: ", warm_up_factor)
-        print("weight_decay: ", weight_decay)
-        print("decoupled_weight_decay: ", decoupled_weight_decay)
 
         betas = (0.9, 0.99)
 
-        def create_optim_schedule(p, base_lr, warm_up: bool = True, optimizer_type: str= "lion"):
+        def create_optim_schedule(
+                p, base_lr, base_wd,
+                decoupled_wd: bool = False,
+                warm_up: bool = True, optimizer_type: str = "lion"
+        ):
             scaled_lr = base_lr * math.sqrt(world_size) / lr_factor
-            scaled_weight_decay = weight_decay / math.sqrt(world_size) * lr_factor
+            scaled_weight_decay = base_wd / math.sqrt(world_size) * lr_factor
 
             if optimizer_type.lower() == "adamw":
                 optimizer = torch.optim.AdamW(
@@ -550,20 +610,20 @@ class EveNetEngine(L.LightningModule):
                     lr=scaled_lr,
                     betas=betas,
                     weight_decay=scaled_weight_decay,
-                    decoupled_weight_decay=decoupled_weight_decay,
+                    decoupled_weight_decay=decoupled_wd,
                 )
-            else: # Default using Lion
+            else:  # Default using Lion
                 optimizer = Lion(
                     p,
                     lr=scaled_lr,
                     betas=betas,
                     weight_decay=scaled_weight_decay,
-                    decoupled_weight_decay=decoupled_weight_decay,
+                    decoupled_weight_decay=decoupled_wd,
                 )
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=warmup_steps if warm_up else 0,
-                num_training_steps=total_steps,
+                num_training_steps=self.total_steps,
                 num_cycles=0.5
             )
             return optimizer, scheduler
@@ -581,7 +641,14 @@ class EveNetEngine(L.LightningModule):
                 print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
                 continue
 
-            opt, sch = create_optim_schedule(params, base_lr=modules['lr'], warm_up=modules['warm_up'], optimizer_type=modules["optimizer_type"])
+            opt, sch = create_optim_schedule(
+                params,
+                base_lr=modules['lr'],
+                base_wd=modules['weight_decay'],
+                warm_up=modules['warm_up'],
+                optimizer_type=modules["optimizer_type"],
+                decoupled_wd=modules["decoupled_wd"],
+            )
             optimizers.append(opt)
             schedulers.append({
                 "scheduler": sch,
@@ -624,14 +691,14 @@ class EveNetEngine(L.LightningModule):
                 print("--> Unexpected keys:", unexpected)
 
         # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
-        for heads in [
-            # self.model.Assignment.multiprocess_assign_head,
-            # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
-            # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
-            # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
-            # self.model.Assignment.multiprocess_assign_head.HadronicTop,
-        ]:
-            self.logger.experiment.watch(heads, log="gradients", log_freq=10, log_graph=False)
+        # for heads in [
+        # self.model.Assignment.multiprocess_assign_head,
+        # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
+        # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
+        # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
+        # self.model.Assignment.multiprocess_assign_head.HadronicTop,
+        # ]:
+        # self.logger.experiment.watch(heads, log="gradients", log_freq=10, log_graph=False)
 
         # Define Freezing
         # self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
@@ -657,6 +724,8 @@ class EveNetEngine(L.LightningModule):
                     'lr': cfg['learning_rate'],
                     'warm_up': cfg.get('warm_up', True),
                     'optimizer_type': cfg.get('optimizer_type', 'lion'),
+                    'weight_decay': cfg.get('weight_decay', 0.0),
+                    'decoupled_wd': cfg.get('decoupled_weight_decay', False),
                     'modules': [],
                 }
             self.model_parts[group]['modules'].append(key)
@@ -669,9 +738,12 @@ class EveNetEngine(L.LightningModule):
         for i, progress in enumerate(self.progressive_training):
             ratio = int(self.progressive_training[i]['epoch_ratio'] * self.hyper_par_cfg['epoch'])
             self.progressive_training[i]['epoch'] = ratio + sum_epochs
+            self.progressive_training[i]['transition_start'] = sum_epochs
             sum_epochs += ratio
 
             print(f"{progress['name']}: {ratio: .0f} epochs, total {sum_epochs: .0f} epochs")
+            print(
+                f"  --> Transition: {progress['transition_start']} -> {progress['transition_start'] + progress['transition_epoch']}")
             for component in progress['components']:
                 optimizer_exists = self.model_parts.get(component, None)
                 if optimizer_exists:

@@ -9,8 +9,8 @@ Training:
   learning_rate: &lr 0.00005
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
-  weight_decay: 0.001
-  decoupled_weight_decay: true
+  weight_decay: &wd 0.001
+  decoupled_weight_decay: &decouple_wd true
 
   diffusion_every_n_epochs: 20 # how often to run diffusion
   diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
@@ -22,6 +22,8 @@ Training:
       optimizer_group: "body" # learning rate based on the first component
       optimizer_type: "lion"
       warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -32,6 +34,8 @@ Training:
       optimizer_group: "body"
       optimizer_type: "lion"
       warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -42,6 +46,8 @@ Training:
       optimizer_group: "object_encoder"
       optimizer_type: "lion"
       warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -54,6 +60,8 @@ Training:
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -66,6 +74,8 @@ Training:
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -80,6 +90,8 @@ Training:
       detection_loss_scale: 1.0
       focal_gamma: 0.0
       include: false # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -91,6 +103,8 @@ Training:
       optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       diffusion_steps: 20
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -103,6 +117,8 @@ Training:
       optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
       diffusion_steps: 100
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
@@ -112,6 +128,13 @@ Training:
   ProgressiveTraining:
     - name: "vanilla"
       epoch_ratio: 1.0
+      # the length of the transition epoch (can be float number)
+      # --> ramp up the loss from previous training schedule to the current one
+      # --> a cosine function is used to ramp up the loss
+      #     --> transition factor: t = 0.5 * (1 - np.cos(np.pi * np.clip(steps / total_steps, 0, 1)))
+      #     ==> loss = t * new_loss + (1 - t) * old_loss
+      # Will not triggered if it's the first training schedule
+      transition_epoch: 0.0
       components:
         - body
         - object_encoder
@@ -119,6 +142,14 @@ Training:
         - regression
         - assignment
         - generation
+    - name: "no use, just for example"
+      epoch_ratio: 0.0
+      transition_epoch: 0.5
+      components:
+        - body
+        - object_encoder
+        - classification
+        - assignment
 
   GradientNorm:
     alpha: 0.12
