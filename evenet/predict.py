@@ -58,6 +58,7 @@ def predict_func(cfg):
 
     predictions = predictor.predict(model, dataloaders=predict_ds_loader, ckpt_path=ckpt_path)
 
+    print(f"Prediction results: {predictions}")
     print(f"[Rank {get_context().get_world_rank()}] Prediction done: {len(predictions)} batches.")
 
 
