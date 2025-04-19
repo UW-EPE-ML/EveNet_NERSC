@@ -100,10 +100,13 @@ class PredictDataControl(DataConfig):
             ds = ds.copy(ds)
             ds.context.execution_options = execution_options
 
+            print(f"{name} execution options: {execution_options}")
+            print(f"cpu: {self._num_train_cpus}, gpu: {self._num_train_gpus}")
+
             if name in datasets_to_split:
                 for i, split in enumerate(
                         ds.streaming_split(
-                            world_size, equal=False, locality_hints=locality_hints
+                            world_size, equal=True, locality_hints=locality_hints
                         )
                 ):
                     print(i, split, locality_hints)
