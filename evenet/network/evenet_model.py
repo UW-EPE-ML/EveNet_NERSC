@@ -513,7 +513,7 @@ class EveNetModel(nn.Module):
     def predict_diffusion_vector(
             self, noise_x: Tensor, cond_x: Dict[str, Tensor], time: Tensor, mode: str,
             noise_mask: Optional[Tensor] = None
-    ) -> Tensor:
+    ) -> Any | None:
 
         """
         Predict the number of point clouds in the batch.
