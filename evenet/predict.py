@@ -113,6 +113,8 @@ class PredictDataControl(DataConfig):
                 for i in range(world_size):
                     output[i][name] = ds.iterator()
 
+        print(output)
+
         return output
 
 
