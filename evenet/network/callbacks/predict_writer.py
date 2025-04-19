@@ -37,3 +37,4 @@ class PredWriter(BasePredictionWriter):
         # Save using torch (could also use numpy or json if preferred)
         torch.save(all_predicts, save_path)
         print(f"--> Saved {len(all_predicts)} predictions to {save_path}")
+        print(f"Current Directory: {os.getcwd()}")
