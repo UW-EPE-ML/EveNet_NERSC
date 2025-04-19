@@ -90,7 +90,7 @@ if __name__ == '__main__':
 
     import pandas as pd
     # Create a dummy dataset with one column
-    df = pd.DataFrame({"value": list(range(1, 161))})
+    df = pd.DataFrame({"value": list(range(1, 164))})
 
     # Convert to Ray Dataset
     predict_ds = ray.data.from_pandas(df)
