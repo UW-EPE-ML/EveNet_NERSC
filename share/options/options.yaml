@@ -151,9 +151,9 @@ Training:
         - classification
         - assignment
 
-  GradientNorm:
-    alpha: 0.12
-    learning_rate: 0.0001
+#  GradientNorm:
+#    alpha: 0.12
+#    learning_rate: 0.0001
 
 Dataset:
   dataset_limit: 1.0
