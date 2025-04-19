@@ -58,7 +58,10 @@ def predict_func(cfg):
     callbacks = []
     predict_write_config = global_config.options.get("prediction", None)
     if predict_write_config:
-        pred_writer = PredWriter(**predict_write_config)
+        pred_writer = PredWriter(
+            output_dir=Path(cfg['current_dir']) / predict_write_config["output_dir"],
+            filename=predict_write_config["filename"],
+        )
         callbacks.append(pred_writer)
     else:
         print("No prediction writer config found, skipping prediction writing.")
@@ -148,6 +151,7 @@ if __name__ == '__main__':
             "batch_size": platform_info.batch_size,
             "prefetch_batches": platform_info.prefetch_batches,
             "total_events": predict_count,
+            "current_dir": os.getcwd(),
         },
         scaling_config=ScalingConfig(
             num_workers=platform_info.number_of_workers,

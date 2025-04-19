@@ -3,10 +3,11 @@ import torch
 import lightning as L
 from lightning.pytorch.callbacks import BasePredictionWriter
 from typing import Any
+from pathlib import Path
 
 
 class PredWriter(BasePredictionWriter):
-    def __init__(self, output_dir: str, filename: str = "predictions.pt", write_interval="epoch"):
+    def __init__(self, output_dir: Path, filename: str = "predictions.pt", write_interval="epoch"):
         super().__init__(write_interval=write_interval)
         self.output_dir = output_dir
         self.filename = filename
@@ -37,4 +38,3 @@ class PredWriter(BasePredictionWriter):
         # Save using torch (could also use numpy or json if preferred)
         torch.save(all_predicts, save_path)
         print(f"--> Saved {len(all_predicts)} predictions to {save_path}")
-        print(f"Current Directory: {os.getcwd()}")

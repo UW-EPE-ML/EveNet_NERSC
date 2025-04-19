@@ -14,7 +14,7 @@ options:
   # For prediction Only
   prediction:
     # The directory where the prediction data is saved
-    output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/test_output"
+    output_dir: "./test_output"
     # The filename of the prediction data
     filename: "prediction.pt"
 
