@@ -82,9 +82,7 @@ class PredictDataControl(DataConfig):
 
         datasets_to_split = set(datasets.keys())
 
-        locality_hints = (
-            worker_node_ids if self._execution_options.locality_with_output else None
-        )
+        locality_hints = (worker_node_ids)
         for name, ds in datasets.items():
             execution_options = copy.deepcopy(self._execution_options)
 
