@@ -1,3 +1,4 @@
+import copy
 import os
 from pathlib import Path
 from typing import Optional
@@ -9,7 +10,7 @@ from ray.train.torch import TorchTrainer
 from ray.train.lightning import RayDDPStrategy, RayLightningEnvironment, prepare_trainer
 
 from ray.train import DataConfig, ScalingConfig
-from ray.data import Dataset, DataIterator, NodeIdStr
+from ray.data import Dataset, DataIterator, NodeIdStr, ExecutionResources
 
 import lightning as L
 from evenet.control.global_config import global_config
@@ -77,19 +78,42 @@ class PredictDataControl(DataConfig):
             worker_node_ids: Optional[list[NodeIdStr]],
             **kwargs,
     ) -> list[dict[str, DataIterator]]:
-        assert len(datasets) == 1, "This only works for predicting on a single dataset."
+        output = [{} for _ in range(world_size)]
 
-        # Configure Ray Data for ingest.
-        ctx = ray.data.DataContext.get_current()
-        ctx.execution_options = DataConfig.default_ingest_options()
+        datasets_to_split = set(self._datasets_to_split)
 
-        # Split the stream into shards.
-        iterator_shards = datasets["predict"].streaming_split(
-            world_size, equal=False, locality_hints=worker_node_ids
+        locality_hints = (
+            worker_node_ids if self._execution_options.locality_with_output else None
         )
+        for name, ds in datasets.items():
+            execution_options = copy.deepcopy(self._execution_options)
 
-        # Return the assigned iterators for each worker.
-        return [{"predict": it} for it in iterator_shards]
+            if execution_options.is_resource_limits_default():
+                # If "resource_limits" is not overriden by the user,
+                # add training-reserved resources to Data's exclude_resources.
+                execution_options.exclude_resources = (
+                    execution_options.exclude_resources.add(
+                        ExecutionResources(
+                            cpu=self._num_train_cpus, gpu=self._num_train_gpus
+                        )
+                    )
+                )
+
+            ds = ds.copy(ds)
+            ds.context.execution_options = execution_options
+
+            if name in datasets_to_split:
+                for i, split in enumerate(
+                        ds.streaming_split(
+                            world_size, equal=False, locality_hints=locality_hints
+                        )
+                ):
+                    output[i][name] = split
+            else:
+                for i in range(world_size):
+                    output[i][name] = ds.iterator()
+
+        return output
 
 
 if __name__ == '__main__':
