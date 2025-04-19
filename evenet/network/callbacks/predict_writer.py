@@ -35,6 +35,5 @@ class PredWriter(BasePredictionWriter):
 
         save_path = os.path.join(self.output_dir, self.filename)
 
-        # Save using torch (could also use numpy or json if preferred)
         torch.save(all_predicts, save_path)
         print(f"--> Saved {len(all_predicts)} predictions to {save_path}")

@@ -5,7 +5,7 @@ platform:
     "CPU": 1,
     "GPU": 0,
   }
-  batch_size: 64
+  batch_size: 128
   prefetch_batches: 1
   use_gpu: false
 
@@ -32,7 +32,7 @@ options:
         include: true
 
   Dataset:
-    dataset_limit: 1.0
+    dataset_limit: 0.005
     normalization_file: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt"
 
 network:
