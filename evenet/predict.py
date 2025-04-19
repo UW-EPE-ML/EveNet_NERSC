@@ -95,6 +95,7 @@ if __name__ == '__main__':
     # Convert to Ray Dataset
     predict_ds = ray.data.from_pandas(df)
     predict_count = predict_ds.count()
+    print(df)
 
     trainer = TorchTrainer(
         train_loop_per_worker=predict_func,
