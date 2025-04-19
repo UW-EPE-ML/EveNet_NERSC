@@ -15,6 +15,7 @@ from ray.data import Dataset, DataIterator, NodeIdStr, ExecutionResources
 import lightning as L
 from evenet.control.global_config import global_config
 from evenet.engine import EveNetEngine
+from evenet.network.callbacks.predict_writer import PredWriter
 from shared import make_process_fn, prepare_datasets
 
 
@@ -54,10 +55,19 @@ def predict_func(cfg):
         accelerator_config["accelerator"] = "cpu"
         accelerator_config["devices"] = 1
 
+    callbacks = []
+    predict_write_config = global_config.options.get("prediction", None)
+    if predict_write_config:
+        pred_writer = PredWriter(**predict_write_config)
+        callbacks.append(pred_writer)
+    else:
+        print("No prediction writer config found, skipping prediction writing.")
+
     predictor = L.Trainer(
         strategy=RayDDPStrategy(find_unused_parameters=True),
         plugins=[RayLightningEnvironment()],
         enable_progress_bar=True,
+        callbacks=callbacks,
         **accelerator_config,
     )
 
@@ -131,7 +141,6 @@ if __name__ == '__main__':
     # Convert to Ray Dataset
     predict_ds = ray.data.from_pandas(df)
     predict_count = predict_ds.count()
-    print(df)
 
     trainer = TorchTrainer(
         train_loop_per_worker=predict_func,
@@ -152,3 +161,8 @@ if __name__ == '__main__':
 
     result = trainer.fit()
     print("Prediction finished.")
+
+    import time
+
+    print("Sleeping to allow Ray shutdown...")
+    time.sleep(2)

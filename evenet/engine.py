@@ -412,6 +412,19 @@ class EveNetEngine(L.LightningModule):
     def predict_step(self, batch, batch_idx) -> STEP_OUTPUT:
         # print(f"Predict step {batch_idx} on rank {self.global_rank}")
 
+        # batch_size = batch["x"].shape[0]
+        # device = self.device
+        #
+        # inputs = {
+        #     key: value.to(device=device) for key, value in batch.items()
+        # }
+        #
+        # outputs = self.model.shared_step(
+        #     batch=inputs,
+        #     batch_size=batch_size,
+        # )
+        #
+        # return outputs
         return batch
 
     def check_gradient(self, gradient_heads: dict[str, torch.nn.Module]):
