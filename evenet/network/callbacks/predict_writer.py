@@ -32,7 +32,6 @@ class PredWriter(BasePredictionWriter):
         # Flatten predictions
         all_predicts = sum(gathered, [])
 
-        # Optional: customize how you save this
         save_path = os.path.join(self.output_dir, self.filename)
 
         # Save using torch (could also use numpy or json if preferred)
