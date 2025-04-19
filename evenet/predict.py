@@ -108,6 +108,7 @@ class PredictDataControl(DataConfig):
                             world_size, equal=False, locality_hints=locality_hints
                         )
                 ):
+                    print(i, split, locality_hints)
                     output[i][name] = split
             else:
                 for i in range(world_size):
