@@ -78,46 +78,19 @@ class PredictDataControl(DataConfig):
             worker_node_ids: Optional[list[NodeIdStr]],
             **kwargs,
     ) -> list[dict[str, DataIterator]]:
-        output = [{} for _ in range(world_size)]
 
-        datasets_to_split = set(datasets.keys())
+        # Configure Ray Data for ingest.
+        ctx = ray.data.DataContext.get_current()
+        ctx.execution_options = DataConfig.default_ingest_options()
 
-        locality_hints = (worker_node_ids)
-        for name, ds in datasets.items():
-            execution_options = copy.deepcopy(self._execution_options)
+        # Split the stream into shards.
+        datasets['predict'] = datasets['predict'].repartition(world_size)
+        iterator_shards = datasets["predict"].streaming_split(
+            world_size, equal=False, locality_hints=worker_node_ids
+        )
 
-            if execution_options.is_resource_limits_default():
-                # If "resource_limits" is not overriden by the user,
-                # add training-reserved resources to Data's exclude_resources.
-                execution_options.exclude_resources = (
-                    execution_options.exclude_resources.add(
-                        ExecutionResources(
-                            cpu=self._num_train_cpus, gpu=self._num_train_gpus
-                        )
-                    )
-                )
-
-            ds = ds.copy(ds)
-            ds.context.execution_options = execution_options
-
-            print(f"{name} execution options: {execution_options}")
-            print(f"cpu: {self._num_train_cpus}, gpu: {self._num_train_gpus}")
-
-            if name in datasets_to_split:
-                for i, split in enumerate(
-                        ds.streaming_split(
-                            world_size, equal=True, locality_hints=locality_hints
-                        )
-                ):
-                    print(i, split, locality_hints)
-                    output[i][name] = split
-            else:
-                for i in range(world_size):
-                    output[i][name] = ds.iterator()
-
-        print(output)
-
-        return output
+        # Return the assigned iterators for each worker.
+        return [{"predict": it} for it in iterator_shards]
 
 
 if __name__ == '__main__':
