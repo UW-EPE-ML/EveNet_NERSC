@@ -12,7 +12,7 @@ options:
   default: options/options.yaml
 
   Training:
-    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_4d852_00000_0_2025-04-19_14-24-56/checkpoint_000015/checkpoint.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints/best_epoch=15-v1.ckpt"
     #    pretrain_model_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_8685a_00000_0_2025-04-10_22-15-19/checkpoint_000000/checkpoint.ckpt"
 
     # Should follow the same components as your finetune model
