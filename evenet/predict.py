@@ -1,9 +1,15 @@
 import os
 from pathlib import Path
+from typing import Optional
+
 import ray
+from ray.actor import ActorHandle
 from ray.train import ScalingConfig, RunConfig
 from ray.train.torch import TorchTrainer
 from ray.train.lightning import RayDDPStrategy, RayLightningEnvironment, prepare_trainer
+
+from ray.train import DataConfig, ScalingConfig
+from ray.data import Dataset, DataIterator, NodeIdStr
 
 import lightning as L
 from evenet.control.global_config import global_config
@@ -58,7 +64,32 @@ def predict_func(cfg):
 
     predictions = predictor.predict(model, dataloaders=predict_ds_loader, ckpt_path=ckpt_path)
 
-    print(f"[Rank {get_context().get_world_rank()}] Prediction done: {len(predictions)} batches; Prediction results: {predictions}")
+    print(
+        f"[Rank {get_context().get_world_rank()}] Prediction done: {len(predictions)} batches; Prediction results: {predictions}")
+
+
+class PredictDataControl(DataConfig):
+    def configure(
+            self,
+            datasets: dict[str, Dataset],
+            world_size: int,
+            worker_handles: Optional[list[ActorHandle]],
+            worker_node_ids: Optional[list[NodeIdStr]],
+            **kwargs,
+    ) -> list[dict[str, DataIterator]]:
+        assert len(datasets) == 1, "This only works for predicting on a single dataset."
+
+        # Configure Ray Data for ingest.
+        ctx = ray.data.DataContext.get_current()
+        ctx.execution_options = DataConfig.default_ingest_options()
+
+        # Split the stream into shards.
+        iterator_shards = datasets["predict"].streaming_split(
+            world_size, equal=False, locality_hints=worker_node_ids
+        )
+
+        # Return the assigned iterators for each worker.
+        return [{"predict": it} for it in iterator_shards]
 
 
 if __name__ == '__main__':
@@ -89,6 +120,7 @@ if __name__ == '__main__':
     # )
 
     import pandas as pd
+
     # Create a dummy dataset with one column
     df = pd.DataFrame({"value": list(range(1, 168))})
 
@@ -111,6 +143,7 @@ if __name__ == '__main__':
         ),
         run_config=RunConfig(name="EveNet-Predict"),
         datasets={"predict": predict_ds},
+        dataset_config=PredictDataControl()
     )
 
     result = trainer.fit()
