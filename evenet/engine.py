@@ -323,7 +323,7 @@ class EveNetEngine(L.LightningModule):
                 t = get_transition(
                     global_step=step,
                     start_step=active_progress['transition_start'] * self.steps_per_epoch,
-                    duration_steps=active_progress['transition_epoch'] * self.steps_per_epoch,
+                    duration_steps=active_progress.get('transition_epoch', 0) * self.steps_per_epoch,
                     device=self.device
                 )
 
@@ -385,7 +385,7 @@ class EveNetEngine(L.LightningModule):
                 t = get_transition(
                     global_step=step,
                     start_step=active_progress['transition_start'] * self.steps_per_epoch,
-                    duration_steps=active_progress['transition_epoch'] * self.steps_per_epoch,
+                    duration_steps=active_progress.get('transition_epoch', 0) * self.steps_per_epoch,
                     device=self.device
                 )
 
@@ -743,7 +743,7 @@ class EveNetEngine(L.LightningModule):
 
             print(f"{progress['name']}: {ratio: .0f} epochs, total {sum_epochs: .0f} epochs")
             print(
-                f"  --> Transition: {progress['transition_start']} -> {progress['transition_start'] + progress['transition_epoch']}")
+                f"  --> Transition: {progress['transition_start']} -> {progress['transition_start'] + progress.get('transition_epoch', 0)}")
             for component in progress['components']:
                 optimizer_exists = self.model_parts.get(component, None)
                 if optimizer_exists:
