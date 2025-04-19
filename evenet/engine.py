@@ -292,12 +292,13 @@ class EveNetEngine(L.LightningModule):
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        step = self.current_step
-        epoch = self.current_epoch
 
-        # Get all optimizers and schedulers
         optimizers = list(self.optimizers())
         schedulers = self.lr_schedulers()
+
+        self.current_step = int(schedulers[0].state_dict().get("last_epoch", self.current_step))
+        step = self.current_step
+
         active_components = {
             'previous': [],
             'current': []
@@ -362,7 +363,7 @@ class EveNetEngine(L.LightningModule):
             for n, v in val.items():
                 self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
-        self.current_step += 1
+        # self.current_step += 1
 
         return loss.mean()
 
