@@ -410,9 +410,9 @@ class EveNetEngine(L.LightningModule):
         return loss.mean()
 
     def predict_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        print(f"Predict step {batch_idx} on rank {self.global_rank}")
+        # print(f"Predict step {batch_idx} on rank {self.global_rank}")
 
-        return torch.tensor([1,2,3], device=self.device) + self.global_rank
+        return batch
 
     def check_gradient(self, gradient_heads: dict[str, torch.nn.Module]):
         for name, module in gradient_heads.items():

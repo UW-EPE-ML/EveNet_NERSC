@@ -25,7 +25,7 @@ options:
         include: true
 
   Dataset:
-    dataset_limit: 0.002
+    dataset_limit: 1.0
     normalization_file: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt"
 
 network:

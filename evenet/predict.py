@@ -58,8 +58,7 @@ def predict_func(cfg):
 
     predictions = predictor.predict(model, dataloaders=predict_ds_loader, ckpt_path=ckpt_path)
 
-    print(f"Prediction results: {predictions}")
-    print(f"[Rank {get_context().get_world_rank()}] Prediction done: {len(predictions)} batches.")
+    print(f"[Rank {get_context().get_world_rank()}] Prediction done: {len(predictions)} batches; Prediction results: {predictions}")
 
 
 if __name__ == '__main__':
@@ -85,9 +84,17 @@ if __name__ == '__main__':
 
     process_fn = make_process_fn(base_dir)
 
-    predict_ds, _, predict_count, _ = prepare_datasets(
-        base_dir, process_fn, platform_info, predict=True
-    )
+    # predict_ds, _, predict_count, _ = prepare_datasets(
+    #     base_dir, process_fn, platform_info, predict=True
+    # )
+
+    import pandas as pd
+    # Create a dummy dataset with one column
+    df = pd.DataFrame({"value": list(range(1, 161))})
+
+    # Convert to Ray Dataset
+    predict_ds = ray.data.from_pandas(df)
+    predict_count = predict_ds.count()
 
     trainer = TorchTrainer(
         train_loop_per_worker=predict_func,
