@@ -11,11 +11,11 @@ from evenet.utilities.debug_tool import time_decorator
 from typing import Dict
 import wandb
 
+
 class GenerationMetrics:
-    def __init__(self, device, class_names, feature_names, hist_xmin = -15, hist_xmax = 15, num_bins=60):
+    def __init__(self, device, class_names, feature_names, hist_xmin=-15, hist_xmax=15, num_bins=60):
         self.sampler = DDIMSampler(device)
         self.device = device
-
 
         # Default values for histogram
         self.num_bins = num_bins
@@ -33,12 +33,14 @@ class GenerationMetrics:
         self.histogram = dict()
         self.truth_histogram = dict()
 
-    def update(self,
-               model,
-               input_set,
-               num_steps_global=20,
-               num_steps_point_cloud=40,
-               eta=1.0):
+    def update(
+            self,
+            model,
+            input_set,
+            num_steps_global=20,
+            num_steps_point_cloud=40,
+            eta=1.0
+    ):
         model.eval()
 
         predict_distribution = dict()
@@ -57,11 +59,11 @@ class GenerationMetrics:
         data_shape = [input_set['num_sequential_vectors'].shape[0], 1]
         process_id = input_set['classification']
         generated_distribution = self.sampler.sample(
-            data_shape = data_shape,
-            pred_fn = predict_for_num_vectors,
-            normalize_fn = model.num_point_cloud_normalizer,
-            num_steps = num_steps_global,
-            eta = eta
+            data_shape=data_shape,
+            pred_fn=predict_for_num_vectors,
+            normalize_fn=model.num_point_cloud_normalizer,
+            num_steps=num_steps_global,
+            eta=eta
         )
 
         predict_distribution["num_vectors"] = torch.floor(generated_distribution.flatten() + 0.5)
@@ -76,11 +78,10 @@ class GenerationMetrics:
 
         predict_for_point_cloud = partial(
             model.predict_diffusion_vector,
-            mode = "event",
+            mode="event",
             cond_x=input_set,
-            noise_mask = input_set["x_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
-        ) # TODO: add stuff from previous step.
-
+            noise_mask=input_set["x_mask"].unsqueeze(-1)  # [B, T, 1] to match noise x
+        )  # TODO: add stuff from previous step.
 
         generated_distribution = self.sampler.sample(
             data_shape=data_shape,
@@ -88,7 +89,7 @@ class GenerationMetrics:
             normalize_fn=model.sequential_normalizer,
             eta=eta,
             num_steps=num_steps_point_cloud,
-            noise_mask=input_set["x_mask"].unsqueeze(-1) # [B, T, 1] to match noise x
+            noise_mask=input_set["x_mask"].unsqueeze(-1)  # [B, T, 1] to match noise x
         )
 
         masking = input_set["x_mask"]
@@ -96,7 +97,7 @@ class GenerationMetrics:
             predict_distribution[f"point cloud-{self.feature_names[i]}"] = generated_distribution[..., i]
             truth_distribution[f"point cloud-{self.feature_names[i]}"] = input_set['x'][..., i]
 
-        #--------------- working line -----------------
+        # --------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():
             if distribution_name not in self.histogram:
                 self.histogram[distribution_name] = {
@@ -104,7 +105,7 @@ class GenerationMetrics:
                     for class_name in self.class_names
                 }
             if distribution_name not in self.truth_histogram:
-                self.truth_histogram[distribution_name]  = {
+                self.truth_histogram[distribution_name] = {
                     class_name: np.zeros(self.num_bins)
                     for class_name in self.class_names
                 }
@@ -114,8 +115,10 @@ class GenerationMetrics:
                 if predict_distribution[distribution_name].size() == masking.size():
                     # Masking for point cloud
                     total_mask = masking[class_mask].flatten()
-                    pred = predict_distribution[distribution_name][class_mask].flatten()[total_mask].detach().cpu().numpy()
-                    truth = truth_distribution[distribution_name][class_mask].flatten()[total_mask].detach().cpu().numpy()
+                    pred = predict_distribution[distribution_name][class_mask].flatten()[
+                        total_mask].detach().cpu().numpy()
+                    truth = truth_distribution[distribution_name][class_mask].flatten()[
+                        total_mask].detach().cpu().numpy()
                 else:
                     pred = predict_distribution[distribution_name][class_mask].detach().cpu().numpy()
                     truth = truth_distribution[distribution_name][class_mask].flatten().detach().cpu().numpy()
@@ -204,6 +207,7 @@ class GenerationMetrics:
             )
         return figs
 
+
 @time_decorator(name="[Generation] shared_step")
 def shared_step(
         batch: Dict[str, torch.Tensor],
@@ -238,6 +242,7 @@ def shared_step(
     loss = total_gen_losses / len(outputs) * loss_scale
     return loss, generation_loss
 
+
 @time_decorator(name="[Generation] shared_epoch_end")
 def shared_epoch_end(
         global_rank,
@@ -258,6 +263,3 @@ def shared_epoch_end(
     metrics_valid.reset()
     if metrics_train:
         metrics_train.reset()
-
-
-

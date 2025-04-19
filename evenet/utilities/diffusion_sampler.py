@@ -2,9 +2,8 @@ import torch
 from torch import Tensor
 from typing import Callable, Optional
 
-def logsnr_schedule_cosine(time: Tensor,
-                           logsnr_min: float = -20.,
-                           logsnr_max: float = 20.) -> Tensor:
+
+def logsnr_schedule_cosine(time: Tensor, logsnr_min: float = -20., logsnr_max: float = 20.) -> Tensor:
     logsnr_min = Tensor([logsnr_min]).to(time.device)
     logsnr_max = Tensor([logsnr_max]).to(time.device)
     b = torch.atan(torch.exp(-0.5 * logsnr_max)).to(time.device)
@@ -12,8 +11,7 @@ def logsnr_schedule_cosine(time: Tensor,
     return -2.0 * torch.log(torch.tan(a * time.to(torch.float32) + b))
 
 
-def get_logsnr_alpha_sigma(time: Tensor,
-                           shape=None):
+def get_logsnr_alpha_sigma(time: Tensor, shape=None):
     logsnr = logsnr_schedule_cosine(time)
     alpha = torch.sqrt(torch.sigmoid(logsnr))
     sigma = torch.sqrt(torch.sigmoid(-logsnr))
@@ -26,8 +24,7 @@ def get_logsnr_alpha_sigma(time: Tensor,
     return logsnr, alpha, sigma
 
 
-def add_noise(x: Tensor,
-              time: Tensor) -> Tensor:
+def add_noise(x: Tensor, time: Tensor) -> tuple[Tensor, Tensor]:
     """
     x: input tensor,
     time: time tensor (B,)
@@ -42,7 +39,7 @@ def add_noise(x: Tensor,
     return perturbed_x, score
 
 
-class DDIMSampler():
+class DDIMSampler:
     def __init__(self, device):
         self.device = device
 
@@ -50,13 +47,13 @@ class DDIMSampler():
         return torch.randn(dimensions, dtype=torch.float32, device=self.device)
 
     def sample(
-        self,
-        data_shape,
-        pred_fn: Callable,
-        normalize_fn: Optional[torch.nn.Module] = None,
-        num_steps: int = 20,
-        eta: float = 1.0,
-        noise_mask: Optional[torch.Tensor]=None
+            self,
+            data_shape,
+            pred_fn: Callable,
+            normalize_fn: Optional[torch.nn.Module] = None,
+            num_steps: int = 20,
+            eta: float = 1.0,
+            noise_mask: Optional[torch.Tensor] = None
     ) -> Tensor:
         """
         time: time tensor (B,)
@@ -79,8 +76,8 @@ class DDIMSampler():
 
                 # Compute the predicted epsilon using the model
                 v = pred_fn(
-                    noise_x = x,
-                    time = t
+                    noise_x=x,
+                    time=t
                 )
 
                 eps = v * alpha + x * sigma
