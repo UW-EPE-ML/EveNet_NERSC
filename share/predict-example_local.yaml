@@ -1,12 +1,13 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny"
-  number_of_workers: 16
+  data_parquet_dir: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
+  number_of_workers: 1
   resources_per_worker: {
-    "CPU": 30,
-    "GPU": 1,
+    "CPU": 1,
+    "GPU": 0,
   }
-  batch_size: 1024
-  prefetch_batches: 2
+  batch_size: 64
+  prefetch_batches: 1
+  use_gpu: false
 
 options:
   default: options/options.yaml
