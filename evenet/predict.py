@@ -80,7 +80,7 @@ class PredictDataControl(DataConfig):
     ) -> list[dict[str, DataIterator]]:
         output = [{} for _ in range(world_size)]
 
-        datasets_to_split = set(self._datasets_to_split)
+        datasets_to_split = set(datasets.keys())
 
         locality_hints = (
             worker_node_ids if self._execution_options.locality_with_output else None
