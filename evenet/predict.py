@@ -78,19 +78,22 @@ class PredictDataControl(DataConfig):
             worker_node_ids: Optional[list[NodeIdStr]],
             **kwargs,
     ) -> list[dict[str, DataIterator]]:
-
         # Configure Ray Data for ingest.
         ctx = ray.data.DataContext.get_current()
         ctx.execution_options = DataConfig.default_ingest_options()
 
-        # Split the stream into shards.
-        datasets['predict'] = datasets['predict'].repartition(world_size)
-        iterator_shards = datasets["predict"].streaming_split(
+        name, ds = next(iter(datasets.items()))
+
+        # Repartition to ensure enough blocks
+        ds = ds.repartition(world_size)
+
+        # Perform streaming split
+        iterator_shards = ds.streaming_split(
             world_size, equal=False, locality_hints=worker_node_ids
         )
 
-        # Return the assigned iterators for each worker.
-        return [{"predict": it} for it in iterator_shards]
+        # Return shards, each wrapped with the dataset key
+        return [{name: it} for it in iterator_shards]
 
 
 if __name__ == '__main__':
@@ -123,7 +126,7 @@ if __name__ == '__main__':
     import pandas as pd
 
     # Create a dummy dataset with one column
-    df = pd.DataFrame({"value": list(range(1, 168))})
+    df = pd.DataFrame({"value": list(range(1, 185))})
 
     # Convert to Ray Dataset
     predict_ds = ray.data.from_pandas(df)
