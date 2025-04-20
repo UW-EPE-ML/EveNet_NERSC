@@ -1,12 +1,12 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full"
   number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
   }
   batch_size: 1024
-  prefetch_batches: 2
+  prefetch_batches: 5
 
 wandb:
   project: "Pretrain"
@@ -53,7 +53,7 @@ options:
 
   Dataset:
     dataset_limit: 1.0
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250409.tiny/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
 
 network:
   default: network/pretrain.yaml
