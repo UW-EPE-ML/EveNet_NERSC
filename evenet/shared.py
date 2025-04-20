@@ -21,7 +21,7 @@ def register_dataset(
         parquet_files: list[str],
         process_event_batch_partial,
         platform_info,
-        dataset_total: float = 1.0,
+        dataset_limit: float = 1.0,
         file_shuffling: bool = False,
 ) -> tuple[Dataset, int]:
     """Registers a Ray dataset, preprocesses it, and returns dataset and event count."""
@@ -36,7 +36,7 @@ def register_dataset(
     )
 
     total_events = ds.count()
-    ds = ds.limit(int(total_events * dataset_total))
+    ds = ds.limit(int(total_events * dataset_limit))
     total_events = ds.count()
 
     ds = ds.map_batches(
