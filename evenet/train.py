@@ -149,8 +149,6 @@ def main(args):
 
     base_dir = Path(platform_info.data_parquet_dir)
 
-    shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
-
     process_fn = make_process_fn(base_dir)
     train_ds, valid_ds, total_events, val_count = prepare_datasets(
         base_dir,
