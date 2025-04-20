@@ -140,7 +140,7 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
             'batch_size': global_config.platform.batch_size,
-            'epoch': global_config.options.Training.epochs,
+            'epoch': global_config.options.Training.total_epochs,
             'lr_factor': global_config.options.Training.learning_rate_factor,
             'warm_up_factor': global_config.options.Training.learning_rate_warm_up_factor,
             'weight_decay': global_config.options.Training.weight_decay,
@@ -345,7 +345,7 @@ class EveNetEngine(L.LightningModule):
 
         clip_grad_norm_(self.model.parameters(), 1.0)
 
-        self.check_gradient(gradient_heads)
+        # self.check_gradient(gradient_heads)
 
         for opt in optimizers:
             opt.step()
@@ -574,11 +574,11 @@ class EveNetEngine(L.LightningModule):
     @time_decorator()
     def safe_manual_backward(self, loss, *args, **kwargs):
         super().manual_backward(loss, *args, **kwargs)
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                    print(f"🚨 Gradient in {name} is NaN or Inf!")
-                    raise ValueError("Gradient check failed.")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+        #             print(f"🚨 Gradient in {name} is NaN or Inf!")
+        #             raise ValueError("Gradient check failed.")
 
     # @time_decorator
     def configure_optimizers(self):

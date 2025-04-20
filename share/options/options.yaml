@@ -1,4 +1,7 @@
 Training:
+  # Total plan epochs for optimizer decay
+  total_epochs: 100
+  # Trainer will stop at this epoch number
   epochs: 100
 
   model_checkpoint_save_path: "."
