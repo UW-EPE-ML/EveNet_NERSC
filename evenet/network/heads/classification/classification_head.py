@@ -18,7 +18,8 @@ class BranchLinear(nn.Module):
             hidden_dim: int,
             num_outputs: int = 1,
             dropout: float = 0.0,
-            batch_norm: bool = False
+            batch_norm: bool = False,
+            skip_connection: bool = False
     ):
         super(BranchLinear, self).__init__()
 
@@ -41,7 +42,7 @@ class BranchLinear(nn.Module):
                 normalization_type="LayerNorm",
                 activation_type="gelu",
                 dropout=dropout,
-                skip_connection=False
+                skip_connection=skip_connection
             ) for _ in range(self.num_layers)])
 
         # TODO Play around with this normalization layer
@@ -103,6 +104,7 @@ class ClassificationHead(nn.Module):
             input_dim: int,
             hidden_dim: int,
             dropout: float = 0.0,
+            skip_connection: bool = False,
     ):
         super(ClassificationHead, self).__init__()
         networks = OrderedDict()
@@ -114,7 +116,8 @@ class ClassificationHead(nn.Module):
                 hidden_dim=hidden_dim,
                 num_outputs=num_classes,
                 dropout=dropout,
-                batch_norm=True
+                batch_norm=True,
+                skip_connection=skip_connection
             )
         self.networks = nn.ModuleDict(networks)
 
@@ -142,6 +145,7 @@ class RegressionHead(nn.Module):
             hidden_dim: int,
             device,
             dropout: float = 0.0,
+            skip_connection: bool = False
     ):
         super(RegressionHead, self).__init__()
         networks = OrderedDict()
@@ -163,7 +167,8 @@ class RegressionHead(nn.Module):
                 hidden_dim=hidden_dim,
                 num_outputs=num_regressions,
                 dropout=dropout,
-                batch_norm=True
+                batch_norm=True,
+                skip_connection=skip_connection
             )
             self.regressions_target[name] = target_list
             mean = torch.cat([means[target].unsqueeze(-1) for target in target_list], dim=-1)

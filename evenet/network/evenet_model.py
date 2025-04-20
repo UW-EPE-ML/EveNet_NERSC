@@ -109,7 +109,7 @@ class EveNetModel(nn.Module):
             final_embedding_dim=global_embedding_cfg.hidden_dim,
             normalization_type=global_embedding_cfg.normalization,
             activation_type=global_embedding_cfg.linear_activation,
-            skip_connection=False,
+            skip_connection=global_embedding_cfg.skip_connection,
             num_embedding_layers=global_embedding_cfg.num_embedding_layers,
             dropout=global_embedding_cfg.dropout
         )
@@ -174,6 +174,7 @@ class EveNetModel(nn.Module):
                 event_num_classes=self.event_info.num_classes,
                 num_layers=cls_cfg.num_classification_layers,
                 hidden_dim=cls_cfg.hidden_dim,
+                skip_connection=cls_cfg.skip_connection,
                 dropout=cls_cfg.dropout,
             )
         # [4] Regression Head
@@ -188,6 +189,7 @@ class EveNetModel(nn.Module):
                 num_layers=reg_cfg.num_regression_layers,
                 hidden_dim=reg_cfg.hidden_dim,
                 dropout=reg_cfg.dropout,
+                skip_connection=reg_cfg.skip_connection,
                 device=self.device,
             )
 
