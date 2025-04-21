@@ -395,14 +395,16 @@ class EveNetModel(nn.Module):
                 full_time = time.contiguous()
                 time_masking = full_input_point_cloud_mask.float()
             else:
-                invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(invisible_point_cloud,
-                                                                                             time)
+                invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(
+                    invisible_point_cloud, time
+                )
                 full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
                 full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
                 full_attn_mask = invisible_attn_mask.contiguous()
                 full_time = time.contiguous()
-                time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask],
-                                         dim=1).float()
+                time_masking = torch.cat(
+                    [torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1
+                ).float()
 
             #############################
             ## Central embedding (PET) ##
