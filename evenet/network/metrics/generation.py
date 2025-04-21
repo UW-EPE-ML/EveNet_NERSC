@@ -40,6 +40,7 @@ class GenerationMetrics:
         self.histogram = dict()
         self.truth_histogram = dict()
 
+    @time_decorator(name="[Generation] update metrics")
     def update(
             self,
             model,
@@ -231,7 +232,7 @@ class GenerationMetrics:
         ax.set_xlabel('Value')
         ax.set_ylabel('Frequency')
         ax.legend()
-        plt.show()
+        # plt.show()
 
         return fig
 
