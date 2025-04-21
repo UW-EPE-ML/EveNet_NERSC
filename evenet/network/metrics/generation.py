@@ -13,8 +13,10 @@ import wandb
 
 
 class GenerationMetrics:
-    def __init__(self, device, class_names, feature_names, hist_xmin=-15, hist_xmax=15, num_bins=60,
-                 point_cloud_generation=False, neutrino_generation=False):
+    def __init__(
+            self, device, class_names, feature_names, hist_xmin=-15, hist_xmax=15, num_bins=60,
+            point_cloud_generation=False, neutrino_generation=False
+    ):
 
         self.sampler = DDIMSampler(device)
         self.device = device
@@ -51,7 +53,8 @@ class GenerationMetrics:
 
         predict_distribution = dict()
         truth_distribution = dict()
-
+        masking = None
+        process_id = input_set['classification']
         if self.point_cloud_generation:
             ####################################
             ##  Step 1: Generate num vectors  ##
@@ -64,7 +67,6 @@ class GenerationMetrics:
             )
 
             data_shape = [input_set['num_sequential_vectors'].shape[0], 1]
-            process_id = input_set['classification']
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
                 pred_fn=predict_for_num_vectors,
@@ -249,14 +251,18 @@ def shared_step(
         outputs: Dict[str, torch.Tensor],
         gen_metrics: GenerationMetrics,
         model: torch.nn.Module,
-        loss_scale: float,
+        global_loss_scale: float,
+        event_loss_scale: float,
         device: torch.device,
+        loss_head_dict: dict,
         num_steps_global=20,
         num_steps_point_cloud=100,
         diffusion_on: bool = False,
 ):
     generation_loss = dict()
-    total_gen_losses = 0
+
+    global_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    event_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     for generation_target, generation_result in outputs.items():
         masking = batch["x_mask"].unsqueeze(-1) if generation_target == "point_cloud" else None
         generation_loss[generation_target] = gen_loss(
@@ -264,7 +270,11 @@ def shared_step(
             target=generation_result["truth"],
             mask=masking
         )
-        total_gen_losses += generation_loss[generation_target]
+        # total_gen_losses += generation_loss[generation_target]
+        if generation_target == "num_point_cloud":
+            global_gen_loss = global_gen_loss + generation_loss[generation_target]
+        else:
+            event_gen_loss = event_gen_loss + generation_loss[generation_target]
 
         if diffusion_on:
             gen_metrics.update(
@@ -274,7 +284,10 @@ def shared_step(
                 num_steps_point_cloud=num_steps_point_cloud,
             )
 
-    loss = total_gen_losses / len(outputs) * loss_scale
+    loss_head_dict["generation-global"] = global_gen_loss
+    loss_head_dict["generation-event"] = event_gen_loss
+
+    loss = (global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale) / len(outputs)
     return loss, generation_loss
 
 

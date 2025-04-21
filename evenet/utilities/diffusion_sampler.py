@@ -2,6 +2,8 @@ import torch
 from torch import Tensor
 from typing import Callable, Optional
 
+from evenet.utilities.debug_tool import time_decorator
+
 
 def logsnr_schedule_cosine(time: Tensor, logsnr_min: float = -20., logsnr_max: float = 20.) -> Tensor:
     logsnr_min = Tensor([logsnr_min]).to(time.device)
@@ -46,6 +48,7 @@ class DDIMSampler:
     def prior_sde(self, dimensions) -> Tensor:
         return torch.randn(dimensions, dtype=torch.float32, device=self.device)
 
+    @time_decorator(name="DDIM sampler")
     def sample(
             self,
             data_shape,

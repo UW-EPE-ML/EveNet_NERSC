@@ -622,8 +622,9 @@ class EveNetModel(nn.Module):
             full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
             full_attn_mask = invisible_attn_mask.contiguous()
             full_time = time.contiguous()
-            time_masking = torch.cat([torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask],
-                                     dim=1).float()
+            time_masking = torch.cat(
+                [torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1
+            ).float()
             full_global_conditions = self.GlobalEmbedding(
                 x=global_conditions,
                 mask=global_conditions_mask

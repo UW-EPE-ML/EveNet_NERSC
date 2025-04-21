@@ -76,7 +76,9 @@ class EveNetEngine(L.LightningModule):
         self.classification_cfg = self.component_cfg.Classification
         self.regression_cfg = self.component_cfg.Regression
         self.assignment_cfg = self.component_cfg.Assignment
-        self.generation_cfg = self.component_cfg.GlobalGeneration
+        self.global_generation_cfg = self.component_cfg.GlobalGeneration
+        self.event_generation_cfg = self.component_cfg.EventGeneration
+        self.generation_include = self.global_generation_cfg.include or self.event_generation_cfg.include
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
@@ -132,7 +134,7 @@ class EveNetEngine(L.LightningModule):
             print(f"{self.__class__.__name__} assignment loss initialized")
 
         self.gen_loss = None
-        if self.generation_cfg.include:
+        if self.generation_include:
             import evenet.network.loss.generation as gen_loss
             self.gen_loss = gen_loss.loss
             print(f"{self.__class__.__name__} generation loss initialized")
@@ -240,13 +242,14 @@ class EveNetEngine(L.LightningModule):
 
             loss_raw['assignment'] = scaled_ass_loss
 
-        if self.generation_cfg.include:
+        if self.generation_include:
             scaled_gen_loss, detailed_gen_loss = gen_step(
                 batch=batch,
                 outputs=outputs["generations"],
                 gen_metrics=self.generation_metrics_train if self.training else self.generation_metrics_valid,
                 model=self.model,
-                loss_scale=self.generation_cfg.loss_scale,
+                global_loss_scale=self.global_generation_cfg.loss_scale,
+                event_loss_scale=self.event_generation_cfg.loss_scale,
                 device=device,
                 num_steps_global=self.global_diffusion_steps,
                 num_steps_point_cloud=self.point_cloud_diffusion_steps,
@@ -255,10 +258,10 @@ class EveNetEngine(L.LightningModule):
                         and ((self.current_epoch % self.diffusion_every_n_epochs) == (
                         self.diffusion_every_n_epochs - 1))
                         and ((batch_idx % self.diffusion_every_n_steps) == 0)
-                )
+                ),
+                loss_head_dict=loss_head_dict,
             )
-            loss_head_dict["generation"] = scaled_gen_loss
-
+            # loss_head_dict["generation"] = scaled_gen_loss
             loss_raw["generation"] = scaled_gen_loss
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
@@ -469,17 +472,17 @@ class EveNetEngine(L.LightningModule):
             self.assignment_metrics_train = make_assignment_metrics()
             self.assignment_metrics_valid = make_assignment_metrics()
 
-        if self.generation_cfg.include:
-            self.generation_metrics_train = GenerationMetrics(
-                class_names=self.config.event_info.class_label['EVENT']['signal'][0],
-                feature_names=self.config.event_info.sequential_feature_names,
-                device=self.device
-            )
-            self.generation_metrics_valid = GenerationMetrics(
-                class_names=self.config.event_info.class_label['EVENT']['signal'][0],
-                feature_names=self.config.event_info.sequential_feature_names,
-                device=self.device
-            )
+        if self.generation_include:
+            generation_kwargs = {
+                "class_names": self.config.event_info.class_label['EVENT']['signal'][0],
+                "feature_names": self.config.event_info.sequential_feature_names,
+                "device": self.device,
+                "point_cloud_generation": self.global_generation_cfg.include,
+                "neutrino_generation": self.event_generation_cfg.include,
+            }
+
+            self.generation_metrics_train = GenerationMetrics(**generation_kwargs)
+            self.generation_metrics_valid = GenerationMetrics(**generation_kwargs)
 
     def on_fit_end(self) -> None:
         if torch.cuda.is_available():
@@ -547,7 +550,7 @@ class EveNetEngine(L.LightningModule):
                 logger=self.logger.experiment,
             )
 
-        if self.generation_cfg.include:
+        if self.generation_include:
             gen_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.generation_metrics_valid,
@@ -692,8 +695,8 @@ class EveNetEngine(L.LightningModule):
             device=self.device,
             classification=self.classification_cfg.include,
             regression=self.regression_cfg.include,
-            generation=self.generation_cfg.include,
-            neutrino_generation=self.generation_cfg.include,
+            generation=self.global_generation_cfg.include,
+            neutrino_generation=self.event_generation_cfg.include,
             assignment=self.assignment_cfg.include,
             normalization_dict=self.normalization_dict,
         )
@@ -802,11 +805,12 @@ class EveNetEngine(L.LightningModule):
             gradient_heads["regression"] = self.model.Regression
             loss_heads["regression"] = torch.zeros(1, device=self.device, requires_grad=True)
 
-        if self.generation_cfg.include:
+        if self.global_generation_cfg.include:
             gradient_heads["generation-global"] = self.model.GlobalGeneration
-            gradient_heads["generation-event"] = self.model.EventGeneration
-
             loss_heads["generation-global"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.event_generation_cfg.include:
+            gradient_heads["generation-event"] = self.model.EventGeneration
             loss_heads["generation-event"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.assignment_cfg.include:
