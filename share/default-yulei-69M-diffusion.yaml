@@ -74,6 +74,7 @@ options:
           - object_encoder
           - assignment
           - classification
+          - generation
 
   Dataset:
     dataset_limit: 1.0
