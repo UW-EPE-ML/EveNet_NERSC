@@ -19,6 +19,12 @@ options:
     # The filename of the prediction data
     filename: "prediction.pt"
 
+    extra_save:
+      - EXTRA/num_electron
+      - EXTRA/num_muon
+      - EXTRA/num_bjet
+      - EXTRA/num_jet
+
   Training:
     total_epochs: 20
     epochs: 20
