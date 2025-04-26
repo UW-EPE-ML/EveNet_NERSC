@@ -14,5 +14,5 @@ python3 downstreams/ttbar_semileptonic/preprocess/preprocess_spanet.py downstrea
 
 To run the training, go to main directory and run the following command:
 ```
-python evenet/train.py downstreams/ttbar_semileptonic/train.yaml  --load_all
+python evenet/train.py downstreams/ttbar_semileptonic/train.yaml --load_all
 ```
