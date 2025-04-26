@@ -10,13 +10,24 @@ INPUTS:
       mass: log_normalize
       pt: log_normalize
       eta: normalize
-      phi: normalize
+
+      sin_phi: normalize
+      cos_phi: normalize
+
+      qtag: none
       btag: none
+      etag: none
+      utag: none
 
   # ---------------------------------------------------------------------
   # REQUIRED - GLOBAL - inputs which will have a single vector per event.
   # ---------------------------------------------------------------------
   GLOBAL:
+    Conditions:
+      met: log_normalize
+      sumet: log_normalize
+      sin_phi: normalize
+      cos_phi: normalize
 
 
 # ----------------------------------------------------------------------
@@ -24,15 +35,14 @@ INPUTS:
 # ----------------------------------------------------------------------
 EVENT:
 
-  TTHadronics:
+  TT1L:
     t1:
       - b
       - q1
       - q2
     t2:
       - b
-      - q1
-      - q2
+      - l
 
 
 # ---------------------------------------------------------
@@ -40,12 +50,8 @@ EVENT:
 # ---------------------------------------------------------
 PERMUTATIONS:
 
-  TTHadronics:
-    EVENT:
-      - [ t1, t2 ]
+  TT1L:
     t1:
-      - [ q1, q2 ]
-    t2:
       - [ q1, q2 ]
 
 
@@ -53,15 +59,25 @@ PERMUTATIONS:
 # REQUIRED - REGRESSIONS - List of desired features to regress from observables.
 # ------------------------------------------------------------------------------
 REGRESSIONS:
+  EVENT:
+    - neutrino_eta
+    - neutrino_px
+    - neutrino_py
+    - neutrino_pz
+    - log_invariant_mass
 
 
 # -----------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
 # -----------------------------------------------------------------------------
 CLASSIFICATIONS:
+  EVENT:
+    - signal
 
 CLASSLABEL:
-
+  EVENT:
+    signal:
+      - [ TT ]
 
 PARTICLE_PROPERTIES:
   - Mass

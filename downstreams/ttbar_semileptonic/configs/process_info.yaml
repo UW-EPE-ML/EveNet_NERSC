@@ -32,10 +32,9 @@ EXCLUDE:
     SYMMETRY: [ b1, b2 ]
 
 
-TTHadronics:
+TT1L:
   category: TT
   process_id: 0
-  diagram: &TTHadronics
+  diagram:
     t1: *top_had
-    t2: *top_had
-    SYMMETRY: [ t1, t2 ]
+    t2: *top_lep

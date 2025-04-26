@@ -18,6 +18,7 @@ from preprocessing.evenet_data_converter import EveNetDataConverter
 from preprocessing.postprocessor import PostProcessor
 import h5py, glob
 
+
 def list_h5_files(indir):
     # Option 1: Using glob (recommended)
     return sorted(glob.glob(os.path.join(indir, "*.h5")))
@@ -25,15 +26,19 @@ def list_h5_files(indir):
     # Option 2: Using os.listdir (if you prefer)
     # return sorted([os.path.join(indir, f) for f in os.listdir(indir) if f.endswith(".h5")])
 
+
 def load_all_datasets(filepath):
     """Recursively load datasets from a file into a flat dict with full paths as keys."""
     data = {}
+
     def visit(name, obj):
         if isinstance(obj, h5py.Dataset):
             data[name] = obj[()]
+
     with h5py.File(filepath, 'r') as f:
         f.visititems(visit)
     return data
+
 
 def concatenate_h5_datasets(indir):
     """Concatenate datasets from multiple h5 files with nested structure."""
@@ -47,6 +52,19 @@ def concatenate_h5_datasets(indir):
 
     # Concatenate along axis 0
     concatenated_data = {k: np.concatenate(vs, axis=0) for k, vs in all_data.items()}
+
+    # Change name
+    prefix_replacements = {
+        "INPUTS/Met/": "INPUTS/Conditions/",
+        "INPUTS/Momenta/": "INPUTS/Source/"
+    }
+
+    for k in list(concatenated_data.keys()):
+        for prefix, replacement in prefix_replacements.items():
+            if k.startswith(prefix):
+                new_key = k.replace(prefix, replacement)
+                concatenated_data[new_key] = concatenated_data.pop(k)
+
     return concatenated_data
 
 
@@ -66,19 +84,13 @@ def generate_regression_names(event_info: EventInfo):
     regression_keys = []
     regression_key_map = []
 
-    common_process = set(event_info.product_particles) & set(event_info.regressions)
+    common_process = set(event_info.regressions)
     # Collect all possible regression keys
     for process in sorted(common_process):
-        for particle, regression in event_info.regressions[process].items():
-            products = list(regression.items()) if isinstance(regression, dict) else [(None, regression)]
-            for product, targets in products:
-                for target in targets:
-                    if product is not None:
-                        key = f"{process}/{particle}/{product}/{target.name}"
-                    else:
-                        key = f"{process}/{particle}/{target.name}"
-                    regression_keys.append(key)
-                    regression_key_map.append((process, particle, product, target.name))
+        if process != "EVENT": continue
+        for regression in event_info.regressions[process]:
+            regression_keys.append(f"REGRESSIONS/{process}/{regression.name}")
+            regression_key_map.append((process, regression.name, None, None))
 
     return regression_keys, regression_key_map
 
@@ -104,28 +116,6 @@ def flatten_dict(data: dict, delimiter: str = ":"):
     return table, shape_metadata
 
 
-def unflatten_dict(table: dict[str, np.ndarray], shape_metadata: dict, delimiter: str = ":"):
-    reconstructed = {}
-    grouped = {}
-    for col in table:
-        base = col.split(delimiter)[0]
-        grouped.setdefault(base, []).append(col)
-    for base, columns in grouped.items():
-        if base not in shape_metadata:
-            reconstructed[base] = table[columns[0]]
-        else:
-            shape = tuple(shape_metadata[base])
-            sorted_columns = sorted(columns, key=lambda x: tuple(map(int, x.split(delimiter)[1:])))
-            flat = np.stack([table[col] for col in sorted_columns], axis=1)
-            full_shape = (flat.shape[0],) + shape
-            reconstructed[base] = flat.reshape(full_shape)
-    # Print shapes
-    # for k, v in reconstructed.items():
-    #     print(f"{k}: {v.shape}")
-
-    return reconstructed
-
-
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
 
@@ -145,7 +135,6 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         matched_data = concatenate_h5_datasets(in_dir)
         matched_data["INFO/VetoDoubleAssign"] = np.ones((matched_data["INPUTS/Source/MASK"].shape[0]), dtype=np.bool)
 
-
         if matched_data is None:
             print(f"[WARNING] No matched data for process {process} in dir {in_dir}")
             continue
@@ -163,18 +152,19 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
         # Load Point Cloud and Mask
         sources = converter.load_sources()
+        sources['sources-1-mask'] = sources['sources-1-mask'][:, np.newaxis]
         num_sequential_vectors = np.sum(sources['sources-0-mask'], axis=1)
-        num_vectors = num_sequential_vectors # + np.sum(sources['sources-1-mask'][:, np.newaxis], axis=1) // TODO: tmp fix
+        num_vectors = num_sequential_vectors  # + np.sum(sources['sources-1-mask'][:, np.newaxis], axis=1) // TODO: tmp fix
 
         assignments = converter.load_assignments(assignment_keys, assignment_key_map, direct_from_spanet=True)
-        regressions = converter.load_regressions(regression_keys, regression_key_map)
+        regressions = converter.load_regressions(regression_keys, regression_key_map, direct_from_spanet=True)
         classifications = converter.load_classification()
 
         # invisible = converter.load_invisible(max_num_neutrinos=global_config.get("max_neutrinos", 2))
 
         if 'sources-1-data' not in sources:
-            sources['sources-1-data'] = np.zeros((sources['sources-0-data'].shape[0],1), dtype=np.float32)
-            sources['sources-1-mask'] = np.ones((sources['sources-0-data'].shape[0],1), dtype=np.bool)
+            sources['sources-1-data'] = np.zeros((sources['sources-0-data'].shape[0], 1), dtype=np.float32)
+            sources['sources-1-mask'] = np.ones((sources['sources-0-data'].shape[0], 1), dtype=np.bool)
 
         process_data = {
             'num_vectors': num_vectors,
@@ -210,7 +200,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
 
         assignment_mask_per_process = {}
-        assignment_idx = {key:i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
+        assignment_idx = {key: i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
         for key, i in assignment_idx.items():
             particle = key.split('/')[2]
             assignment_mask_per_process[particle] = assignments['assignments-mask'][:, i]
@@ -232,15 +222,15 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             num_vectors=process_data['num_sequential_vectors'],
             class_counts=class_counts,
             subprocess_counts=subprocess_counts,
-            invisible=process_data['x'], # TODO: tmp fix
+            invisible=process_data['x'],  # TODO: tmp fix
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
-        
+
     if len(converted_data) == 0:
         print(f"[WARNING] No data found for any of the processes in {in_dir}")
         return None
-    
+
     final_table = pa.concat_tables(converted_data)
 
     shuffle_indices = np.random.default_rng(31).permutation(final_table.num_rows)
@@ -321,7 +311,7 @@ def main(cfg):
         if norm_stats is None:
             print(f"[WARNING] No data found for {cfg.in_dir}. Skipping this run.")
             return
-        
+
         PostProcessor.merge(
             [norm_stats],
             regression_names=global_config.event_info.regression_names,

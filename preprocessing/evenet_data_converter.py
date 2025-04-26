@@ -92,7 +92,7 @@ class EveNetDataConverter:
 
         return output_dict
 
-    def load_regressions(self, regression_keys, regression_key_map):
+    def load_regressions(self, regression_keys, regression_key_map, direct_from_spanet=False):
         label = "REGRESSIONS"
         output_dict = OrderedDict()
 
@@ -104,19 +104,25 @@ class EveNetDataConverter:
 
         # Fill in data and mask
         for idx, (process, particle, product, target_name) in enumerate(regression_key_map):
-            key = f"{process}/{particle}"
-            if product is not None:
-                data_key = f"{label}/{key}/{product}/{target_name}"
-            else:
-                data_key = f"{label}/{key}/{target_name}"
-            mask_key = f"{label}/{key}/MASK"
-
-            try:
+            if direct_from_spanet:
+                data_key = f"{label}/{process}/{particle}"
+                mask_key = f"{label}/{process}/{particle}"
                 regression_data[:, idx] = self.raw_data[data_key]
-                regression_mask[:, idx] = self.raw_data[mask_key]
-            except KeyError as e:
-                # print(f"[WARN] Missing {data_key} or {mask_key}, skipping: {e}")
-                continue
+                regression_mask[:, idx] = np.ones_like(regression_data[:, idx])
+            else:
+                key = f"{process}/{particle}"
+                if product is not None:
+                    data_key = f"{label}/{key}/{product}/{target_name}"
+                else:
+                    data_key = f"{label}/{key}/{target_name}"
+                mask_key = f"{label}/{key}/MASK"
+
+                try:
+                    regression_data[:, idx] = self.raw_data[data_key]
+                    regression_mask[:, idx] = self.raw_data[mask_key]
+                except KeyError as e:
+                    # print(f"[WARN] Missing {data_key} or {mask_key}, skipping: {e}")
+                    continue
             print(f"[INFO] Recorded {data_key} and {mask_key}")
 
         # Store in output
