@@ -116,6 +116,22 @@ def flatten_dict(data: dict, delimiter: str = ":"):
     return table, shape_metadata
 
 
+def calculate_extra_variables(data: dict):
+
+    mask = data['INPUTS/Source/MASK']
+
+    num_electron = (data['INPUTS/Source/etag'] * mask).sum(axis=1)
+    num_muon = (data['INPUTS/Source/utag'] * mask).sum(axis=1)
+    num_bjet = (data['INPUTS/Source/btag'] * mask).sum(axis=1)
+    num_jet = (data['INPUTS/Source/qtag'] * mask).sum(axis=1)
+
+    return {
+        'EXTRA/num_electron': num_electron,
+        'EXTRA/num_muon': num_muon,
+        'EXTRA/num_bjet': num_bjet,
+        'EXTRA/num_jet': num_jet,
+    }
+
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
 
@@ -162,6 +178,9 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
         # invisible = converter.load_invisible(max_num_neutrinos=global_config.get("max_neutrinos", 2))
 
+        # Extra variables
+        extra_variables = calculate_extra_variables(converter.raw_data)
+
         if 'sources-1-data' not in sources:
             sources['sources-1-data'] = np.zeros((sources['sources-0-data'].shape[0], 1), dtype=np.float32)
             sources['sources-1-mask'] = np.ones((sources['sources-0-data'].shape[0], 1), dtype=np.bool)
@@ -185,6 +204,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
             **assignments,
             **regressions,
+
+            **extra_variables,
         }
 
         flattened_data, meta_data = flatten_dict(process_data)

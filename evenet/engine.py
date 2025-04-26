@@ -13,11 +13,12 @@ from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
+from evenet.network.loss.assignment import convert_target_assignment
 
 from evenet.network.metrics.general_comparison import GenericMetrics
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
-from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
+from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass, predict
 from evenet.network.metrics.assignment import shared_step as ass_step, shared_epoch_end as ass_end
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
@@ -426,6 +427,28 @@ class EveNetEngine(L.LightningModule):
             batch=inputs,
             batch_size=batch_size,
         )
+
+        extra_save = self.config.options.prediction.get('extra_save', {})
+        for key in extra_save:
+            if key in batch:
+                outputs[key] = batch[key]
+
+        if self.assignment_cfg.include:
+            outputs["assignment_target"], outputs["assignment_target_mask"] = convert_target_assignment(
+                targets=batch["assignments-indices"],
+                targets_mask=batch["assignments-mask"],
+                event_particles=self.ass_args['loss']['event_particles'],
+                num_targets=self.ass_args['loss']['num_targets']
+            )
+
+            outputs["assignment_prediction"] = {}
+            for process in self.config.event_info.process_names:
+                outputs["assignment_prediction"][process] = predict(
+                        assignments=outputs["assignments"].pop(process),
+                        detections=outputs["detections"].pop(process),
+                        product_symbolic_groups=self.ass_args['step']['product_symbolic_groups'][process],
+                        event_permutations=self.ass_args['step']['event_permutations'][process],
+                    )
 
         return outputs
 
