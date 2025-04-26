@@ -13,21 +13,21 @@ wandb:
   project: "spanet-tt1l"
   entity: "ytchou97-university-of-washington"
   name: "tt1l"
-  tags: [ "Pretrain", "Parquet", "Mac", "TT1L" ]
+  tags: [ "Pretrain", "Parquet", "NERSC", "TT1L" ]
 
 options:
   default: configs/options.yaml
 
   # overwrites
   Training:
-    total_epochs: 500
-    epochs: 10
-#    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full"
+    total_epochs: 20
+    epochs: 20
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
     pretrain_model_load_path: null
 
-    learning_rate: &lr 0.00025
-    weight_decay: &wd 0.0001
+    learning_rate: &lr 0.0004
+    weight_decay: &wd 0.00005
     Components:
       GlobalEmbedding:
         learning_rate: *lr
