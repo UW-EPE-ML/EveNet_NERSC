@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/test/"
   number_of_workers: 12
   resources_per_worker: {
     "CPU": 30,
@@ -9,20 +9,21 @@ platform:
   prefetch_batches: 2
   use_gpu: true
 
-wandb:
-  project: "spanet-tt1l"
-  entity: "ytchou97-university-of-washington"
-  name: "tt1l"
-  tags: [ "Pretrain", "Parquet", "NERSC", "TT1L" ]
-
 options:
   default: configs/options.yaml
+
+  # For prediction Only
+  prediction:
+    # The directory where the prediction data is saved
+    output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.SPANet/"
+    # The filename of the prediction data
+    filename: "prediction.pt"
 
   Training:
     total_epochs: 20
     epochs: 20
-    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
+#    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=19.ckpt"
     pretrain_model_load_path: null
 
     learning_rate: &lr 0.000075
