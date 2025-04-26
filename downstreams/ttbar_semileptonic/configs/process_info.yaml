@@ -1,0 +1,41 @@
+EXCLUDE:
+  W_had: &W_had
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  W_lep: &W_lep
+    l: null
+    v: null
+
+  Z_had: &Z_had
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  Z_lep: &Z_lep
+    l1: null
+    l2: null
+    SYMMETRY: [ l1, l2 ]
+
+  top_had: &top_had
+    b: null
+    W: *W_had
+
+  top_lep: &top_lep
+    b: null
+    W: *W_lep
+
+  a_had: &a_had
+    b1: null
+    b2: null
+    SYMMETRY: [ b1, b2 ]
+
+
+TTHadronics:
+  category: TT
+  process_id: 0
+  diagram: &TTHadronics
+    t1: *top_had
+    t2: *top_had
+    SYMMETRY: [ t1, t2 ]

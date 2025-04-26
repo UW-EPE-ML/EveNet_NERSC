@@ -1,0 +1,129 @@
+Training:
+  epochs: 500
+
+  model_checkpoint_save_path: "."
+  model_checkpoint_load_path: null
+
+  pretrain_model_load_path: null
+
+  learning_rate: &lr 0.0001
+  learning_rate_factor: &lr_factor 1.0
+  learning_rate_warm_up_factor: &lr_warm 1.0
+  weight_decay: 1e-2
+  decoupled_weight_decay: true
+
+  diffusion_every_n_epochs: 20 # how often to run diffusion
+  diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
+
+
+  Components:
+    GlobalEmbedding:
+      learning_rate: *lr
+      optimizer_group: "body" # learning rate based on the first component
+      optimizer_type: "AdamW"
+      warm_up: true
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    PET:
+      learning_rate: *lr
+      optimizer_group: "body"
+      optimizer_type: "AdamW"
+      warm_up: true
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    ObjectEncoder:
+      learning_rate: *lr
+      optimizer_group: "object_encoder"
+      optimizer_type: "AdamW"
+      warm_up: true
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Classification:
+      learning_rate: *lr
+      optimizer_group: "classification"
+      optimizer_type: "AdamW"
+      warm_up: true
+      loss_scale: 1.0 # loss coefficient
+      include: false # whether to build in network
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Regression:
+      learning_rate: *lr
+      optimizer_group: "regression"
+      optimizer_type: "AdamW"
+      warm_up: true
+      loss_scale: 1.0 # loss coefficient
+      include: false # whether to build in network
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Assignment:
+      learning_rate: *lr
+      optimizer_group: "assignment"
+      optimizer_type: "AdamW"
+      warm_up: true
+      assignment_loss_scale: 1.0
+      detection_loss_scale: 1.0
+      focal_gamma: 0.0
+      include: true # whether to build in network
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    GlobalGeneration:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
+      include: false # whether to build in network
+      diffusion_steps: 20
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    EventGeneration:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
+      include: false # whether to build in network
+      diffusion_steps: 100
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+
+
+  ProgressiveTraining:
+    - name: "vanilla"
+      epoch_ratio: 1.0
+      components:
+        - body
+        - object_encoder
+        - classification
+        - regression
+        - assignment
+        - generation
+
+
+Dataset:
+  dataset_limit: 1.0
+  normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
+  train_validation_split: 0.9

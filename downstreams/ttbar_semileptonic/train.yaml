@@ -1,0 +1,48 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/SPANet_comparison/TTHadronics/EveNet_Input/"
+  number_of_workers: 16
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+  batch_size: 2048
+  prefetch_batches: 1
+  use_gpu: true
+
+wandb:
+  project: "spanet-tthadronics"
+  entity: "ytchou97-university-of-washington"
+  name: "spanet_tthadronics"
+  tags: [ "Pretrain", "Parquet", "Mac" ]
+
+options:
+  default: configs/options.yaml
+
+  # overwrites
+  Training:
+    epochs: 500
+    classification_loss_scale: 0.0
+    regression_loss_scale: 0.0
+    feature_generation_loss_scale: 0.0
+    assignment_loss_scale: 1.0
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/t/tihsu/database/SPANet_comparison/TTHadronics/EveNet_Input/normalization.pt"
+
+network:
+  default: configs/model.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: configs/event_info.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: configs/resonance.yaml
+
+  # overwrites
+  # ...
