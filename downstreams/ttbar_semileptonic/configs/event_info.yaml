@@ -38,7 +38,7 @@ EVENT:
   TT1L:
     lt:
       - b
-      - l
+#      - l
 
     ht:
       - b
