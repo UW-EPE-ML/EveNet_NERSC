@@ -1,13 +1,13 @@
 platform:
   data_parquet_dir: "$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/"
-  number_of_workers: 1
+  number_of_workers: 4
   resources_per_worker: {
-    "CPU": 5,
-    "GPU": 0,
+    "CPU": 30,
+    "GPU": 1,
   }
-  batch_size: 128
-  prefetch_batches: 1
-  use_gpu: false
+  batch_size: 2048
+  prefetch_batches: 2
+  use_gpu: true
 
 wandb:
   project: "spanet-tt1l"
