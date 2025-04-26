@@ -357,6 +357,7 @@ class SingleProcessAssignmentMetrics:
 
         # Log mass distribution
         for cluster_name, names, orbit in self.clusters:
+            continue
 
             truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
             truth = torch.stack([truth_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
