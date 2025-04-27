@@ -11,8 +11,9 @@ YAML_CONFIG="downstreams/ttH/preprocess.yaml"
 IN_BASE="/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttH"
 OUT_BASE="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttH"
 
-for dataset in train test train.sb test.sb; do
-    python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
+#for dataset in train test train.sb test.sb; do
+for dataset in train; do
+    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
         --in_dir "$IN_BASE/$dataset" \
         --store_dir "$OUT_BASE/$dataset"
 done
