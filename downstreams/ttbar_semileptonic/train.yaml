@@ -69,7 +69,8 @@ options:
     train_validation_split: 0.95
 
 network:
-  default: configs/model.yaml
+#  default: configs/model.yaml
+  default: configs/model_large.yaml
 
   # overwrites
   # ...
