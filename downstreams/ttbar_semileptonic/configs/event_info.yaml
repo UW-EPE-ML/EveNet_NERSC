@@ -36,15 +36,21 @@ INPUTS:
 EVENT:
 
   TT1L:
-    t1:
+#    t1:
+#      - b
+#      - l
+#
+#    t2:
+#      - b
+#      - q1
+#      - q2
+    lt:
       - b
-      - l
 
-    t2:
+    ht:
       - b
       - q1
       - q2
-
 
 # ---------------------------------------------------------
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
@@ -52,9 +58,10 @@ EVENT:
 PERMUTATIONS:
 
   TT1L:
-    t2:
+#    t2:
+#      - [ q1, q2 ]
+    ht:
       - [ q1, q2 ]
-
 
 # ------------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired features to regress from observables.
