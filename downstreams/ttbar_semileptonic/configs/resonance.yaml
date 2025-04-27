@@ -35,6 +35,7 @@ LeptonicTop:
     nProduct_Lepton: 1
 
 
+
 DiObjectDecay:
   W/qq:
     Mass: 80.38
@@ -67,4 +68,10 @@ SingleVisibleDecay:
     nProduct_Lepton: 1
     Product_LeptonCharge: 0
 
-
+  t/b:
+    Mass: 172.76
+    Spin: 0.5
+    nProduct_BJet: 1
+    nProduct_Jet: 0
+    nProduct_Lepton: 0
+    Product_LeptonCharge: 0
