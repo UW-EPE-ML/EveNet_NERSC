@@ -444,11 +444,11 @@ class EveNetEngine(L.LightningModule):
             outputs["assignment_prediction"] = {}
             for process in self.config.event_info.process_names:
                 outputs["assignment_prediction"][process] = predict(
-                        assignments=outputs["assignments"].pop(process),
-                        detections=outputs["detections"].pop(process),
-                        product_symbolic_groups=self.ass_args['step']['product_symbolic_groups'][process],
-                        event_permutations=self.ass_args['step']['event_permutations'][process],
-                    )
+                    assignments=outputs["assignments"].pop(process),
+                    detections=outputs["detections"].pop(process),
+                    product_symbolic_groups=self.ass_args['step']['product_symbolic_groups'][process],
+                    event_permutations=self.ass_args['step']['event_permutations'][process],
+                )
 
         return outputs
 
@@ -727,10 +727,24 @@ class EveNetEngine(L.LightningModule):
         if self.pretrain_ckpt_path is not None:
             if self.global_rank == 0:
                 print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
+                # Load full checkpoint
                 state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)['state_dict']
-                # Remove "model." prefix from keys
                 state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
-                missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+                model_state_dict = self.model.state_dict()
+                # Filter only matching keys (shape must match)
+                filtered_state_dict = {}
+                for k, v in state_dict.items():
+                    if k in model_state_dict and v.shape == model_state_dict[k].shape:
+                        filtered_state_dict[k] = v
+                    else:
+                        print(
+                            f"Skipping loading for layer: {k} due to shape mismatch "
+                            f"(ckpt {v.shape} vs model {model_state_dict.get(k, None).shape})"
+                        )
+
+                # Now load filtered keys
+                missing, unexpected = self.model.load_state_dict(filtered_state_dict, strict=False)
+
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
 
