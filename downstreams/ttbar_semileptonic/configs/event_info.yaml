@@ -36,11 +36,11 @@ INPUTS:
 EVENT:
 
   TT1L:
-    lt:
+    t1:
       - b
-#      - l
+      - l
 
-    ht:
+    t2:
       - b
       - q1
       - q2
@@ -52,7 +52,7 @@ EVENT:
 PERMUTATIONS:
 
   TT1L:
-    ht:
+    t2:
       - [ q1, q2 ]
 
 
