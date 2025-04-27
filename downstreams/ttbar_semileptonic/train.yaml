@@ -13,7 +13,7 @@ wandb:
   project: "spanet-tt1l"
   entity: "ytchou97-university-of-washington"
   name: "tt1l"
-  tags: [ "Pretrain", "Parquet", "NERSC", "TT1L" ]
+  tags: [ "Pretrain", "Parquet", "NERSC", "TT1L", "PreTrain" ]
 
 options:
   default: configs/options.yaml
@@ -22,22 +22,24 @@ options:
     total_epochs: 50
     epochs: 50
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
-    pretrain_model_load_path: null
+    #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
+    #    pretrain_model_load_path: null
+    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
     learning_rate: &lr 0.00075
+    learning_rate_body: &lr_body 0.000075
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
-        learning_rate: *lr
+        learning_rate: *lr_body
         weight_decay: *wd
         optimizer_type: "AdamW"
       PET:
-        learning_rate: *lr
+        learning_rate: *lr_body
         weight_decay: *wd
         optimizer_type: "AdamW"
       ObjectEncoder:
-        learning_rate: *lr
+        learning_rate: *lr_body
         weight_decay: *wd
         optimizer_type: "AdamW"
       Classification:
@@ -69,8 +71,9 @@ options:
     train_validation_split: 0.95
 
 network:
-#  default: configs/model.yaml
-  default: configs/model_large.yaml
+  #  default: configs/model.yaml
+  #  default: configs/model_large.yaml
+  default: configs/pretrain.yaml
 
   # overwrites
   # ...
