@@ -56,7 +56,9 @@ def concatenate_h5_datasets(indir):
     # Change name
     prefix_replacements = {
         "INPUTS/Met/": "INPUTS/Conditions/",
-        "INPUTS/Momenta/": "INPUTS/Source/"
+        "INPUTS/Momenta/": "INPUTS/Source/",
+        "TARGETS/ht": "TARGETS/t2",
+        "TARGETS/lt": "TARGETS/t1",
     }
 
     for k in list(concatenated_data.keys()):
