@@ -727,22 +727,26 @@ class EveNetEngine(L.LightningModule):
         if self.pretrain_ckpt_path is not None:
             if self.global_rank == 0:
                 print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
-                # Load full checkpoint
+                # Load checkpoint
                 state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)['state_dict']
                 state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+
+                # Get model state dict
                 model_state_dict = self.model.state_dict()
-                # Filter only matching keys (shape must match)
+
+                # Safe filtering
                 filtered_state_dict = {}
                 for k, v in state_dict.items():
-                    if k in model_state_dict and v.shape == model_state_dict[k].shape:
-                        filtered_state_dict[k] = v
+                    if k in model_state_dict:
+                        if v.shape == model_state_dict[k].shape:
+                            filtered_state_dict[k] = v
+                        else:
+                            print(
+                                f"Skipping loading for layer: {k} due to shape mismatch (ckpt {v.shape} vs model {model_state_dict[k].shape})")
                     else:
-                        print(
-                            f"Skipping loading for layer: {k} due to shape mismatch "
-                            f"(ckpt {v.shape} vs model {model_state_dict.get(k, None).shape})"
-                        )
+                        print(f"Skipping loading for layer: {k} because it does not exist in the current model.")
 
-                # Now load filtered keys
+                # Load filtered keys
                 missing, unexpected = self.model.load_state_dict(filtered_state_dict, strict=False)
 
                 print("--> Missing keys:", missing)
