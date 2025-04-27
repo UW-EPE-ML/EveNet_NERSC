@@ -20,7 +20,7 @@ Body:
     feature_drop: 0.0
     hidden_dim: 64
     enable_local_embedding: true
-    local_Krank: 5
+    local_Krank: 3
     local_point_index:
       - 2
       - 3

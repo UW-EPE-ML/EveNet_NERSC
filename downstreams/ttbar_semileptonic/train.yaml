@@ -5,7 +5,7 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 2048
+  batch_size: 4096
   prefetch_batches: 2
   use_gpu: true
 
@@ -25,33 +25,39 @@ options:
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
     pretrain_model_load_path: null
 
-    learning_rate: &lr 0.0004
-    weight_decay: &wd 0.01
+    learning_rate: &lr 0.00015
+    weight_decay: &wd 0.001
     Components:
       GlobalEmbedding:
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       PET:
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       ObjectEncoder:
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       Classification:
         include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       Regression:
         include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       Assignment:
         include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "lion"
       GlobalGeneration:
         include: false
       EventGeneration:
