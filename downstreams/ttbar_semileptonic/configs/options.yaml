@@ -9,10 +9,10 @@ Training:
 
   pretrain_model_load_path: null
 
-  learning_rate: &lr 0.00005
+  learning_rate: &lr 0.0001
   learning_rate_factor: &lr_factor 1.0
   learning_rate_warm_up_factor: &lr_warm 1.0
-  weight_decay: &wd 0.001
+  weight_decay: &wd 0.01
   decoupled_weight_decay: &decouple_wd true
 
   diffusion_every_n_epochs: 20 # how often to run diffusion
@@ -23,7 +23,7 @@ Training:
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -35,7 +35,7 @@ Training:
     PET:
       learning_rate: *lr
       optimizer_group: "body"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -47,7 +47,7 @@ Training:
     ObjectEncoder:
       learning_rate: *lr
       optimizer_group: "object_encoder"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -59,7 +59,7 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
@@ -73,7 +73,7 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
       include: true # whether to build in network
@@ -87,7 +87,7 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
@@ -103,7 +103,7 @@ Training:
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       include: false # whether to build in network
       loss_scale: 1.0 # loss coefficient
@@ -118,7 +118,7 @@ Training:
     EventGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
-      optimizer_type: "lion"
+      optimizer_type: "AdamW"
       warm_up: true
       include: false # whether to build in network
       loss_scale: 1.0 # loss coefficient

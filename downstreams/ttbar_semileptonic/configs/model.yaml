@@ -24,6 +24,7 @@ Body:
     local_point_index:
       - 2
       - 3
+      - 4
     num_local_layer: 10
     num_layers: 16
     drop_probability: 0.0
