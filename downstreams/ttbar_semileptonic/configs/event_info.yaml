@@ -10,14 +10,18 @@ INPUTS:
       mass: log_normalize
       pt: log_normalize
       eta: normalize
-
-      sin_phi: normalize
-      cos_phi: normalize
-
-      qtag: none
+      phi: normalize_uniform
       btag: none
-      etag: none
-      utag: none
+      isLepton: none
+      charge: none
+
+#      mass: log_normalize
+#      pt: log_normalize
+#      eta: normalize
+#      phi: normalize_uniform
+#      btag: none
+#      isLepton: none
+#      charge: none
 
   # ---------------------------------------------------------------------
   # REQUIRED - GLOBAL - inputs which will have a single vector per event.
@@ -25,9 +29,7 @@ INPUTS:
   GLOBAL:
     Conditions:
       met: log_normalize
-      sumet: log_normalize
-      sin_phi: normalize
-      cos_phi: normalize
+      met_phi: normalize
 
 
 # ----------------------------------------------------------------------

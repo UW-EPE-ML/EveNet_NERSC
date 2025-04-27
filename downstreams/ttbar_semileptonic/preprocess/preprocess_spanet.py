@@ -67,6 +67,21 @@ def concatenate_h5_datasets(indir):
                 new_key = k.replace(prefix, replacement)
                 concatenated_data[new_key] = concatenated_data.pop(k)
 
+    # Special Treatment for phi
+    concatenated_data['INPUTS/Conditions/met_phi'] = np.arctan2(
+        concatenated_data['INPUTS/Conditions/sin_phi'],
+        concatenated_data['INPUTS/Conditions/cos_phi']
+    )
+    concatenated_data['INPUTS/Source/phi'] = np.arctan2(
+        concatenated_data['INPUTS/Source/sin_phi'],
+        concatenated_data['INPUTS/Source/cos_phi']
+    )
+    concatenated_data['INPUTS/Source/isLepton'] = np.logical_or(
+        concatenated_data['INPUTS/Source/etag'] != 0,
+        concatenated_data['INPUTS/Source/utag'] != 0
+    ).astype(np.float32)
+    concatenated_data['INPUTS/Source/charge'] = np.zeros_like(concatenated_data['INPUTS/Source/isLepton'], dtype=np.float32)
+
     return concatenated_data
 
 
