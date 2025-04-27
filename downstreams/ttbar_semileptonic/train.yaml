@@ -25,8 +25,8 @@ options:
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
     pretrain_model_load_path: null
 
-    learning_rate: &lr 0.000075
-    weight_decay: &wd 0.0001
+    learning_rate: &lr 0.0001
+    weight_decay: &wd 0.001
     Components:
       GlobalEmbedding:
         learning_rate: *lr
