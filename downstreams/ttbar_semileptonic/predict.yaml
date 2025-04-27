@@ -70,7 +70,8 @@ options:
 
 network:
   #  default: configs/model.yaml
-  default: configs/model_large.yaml
+#  default: configs/model_large.yaml
+  default: configs/pretrain.yaml
   # overwrites
   # ...
 
