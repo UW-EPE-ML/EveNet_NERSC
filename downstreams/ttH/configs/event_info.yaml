@@ -36,13 +36,15 @@ INPUTS:
 EVENT:
 
   TTH:
-    lt:
+    t1:
       - b
+      - l
 
-    ht:
+    t2:
       - b
       - q1
       - q2
+
     h:
       - b1
       - b2

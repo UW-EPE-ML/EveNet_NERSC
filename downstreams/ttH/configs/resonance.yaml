@@ -58,6 +58,14 @@ DiObjectDecay:
     nProduct_Lepton: 2
     Product_LeptonCharge: 0
 
+  h/bb:
+    Mass: 125.0
+    Spin: 0
+    nProduct_BJet: 2
+    nProduct_Jet: 0
+    nProduct_Lepton: 0
+    Product_LeptonCharge: 0
+
 SingleVisibleDecay:
   W/l:
     Mass: 80.38
