@@ -19,10 +19,10 @@ options:
   default: configs/options.yaml
 
   Training:
-    total_epochs: 50
-    epochs: 50
+    total_epochs: 100
+    epochs: 100
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-    #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=4-v1.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=49-v1.ckpt"
     pretrain_model_load_path: null
     #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
