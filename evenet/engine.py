@@ -83,9 +83,13 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict["class_balance"]
-        self.assignment_weight = self.normalization_dict["particle_balance"]
-        self.subprocess_balance = self.normalization_dict["subprocess_balance"]
+        self.balance_dict: dict = self.normalization_dict
+        if self.config.options.Dataset.get("balance_file", None) is not None:
+            self.balance_dict = torch.load(self.config.options.Dataset.balance_file)
+
+        self.class_weight = self.balance_dict["class_balance"]
+        self.assignment_weight = self.balance_dict["particle_balance"]
+        self.subprocess_balance = self.balance_dict["subprocess_balance"]
 
         print(f"{self.__class__.__name__} normalization dicts initialized")
 

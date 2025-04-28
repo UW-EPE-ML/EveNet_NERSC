@@ -165,4 +165,5 @@ Training:
 Dataset:
   dataset_limit: 1.0
   normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
+  balance_file: null
   train_validation_split: 0.7
