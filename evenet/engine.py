@@ -648,7 +648,7 @@ class EveNetEngine(L.LightningModule):
                 optimizer = torch.optim.AdamW(
                     p,
                     lr=scaled_lr,
-                    betas=betas,
+                    # betas=betas,
                     weight_decay=scaled_weight_decay
                 )
             elif optimizer_type.lower() == "lion":
