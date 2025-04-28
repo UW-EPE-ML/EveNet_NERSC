@@ -22,9 +22,9 @@ options:
     total_epochs: 50
     epochs: 50
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=4-v1.ckpt"
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=4-v1.ckpt"
     #    pretrain_model_load_path: null
-#    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
+    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
     learning_rate: &lr 0.001
     learning_rate_body: &lr_body 0.000075
@@ -60,7 +60,7 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: "AdamW"
-        assignment_loss_scale: 10.0
+        assignment_loss_scale: 1.0
         detection_loss_scale: 0.0
       GlobalGeneration:
         include: false

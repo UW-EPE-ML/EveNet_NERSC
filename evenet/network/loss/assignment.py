@@ -280,11 +280,6 @@ def loss(
         process_balance
     )
 
-    print("--> Loss Start: ")
-    print("particle_balance: ", particle_balance)
-    print("process_balance: ", process_balance)
-    print("process_weight: ", process_weight)
-
     loss_summary = dict({
         "assignment": dict(),
         "detection": dict()
@@ -307,8 +302,5 @@ def loss(
         )
         loss_summary["assignment"][process] = assignment_loss # / num_processes # not scale with num processes
         loss_summary["detection"][process] = detection_loss # / num_processes # not scale with num processes
-
-    print("--> Loss End: ")
-    print("loss_summary: ", loss_summary)
 
     return loss_summary
