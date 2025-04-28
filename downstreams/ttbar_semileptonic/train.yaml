@@ -26,8 +26,8 @@ options:
     #    pretrain_model_load_path: null
     pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
-    learning_rate: &lr 0.001
-    learning_rate_body: &lr_body 0.0001
+    learning_rate: &lr 0.00075
+    learning_rate_body: &lr_body 0.000075
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
@@ -60,7 +60,7 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: "AdamW"
-        assignment_loss_scale: 1.0
+        assignment_loss_scale: 10.0
         detection_loss_scale: 0.0
       GlobalGeneration:
         include: false
