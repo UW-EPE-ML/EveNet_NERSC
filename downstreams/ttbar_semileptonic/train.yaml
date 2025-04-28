@@ -60,7 +60,7 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: "AdamW"
-        assignment_loss_scale: 10.0
+        assignment_loss_scale: 1.0
 #        detection_loss_scale: 0.0
       GlobalGeneration:
         include: false
@@ -72,7 +72,7 @@ options:
 #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
 #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
-    train_validation_split: 0.75
+    train_validation_split: 0.95
 
 network:
   #  default: configs/model.yaml
