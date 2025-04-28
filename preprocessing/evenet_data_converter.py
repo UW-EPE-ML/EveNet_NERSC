@@ -165,7 +165,21 @@ class EveNetDataConverter:
         self.raw_data = data_selected
         self.total_length = n_event_current
 
-    def load_invisible(self, max_num_neutrinos: int):
+    def load_invisible(self, max_num_neutrinos: int, direct_from_spanet: bool = False):
+
+        if direct_from_spanet:
+            invisible = np.stack(
+                [self.raw_data[f'INPUTS/Invisible/{key}'][:, :] for key in self.event_info.generations['Neutrinos']],
+                axis=2,
+            )
+            invisible_mask = np.ones((self.total_length, max_num_neutrinos), dtype=bool)
+
+            return {
+                "invisible-data": invisible,
+                "invisible-mask": invisible_mask,
+                "invisible-num-valid": np.ones(self.total_length, dtype=np.int32) * 2,
+                "invisible-num-raw": np.sum(invisible_mask, axis=-1),
+            }
 
         source_len = len(self.event_info.input_features['Source'])
         feature_len = len(self.event_info.generations['Neutrinos'])
