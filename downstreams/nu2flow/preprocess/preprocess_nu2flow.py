@@ -224,7 +224,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             num_vectors=process_data['num_sequential_vectors'],
             class_counts=class_counts,
             subprocess_counts=subprocess_counts,
-            invisible=process_data['x'],  # TODO: tmp fix
+            invisible=process_data['x_invisible'],
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
