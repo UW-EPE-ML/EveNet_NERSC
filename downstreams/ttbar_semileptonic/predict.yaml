@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.SPANet/"
     # The filename of the prediction data
-    filename: "prediction.pt"
+    filename: "prediction-6.pt"
 
     extra_save:
       - EXTRA/num_electron
@@ -29,7 +29,7 @@ options:
     total_epochs: 50
     epochs: 50
     #    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=14.ckpt"
+    model_checkpoint_load_path: "/global/homes/a/avencast/ray_results/EveNet-Training/TorchTrainer_b9355_00000_0_2025-04-28_03-29-53/checkpoint_000006/checkpoint.ckpt"
     pretrain_model_load_path: null
 
     learning_rate: &lr 0.000075
