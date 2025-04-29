@@ -5,8 +5,11 @@ import vector
 
 def compute_mass(pt, eta, energy):
     pz = pt * np.sinh(eta)
-    mass2 = energy ** 2 - (pt ** 2 + pz ** 2)
-    mass = np.where(mass2 > 0, np.sqrt(mass2), 0.0)
+    mass2 = energy ** 2 - (pt ** 2 + (pt * np.sinh(eta)) ** 2)
+
+    mass = np.zeros_like(mass2)
+    positive_mask = mass2 > 0
+    mass[positive_mask] = np.sqrt(mass2[positive_mask])
     return mass
 
 
