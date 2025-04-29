@@ -96,8 +96,8 @@ class EveNetModel(nn.Module):
         )
 
         self.invisible_normalizer = Normalizer(
-            mean=normalization_dict["invisible_mean"]["Source"].unsqueeze(-1).to(self.device),
-            std=normalization_dict["invisible_std"]["Source"].unsqueeze(-1).to(self.device),
+            mean=normalization_dict["invisible_mean"]["Source"].to(self.device),
+            std=normalization_dict["invisible_std"]["Source"].to(self.device),
             norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool),
             inv_cdf_index=self.event_info.sequential_inv_cdf_index,
         )
