@@ -84,16 +84,16 @@ Assignment:
 GlobalGeneration:
   num_layers: 3
   num_resnet_layers: 2
-  hidden_dim: 64
-  resnet_dim: 64
+  hidden_dim: 128
+  resnet_dim: 128
   layer_scale_init: 1.0e-05
   feature_drop_for_stochastic_depth: 0.0
   activation: SILU
   dropout: 0.0
 
 EventGeneration:
-  hidden_dim: 64
-  num_layers: 3
+  hidden_dim: 128
+  num_layers: 4
   num_heads: 4
   dropout: 0.1
   layer_scale: true
