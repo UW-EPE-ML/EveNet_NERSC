@@ -29,9 +29,9 @@ options:
     diffusion_every_n_epochs: 10 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.0005
-    learning_rate_body: &lr_body 0.0005
-    weight_decay: &wd 0.01
+    learning_rate: &lr 0.00035
+    learning_rate_body: &lr_body 0.00035
+    weight_decay: &wd 0.001
     Components:
       GlobalEmbedding:
         learning_rate: *lr_body
