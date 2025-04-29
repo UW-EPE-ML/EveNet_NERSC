@@ -139,23 +139,23 @@ class GenerationMetrics:
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
                 pred_fn=predict_for_neutrino,
-                # normalize_fn=model.sequential_normalizer,
+                normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_neutrino,
                 use_tqdm=False,
                 process_name=f"Neutrino",
             )
 
-            truth_normalized = model.sequential_normalizer(
-                input_set['x_invisible'],
-                mask=None
-            )
+            # truth_normalized = model.sequential_normalizer(
+            #     input_set['x_invisible'],
+            #     mask=None
+            # )
 
             masking = input_set["x_invisible_mask"]
             for i in range(data_shape[-1]):
                 predict_distribution[f"neutrino-{self.feature_names[i]}"] = generated_distribution[..., i]
-                # truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
-                truth_distribution[f"neutrino-{self.feature_names[i]}"] = truth_normalized[..., i]
+                truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
+                # truth_distribution[f"neutrino-{self.feature_names[i]}"] = truth_normalized[..., i]
 
         # --------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():
