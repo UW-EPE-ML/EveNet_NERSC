@@ -158,6 +158,12 @@ Training:
         - classification
         - assignment
 
+  EarlyStopping:
+    patience: 20
+    min_delta: 0.0005
+    monitor: "val/loss"
+    mode: "min"
+    verbose: true
 #  GradientNorm:
 #    alpha: 0.12
 #    learning_rate: 0.0001
