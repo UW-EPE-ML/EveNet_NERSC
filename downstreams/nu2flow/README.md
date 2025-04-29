@@ -35,3 +35,58 @@ To run the evaluation, go to main directory and run the following command:
 ```
 python evenet/predict.py downstreams/nu2flow/predict.yaml
 ```
+
+## Testing Phi Transformation
+
+```python
+import math
+import torch
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import norm
+import pandas as pd
+
+df = pd.read_parquet("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/SPANet.store.nu2flow/data_nu2flow.parquet")
+a = torch.load("/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/SPANet.store.nu2flow/normalization.pt")
+# Given
+raw = df['x_invisible:0:3']
+mean = a['invisible_mean']['Source'][3].numpy()
+std = a['invisible_std']['Source'][3].numpy()
+# Step 1: Standardize
+n_1 = (raw - mean) / std
+# Step 2: Rescale to [0,1] assuming [-sqrt(3), sqrt(3)]
+scale = math.sqrt(3)
+n_1_scaled = (n_1 + scale) / (2 * scale)
+n_1_scaled = torch.clamp(torch.tensor(n_1_scaled), 1e-6, 1-1e-6)
+# Step 3: Inverse CDF to get Gaussianized φ
+normal = torch.distributions.Normal(0, 1)
+n_2 = normal.icdf(n_1_scaled)
+# Convert tensors to numpy
+n_1_np = n_1
+n_1_scaled_np = n_1_scaled
+n_2_np = n_2
+raw_np = raw
+# Step 4: Plot all together
+plt.figure(figsize=(12, 8))
+# Raw φ
+plt.hist(raw_np, bins=50, alpha=0.5, label='raw [-π, π]', density=True)
+# Standardized φ
+plt.hist(n_1_np, bins=50, alpha=0.5, label='standardized', density=True)
+# Rescaled φ
+plt.hist(n_1_scaled_np, bins=50, alpha=0.5, label='rescaled [0,1]', density=True)
+# Gaussianized φ
+counts, bins, _ = plt.hist(n_2_np, bins=50, alpha=0.5, label='gaussianized', density=True)
+# Fit a Gaussian on n_2 and plot
+mu, sigma = norm.fit(n_2_np)
+x_fit = np.linspace(bins[0], bins[-1], 100)
+pdf_fit = norm.pdf(x_fit, mu, sigma)
+plt.plot(x_fit, pdf_fit, 'k--', label=f'Gaussian fit\nμ={mu:.2f}, σ={sigma:.2f}')
+# Plot formatting
+plt.legend()
+plt.title('φ Transformations and Gaussian Fit')
+plt.xlabel('Value')
+plt.ylabel('Density')
+plt.grid(True)
+plt.show()
+```
+![phi_test](aux/phi_test.png)

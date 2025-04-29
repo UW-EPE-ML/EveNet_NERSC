@@ -47,7 +47,9 @@ class Normalizer(nn.Module):
             # After normalization, apply inverse CDF transformation
             x_partial = x[..., self.inv_cdf_index].contiguous()
             # normalized uniform: [-sqrt(3), sqrt(3)] , add extra 0.1 to avoid unperfect mean, std deviation
-            x_partial = (x_partial + (math.sqrt(3) + 0.1)) / (2 * (math.sqrt(3) + 0.1))
+            # x_partial = (x_partial + (math.sqrt(3) + 0.1)) / (2 * (math.sqrt(3) + 0.1))
+            # Yulei: Don't add extra 0.1
+            x_partial = (x_partial + (math.sqrt(3))) / (2 * (math.sqrt(3)))
             x_partial = torch.clamp(x_partial, 1e-6, 1 - 1e-6)
             x[..., self.inv_cdf_index] = self.normal.icdf(x_partial)
             if mask is not None:
@@ -68,7 +70,9 @@ class Normalizer(nn.Module):
         if len(self.inv_cdf_index) > 0:
             x_partial = x[..., self.inv_cdf_index].contiguous()
             x_partial = self.normal.cdf(x_partial)
-            x_partial = x_partial * 2 * (math.sqrt(3) + 0.1) - (math.sqrt(3) + 0.1)
+            # x_partial = x_partial * 2 * (math.sqrt(3) + 0.1) - (math.sqrt(3) + 0.1)
+            # Yulei: Don't add extra 0.1
+            x_partial = x_partial * 2 * (math.sqrt(3)) - (math.sqrt(3))
             x[..., self.inv_cdf_index] = x_partial
             if mask is not None:
                 x = x * mask
