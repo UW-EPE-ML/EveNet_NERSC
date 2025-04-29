@@ -103,8 +103,6 @@ def prepare_datasets(
             ray_remote_args={"num_cpus": 0.5},
         )
 
-
-
         total_events = ds.count()
         ds = ds.limit(int(total_events * dataset_limit))
         total_events = ds.count()
@@ -130,13 +128,13 @@ def prepare_datasets(
             "Validation",
             f"{val_events:,}",
             f"{val_events / total_events:.2%}",
-            f"0 - {split_idx_0 - 1:,}, {split_idx_1:,} - {total_events - 1:,}",
+            f"{split_idx_0:,} - {split_idx_1 - 1:,}",
         )
         table.add_row(
             "Train",
             f"{train_events:,}",
             f"{train_events / total_events:.2%}",
-            f"{split_idx_0:,} - {split_idx_1 - 1:,}",
+            f"0 - {split_idx_0 - 1:,}, {split_idx_1:,} - {total_events - 1:,}",
         )
 
         # Print it
