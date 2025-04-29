@@ -43,6 +43,7 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.sampler = None
         self.steps_per_epoch = None
         self.total_steps = None
         self.current_step = None  # hack global_step due to incorrect behavior in lightning for multiple optimizers
@@ -853,6 +854,9 @@ class EveNetEngine(L.LightningModule):
 
             print(f"{self.__class__.__name__} GRADIENT NORM Applied [Currently DISABLED for development]!")
             print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
+
+        from evenet.utilities.diffusion_sampler import DDIMSampler
+        self.sampler = DDIMSampler(device=self.device)
 
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
