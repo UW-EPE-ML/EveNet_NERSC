@@ -292,6 +292,7 @@ def shared_step(
         loss_head_dict: dict,
         num_steps_global=20,
         num_steps_point_cloud=100,
+        num_steps_neutrino=100,
         diffusion_on: bool = False,
 ):
     generation_loss = dict()
@@ -317,6 +318,7 @@ def shared_step(
                 input_set=batch,
                 num_steps_global=num_steps_global,
                 num_steps_point_cloud=num_steps_point_cloud,
+                num_steps_neutrino=num_steps_neutrino,
             )
 
     loss_head_dict["generation-global"] = global_gen_loss

@@ -258,6 +258,7 @@ class EveNetEngine(L.LightningModule):
                 device=device,
                 num_steps_global=self.global_diffusion_steps,
                 num_steps_point_cloud=self.point_cloud_diffusion_steps,
+                num_steps_neutrino=self.neutrino_diffusion_steps,
                 diffusion_on=(
                         not self.training
                         and ((self.current_epoch % self.diffusion_every_n_epochs) == (
