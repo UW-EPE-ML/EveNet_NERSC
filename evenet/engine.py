@@ -504,8 +504,9 @@ class EveNetEngine(L.LightningModule):
                 "class_names": self.config.event_info.class_label['EVENT']['signal'][0],
                 "feature_names": self.config.event_info.sequential_feature_names,
                 "device": self.device,
-                "point_cloud_generation": self.global_generation_cfg.include,
-                "neutrino_generation": self.event_generation_cfg.include,
+                "point_cloud_generation": self.event_generation_cfg.generate_point_cloud,
+                "neutrino_generation": self.event_generation_cfg.generate_neutrino,
+                "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),
             }
 
             self.generation_metrics_train = GenerationMetrics(**generation_kwargs)
@@ -755,16 +756,6 @@ class EveNetEngine(L.LightningModule):
 
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
-
-        # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
-        # for heads in [
-        # self.model.Assignment.multiprocess_assign_head,
-        # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
-        # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
-        # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
-        # self.model.Assignment.multiprocess_assign_head.HadronicTop,
-        # ]:
-        # self.logger.experiment.watch(heads, log="gradients", log_freq=10, log_graph=False)
 
         # Define Freezing
         # self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))

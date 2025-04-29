@@ -166,21 +166,6 @@ class EveNetDataConverter:
         self.total_length = n_event_current
 
     def load_invisible(self, max_num_neutrinos: int, direct_from_spanet: bool = False):
-
-        if direct_from_spanet:
-            invisible = np.stack(
-                [self.raw_data[f'INPUTS/Invisible/{key}'][:, :] for key in self.event_info.generations['Neutrinos']],
-                axis=2,
-            )
-            invisible_mask = np.ones((self.total_length, max_num_neutrinos), dtype=bool)
-
-            return {
-                "invisible-data": invisible,
-                "invisible-mask": invisible_mask,
-                "invisible-num-valid": np.ones(self.total_length, dtype=np.int32) * 2,
-                "invisible-num-raw": np.sum(invisible_mask, axis=-1),
-            }
-
         source_len = len(self.event_info.input_features['Source'])
         feature_len = len(self.event_info.generations['Neutrinos'])
 
@@ -189,27 +174,47 @@ class EveNetDataConverter:
         x_inv = np.zeros((self.total_length, max_num_neutrinos, feature_len), dtype=np.float32)
         x_inv_mask = np.zeros((self.total_length, max_num_neutrinos), dtype=bool)
 
-        i_raw = 0
-        for keys in self.raw_data.keys():
-            if keys.startswith("REGRESSIONS") and "/v/MASK" in keys:
-                x_inv_mask[:, i_raw] = self.raw_data[keys]
+        if direct_from_spanet:
+            # In SPANet output, neutrino features are already aligned neutrino-wise
+            for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
+                if norm == "empty":
+                    continue
 
-                for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
-                    if norm == "empty": continue
+                raw_feature = self.raw_data[f'INPUTS/Invisible/{key}']  # shape (n_events, max_num_neutrinos)
 
-                    if 'log' in norm:
-                        x_inv[:, i_raw, idx] = np.log1p(
-                            np.clip(self.raw_data[keys.replace("/MASK", f"/{key}")], min=1e-10)
-                        )
-                    else:
-                        x_inv[:, i_raw, idx] = self.raw_data[keys.replace("/MASK", f"/{key}")]
+                if 'log' in norm:
+                    x_inv[:, :, idx] = np.log1p(np.clip(raw_feature, a_min=1e-10, a_max=None))
+                else:
+                    x_inv[:, :, idx] = raw_feature
 
-                i_raw += 1
-                if i_raw >= max_num_neutrinos:
-                    break
+            x_inv_mask = np.ones((self.total_length, max_num_neutrinos), dtype=bool)
+            num_valid_invisible = np.sum(x_inv_mask, axis=-1)
+            num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * max_num_neutrinos
 
-        num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * i_raw
-        num_valid_invisible = np.sum(x_inv_mask, axis=-1)
+        else:
+            # REGRESSIONS/v/MASK path
+            i_raw = 0
+            for keys in self.raw_data.keys():
+                if keys.startswith("REGRESSIONS") and "/v/MASK" in keys:
+                    x_inv_mask[:, i_raw] = self.raw_data[keys]
+
+                    for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
+                        if norm == "empty":
+                            continue
+
+                        if 'log' in norm:
+                            x_inv[:, i_raw, idx] = np.log1p(
+                                np.clip(self.raw_data[keys.replace("/MASK", f"/{key}")], a_min=1e-10, a_max=None)
+                            )
+                        else:
+                            x_inv[:, i_raw, idx] = self.raw_data[keys.replace("/MASK", f"/{key}")]
+
+                    i_raw += 1
+                    if i_raw >= max_num_neutrinos:
+                        break
+
+            num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * i_raw
+            num_valid_invisible = np.sum(x_inv_mask, axis=-1)
 
         return {
             "invisible-data": x_inv,

@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 from typing import Callable, Optional
+from tqdm import tqdm
 
 from evenet.utilities.debug_tool import time_decorator
 
@@ -56,7 +57,9 @@ class DDIMSampler:
             normalize_fn: Optional[torch.nn.Module] = None,
             num_steps: int = 20,
             eta: float = 1.0,
-            noise_mask: Optional[torch.Tensor] = None
+            noise_mask: Optional[torch.Tensor] = None,
+            use_tqdm: bool = False,
+            process_name: str = "Sampling",
     ) -> Tensor:
         """
         time: time tensor (B,)
@@ -66,7 +69,12 @@ class DDIMSampler:
         x = self.prior_sde(data_shape)
         if noise_mask is not None:
             x = x * noise_mask
-        for time_step in range(num_steps, 0, -1):
+
+        iterable = range(num_steps, 0, -1)
+        if use_tqdm:
+            iterable = tqdm(iterable, desc=process_name, total=num_steps)
+
+        for time_step in iterable:
             t = torch.ones((batch_size,)).to(self.device) * time_step / num_steps
             t = t.float()  # Convert to float if needed
             logsnr, alpha, sigma = get_logsnr_alpha_sigma(t, shape=const_shape)
