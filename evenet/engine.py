@@ -455,6 +455,35 @@ class EveNetEngine(L.LightningModule):
                     event_permutations=self.ass_args['step']['event_permutations'][process],
                 )
 
+        if self.event_generation_cfg.generate_neutrino:
+            outputs["neutrinos"] = {
+                "predict": {},
+                "target": {}
+            }
+            data_shape = inputs['x_invisible'].shape
+            feature_names = self.config.event_info.sequential_feature_names
+
+            predict_for_neutrino = partial(
+                self.model.predict_diffusion_vector,
+                mode="neutrino",
+                cond_x=inputs,
+                noise_mask=inputs["x_invisible_mask"].unsqueeze(-1)  # [B, T, 1] to match noise x
+            )
+
+            generated_distribution = self.sampler.sample(
+                data_shape=data_shape,
+                pred_fn=predict_for_neutrino,
+                normalize_fn=self.model.invisible_normalizer,
+                eta=1.0,
+                num_steps=self.neutrino_diffusion_steps,
+                use_tqdm=False,
+                process_name=f"Neutrino",
+            )
+
+            for i in range(data_shape[-1]):
+                outputs["neutrino"]["predict"][feature_names[i]] = generated_distribution[..., i]
+                outputs["neutrino"]["target"][feature_names[i]] = inputs['x_invisible'][..., i]
+
         return outputs
 
     def check_gradient(self, gradient_heads: dict[str, torch.nn.Module]):

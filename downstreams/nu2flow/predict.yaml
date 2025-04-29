@@ -1,0 +1,117 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_test/"
+  number_of_workers: 4
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+  batch_size: 4096
+  prefetch_batches: 2
+  use_gpu: true
+
+options:
+  default: configs/options.yaml
+
+  # For prediction Only
+  prediction:
+    # The directory where the prediction data is saved
+    output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
+    # The filename of the prediction data
+    filename: "prediction-mg5.pt"
+
+    extra_save:
+      - EXTRA/num_bjet
+
+  Training:
+    total_epochs: 500
+    epochs: 250
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/best_epoch=120.ckpt"
+    pretrain_model_load_path: null
+    #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
+
+    diffusion_every_n_epochs: 10 # how often to run diffusion
+    diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
+
+    learning_rate: &lr 0.00075
+    learning_rate_body: &lr_body 0.00075
+    weight_decay: &wd 0.001
+    Components:
+      GlobalEmbedding:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      PET:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      ObjectEncoder:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      Classification:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      Regression:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      Assignment:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      GlobalGeneration:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        loss_scale: 0.1
+      EventGeneration:
+        include: true
+        warm_up: true
+        generate_point_cloud: false
+        generate_neutrino: true
+        diffusion_steps: 200
+        learning_rate: *lr
+        weight_decay: *wd
+
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
+    #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
+    #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
+    train_validation_split: 0.75
+
+#  Metrics:
+#    Generation-Binning:
+#      "neutrino-log_pt": [ 50, -4, 4 ]
+#      "neutrino-eta": [ 50, -4, 4 ]
+#      "neutrino-phi": [ 50, -4, 4 ]
+
+
+network:
+  default: configs/model.yaml
+  #  default: configs/model_large.yaml
+  #  default: configs/pretrain.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: configs/event_info.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: configs/resonance.yaml
+
+  # overwrites
+  # ...
