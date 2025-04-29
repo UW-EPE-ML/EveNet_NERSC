@@ -1,6 +1,5 @@
 import os
 import argparse
-from functools import partial
 from pathlib import Path
 
 import ray
@@ -16,8 +15,7 @@ from ray.train import RunConfig, ScalingConfig
 
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, DeviceStatsMonitor, \
-    RichModelSummary
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, RichModelSummary
 
 from evenet.control.global_config import global_config
 from shared import make_process_fn, prepare_datasets
@@ -157,7 +155,6 @@ def main(args):
     scaling_config = ScalingConfig(
         num_workers=platform_info.number_of_workers,
         resources_per_worker=platform_info.resources_per_worker,
-        # use_gpu=False,
         use_gpu=platform_info.get("use_gpu", True),
     )
 
