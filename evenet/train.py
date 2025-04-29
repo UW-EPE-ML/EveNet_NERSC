@@ -71,11 +71,7 @@ def train_func(cfg):
         filename="best_{epoch}",
     )
     early_stop_callback = EarlyStopping(
-        monitor="val/loss",
-        patience=10,  # epochs to wait for improvement
-        mode="min",  # "min" if lower is better (e.g. for loss)
-        verbose=True,  # optional: prints when triggered
-        min_delta=0.001,  # minimum change to qualify as improvement
+        **cfg.get("early_stopping", {}),
     )
 
     accelerator_config = {
@@ -173,6 +169,7 @@ def main(args):
             **global_config.wandb,
         },
         "total_events": total_events,
+        "early_stopping": global_config.options.Training.EarlyStopping,
     }
 
     trainer = TorchTrainer(
