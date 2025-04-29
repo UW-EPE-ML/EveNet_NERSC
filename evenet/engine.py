@@ -482,8 +482,8 @@ class EveNetEngine(L.LightningModule):
             )
 
             for i in range(data_shape[-1]):
-                outputs["neutrino"]["predict"][feature_names[i]] = generated_distribution[..., i]
-                outputs["neutrino"]["target"][feature_names[i]] = inputs['x_invisible'][..., i]
+                outputs["neutrinos"]["predict"][feature_names[i]] = generated_distribution[..., i]
+                outputs["neutrinos"]["target"][feature_names[i]] = inputs['x_invisible'][..., i]
 
         return outputs
 
