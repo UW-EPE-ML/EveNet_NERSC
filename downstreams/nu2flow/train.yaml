@@ -85,7 +85,7 @@ options:
 
   Metrics:
     Generation-Binning:
-      "neutrino-log_pt": [ 50, 4, 4 ]
+      "neutrino-log_pt": [ 50, -4, 4 ]
       "neutrino-eta": [ 50, -4, 4 ]
       "neutrino-phi": [ 50, -4, 4 ]
 
