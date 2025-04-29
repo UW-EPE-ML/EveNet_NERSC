@@ -1,0 +1,168 @@
+Training:
+  # Total plan epochs for optimizer decay
+  total_epochs: 100
+  # Trainer will stop at this epoch number
+  epochs: 100
+
+  model_checkpoint_save_path: "."
+  model_checkpoint_load_path: null
+
+  pretrain_model_load_path: null
+
+  learning_rate: &lr 0.0001
+  learning_rate_factor: &lr_factor 1.0
+  learning_rate_warm_up_factor: &lr_warm 1.0
+  weight_decay: &wd 0.01
+  decoupled_weight_decay: &decouple_wd true
+
+  diffusion_every_n_epochs: 20 # how often to run diffusion
+  diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
+
+
+  Components:
+    GlobalEmbedding:
+      learning_rate: *lr
+      optimizer_group: "body" # learning rate based on the first component
+      optimizer_type: "AdamW"
+      warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    PET:
+      learning_rate: *lr
+      optimizer_group: "body"
+      optimizer_type: "AdamW"
+      warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    ObjectEncoder:
+      learning_rate: *lr
+      optimizer_group: "object_encoder"
+      optimizer_type: "AdamW"
+      warm_up: true
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Classification:
+      learning_rate: *lr
+      optimizer_group: "classification"
+      optimizer_type: "AdamW"
+      warm_up: true
+      loss_scale: 1.0 # loss coefficient
+      include: true # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Regression:
+      learning_rate: *lr
+      optimizer_group: "regression"
+      optimizer_type: "AdamW"
+      warm_up: true
+      loss_scale: 1.0 # loss coefficient
+      include: true # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    Assignment:
+      learning_rate: *lr
+      optimizer_group: "assignment"
+      optimizer_type: "AdamW"
+      warm_up: true
+      assignment_loss_scale: 1.0
+      detection_loss_scale: 1.0
+      focal_gamma: 0.0
+      include: false # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    GlobalGeneration:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
+      include: false # whether to build in network
+      loss_scale: 1.0 # loss coefficient
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      diffusion_steps: 20
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+    EventGeneration:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "AdamW"
+      warm_up: true
+      include: false # whether to build in network
+      loss_scale: 1.0 # loss coefficient
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      diffusion_steps: 100
+      generate_point_cloud: true
+      generate_neutrino: true
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
+  ProgressiveTraining:
+    - name: "vanilla"
+      epoch_ratio: 1.0
+      # the length of the transition epoch (can be float number)
+      # --> ramp up the loss from previous training schedule to the current one
+      # --> a cosine function is used to ramp up the loss
+      #     --> transition factor: t = 0.5 * (1 - np.cos(np.pi * np.clip(steps / total_steps, 0, 1)))
+      #     ==> loss = t * new_loss + (1 - t) * old_loss
+      # Will not triggered if it's the first training schedule
+      transition_epoch: 0.0
+      components:
+        - body
+        - object_encoder
+        - classification
+        - regression
+        - assignment
+        - generation
+    - name: "no use, just for example"
+      epoch_ratio: 0.0
+      transition_epoch: 0.5
+      components:
+        - body
+        - object_encoder
+        - classification
+        - assignment
+
+#  GradientNorm:
+#    alpha: 0.12
+#    learning_rate: 0.0001
+
+Dataset:
+  dataset_limit: 1.0
+  normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
+  train_validation_split: 0.7

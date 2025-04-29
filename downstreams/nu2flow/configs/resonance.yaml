@@ -1,0 +1,69 @@
+# --------------------
+# Resonance Type - List of valid resonance particle (w. different decay topology)
+# --------------------
+
+HadronicTop:
+  t/bqq:
+    Mass: 172.76
+    Spin: 0.5
+    nProduct_BJet: 1
+    nProduct_Jet: 3
+    nProduct_Lepton: 0
+    Product_LeptonCharge: 0
+
+LeptonicTop:
+  t/bl+:
+    Mass: 172.76
+    Spin: 0.5
+    nProduct_BJet: 1
+    nProduct_Jet: 1
+    nProduct_Lepton: 1
+    Product_LeptonCharge: 1
+  t/bl-:
+    Mass: 172.76
+    Spin: 0.5
+    nProduct_BJet: 1
+    nProduct_Jet: 1
+    nProduct_Lepton: 1
+    Product_LeptonCharge: -1
+
+  t/bl:
+    Mass: 172.76
+    Spin: 0.5
+    nProduct_BJet: 1
+    nProduct_Jet: 1
+    nProduct_Lepton: 1
+
+
+
+DiObjectDecay:
+  W/qq:
+    Mass: 80.38
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 2
+    nProduct_Lepton: 0
+    Product_LeptonCharge: 0
+  Z/qq:
+    Mass: 91.19
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 2
+    nProduct_Lepton: 0
+    Product_LeptonCharge: 0
+  Z/ll:
+    Mass: 91.19
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 0
+    nProduct_Lepton: 2
+    Product_LeptonCharge: 0
+
+SingleVisibleDecay:
+  W/l:
+    Mass: 80.38
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 0
+    nProduct_Lepton: 1
+    Product_LeptonCharge: 0

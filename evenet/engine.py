@@ -13,11 +13,12 @@ from matplotlib import pyplot as plt
 from transformers import get_cosine_schedule_with_warmup
 
 from evenet.network.evenet_model import EveNetModel
+from evenet.network.loss.assignment import convert_target_assignment
 
 from evenet.network.metrics.general_comparison import GenericMetrics
 from evenet.network.metrics.classification import ClassificationMetrics
 from evenet.network.metrics.classification import shared_step as cls_step, shared_epoch_end as cls_end
-from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass
+from evenet.network.metrics.assignment import get_assignment_necessaries as get_ass, predict
 from evenet.network.metrics.assignment import shared_step as ass_step, shared_epoch_end as ass_end
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
@@ -82,9 +83,13 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
-        self.class_weight = self.normalization_dict["class_balance"]
-        self.assignment_weight = self.normalization_dict["particle_balance"]
-        self.subprocess_balance = self.normalization_dict["subprocess_balance"]
+        self.balance_dict: dict = self.normalization_dict
+        if self.config.options.Dataset.get("balance_file", None) is not None:
+            self.balance_dict = torch.load(self.config.options.Dataset.balance_file)
+
+        self.class_weight = self.balance_dict["class_balance"]
+        self.assignment_weight = self.balance_dict["particle_balance"]
+        self.subprocess_balance = self.balance_dict["subprocess_balance"]
 
         print(f"{self.__class__.__name__} normalization dicts initialized")
 
@@ -427,6 +432,28 @@ class EveNetEngine(L.LightningModule):
             batch_size=batch_size,
         )
 
+        extra_save = self.config.options.prediction.get('extra_save', {})
+        for key in extra_save:
+            if key in batch:
+                outputs[key] = batch[key]
+
+        if self.assignment_cfg.include:
+            outputs["assignment_target"], outputs["assignment_target_mask"] = convert_target_assignment(
+                targets=batch["assignments-indices"],
+                targets_mask=batch["assignments-mask"],
+                event_particles=self.ass_args['loss']['event_particles'],
+                num_targets=self.ass_args['loss']['num_targets']
+            )
+
+            outputs["assignment_prediction"] = {}
+            for process in self.config.event_info.process_names:
+                outputs["assignment_prediction"][process] = predict(
+                    assignments=outputs["assignments"].pop(process),
+                    detections=outputs["detections"].pop(process),
+                    product_symbolic_groups=self.ass_args['step']['product_symbolic_groups'][process],
+                    event_permutations=self.ass_args['step']['event_permutations'][process],
+                )
+
         return outputs
 
     def check_gradient(self, gradient_heads: dict[str, torch.nn.Module]):
@@ -477,8 +504,9 @@ class EveNetEngine(L.LightningModule):
                 "class_names": self.config.event_info.class_label['EVENT']['signal'][0],
                 "feature_names": self.config.event_info.sequential_feature_names,
                 "device": self.device,
-                "point_cloud_generation": self.global_generation_cfg.include,
-                "neutrino_generation": self.event_generation_cfg.include,
+                "point_cloud_generation": self.event_generation_cfg.generate_point_cloud,
+                "neutrino_generation": self.event_generation_cfg.generate_neutrino,
+                "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),
             }
 
             self.generation_metrics_train = GenerationMetrics(**generation_kwargs)
@@ -621,7 +649,7 @@ class EveNetEngine(L.LightningModule):
                 optimizer = torch.optim.AdamW(
                     p,
                     lr=scaled_lr,
-                    betas=betas,
+                    # betas=betas,
                     weight_decay=scaled_weight_decay
                 )
             elif optimizer_type.lower() == "lion":
@@ -704,22 +732,30 @@ class EveNetEngine(L.LightningModule):
         if self.pretrain_ckpt_path is not None:
             if self.global_rank == 0:
                 print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
+                # Load checkpoint
                 state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)['state_dict']
-                # Remove "model." prefix from keys
                 state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
-                missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+
+                # Get model state dict
+                model_state_dict = self.model.state_dict()
+
+                # Safe filtering
+                filtered_state_dict = {}
+                for k, v in state_dict.items():
+                    if k in model_state_dict:
+                        if v.shape == model_state_dict[k].shape:
+                            filtered_state_dict[k] = v
+                        else:
+                            print(
+                                f"Skipping loading for layer: {k} due to shape mismatch (ckpt {v.shape} vs model {model_state_dict[k].shape})")
+                    else:
+                        print(f"Skipping loading for layer: {k} because it does not exist in the current model.")
+
+                # Load filtered keys
+                missing, unexpected = self.model.load_state_dict(filtered_state_dict, strict=False)
+
                 print("--> Missing keys:", missing)
                 print("--> Unexpected keys:", unexpected)
-
-        # self.logger.experiment.watch(self.model, log="all", log_graph=True, log_freq=500)
-        # for heads in [
-        # self.model.Assignment.multiprocess_assign_head,
-        # self.model.Assignment.multiprocess_assign_head.SingleVisibleDecay,
-        # self.model.Assignment.multiprocess_assign_head.DiObjectDecay,
-        # self.model.Assignment.multiprocess_assign_head.LeptonicTop,
-        # self.model.Assignment.multiprocess_assign_head.HadronicTop,
-        # ]:
-        # self.logger.experiment.watch(heads, log="gradients", log_freq=10, log_graph=False)
 
         # Define Freezing
         # self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))

@@ -95,6 +95,34 @@ def convert_target_assignment_array(
 
 @time_decorator(name="[Assignment] assignment_cross_entropy_loss")
 def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, target_mask: Tensor, gamma: float) -> Tensor:
+    """
+    Calculates the cross-entropy loss for assignment predictions with focal scaling.
+
+    The focal scale is a mechanism that modifies the standard cross-entropy loss to address class imbalance
+    by down-weighting the loss contribution from well-classified examples and focusing more on hard examples.
+
+    Mathematically, the focal scale is defined as:
+    focal_scale = (1 - p)^gamma
+
+    where:
+    - p is the predicted probability for the correct class
+    - gamma is a focusing parameter that adjusts the rate at which easy examples are down-weighted
+
+    When gamma = 0, this is equivalent to standard cross-entropy loss.
+    As gamma increases, the effect of down-weighting easy examples becomes stronger.
+
+    The final loss is calculated as:
+    loss = -log(p) * focal_scale
+
+    Args:
+        prediction: Tensor containing log probabilities of assignments
+        target_data: Tensor containing target assignment indices
+        target_mask: Boolean mask indicating valid targets
+        gamma: Focusing parameter for focal scaling
+
+    Returns:
+        Tensor containing the focal-scaled cross-entropy loss
+    """
     batch_size = prediction.shape[0]
     prediction_shape = prediction.shape[1:]
 
@@ -116,14 +144,14 @@ def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, targe
     log_probability = ravel_prediction.gather(-1, ravel_target.view(-1, 1)).squeeze()
     log_probability = log_probability.masked_fill(~target_mask, 0.0) # 1e-6
 
-    # focal_scale = (1 - torch.exp(log_probability)) ** gamma
-
+    # Calculate the focal scale: (1 - p)^gamma
     p = torch.exp(log_probability)
     # Compute focal scale only where valid
     focal_base = (1 - p).clamp(min=1e-6)
     focal_scale = torch.zeros_like(p)
     focal_scale[target_mask] = focal_base[target_mask] ** gamma
 
+    # Final loss: -log(p) * focal_scale
     return -log_probability * focal_scale
 
 
@@ -133,6 +161,21 @@ def compute_symmetric_losses(
         targets_mask: List[Tensor],
         focal_gamma: float
 ) -> Tensor:
+    """
+    Computes assignment losses for each particle using focal-scaled cross-entropy.
+
+    This function applies the assignment_cross_entropy_loss to each assignment-target pair
+    and returns the stacked losses.
+
+    Args:
+        assignments: List of assignment tensors (log probabilities)
+        targets: List of target tensors
+        targets_mask: List of boolean masks indicating valid targets
+        focal_gamma: Focusing parameter for focal scaling
+
+    Returns:
+        Tensor of shape [num_particles, batch_size] containing losses for each particle
+    """
     # For current encoder structure, the event permutation is already embedded in the model structure, so no need for
     # specific event permutation here.
 
@@ -152,10 +195,36 @@ def symmetric_loss(
         num_targets: List[int],
         focal_gamma: float,
 ) -> Tensor:
+    """
+    Calculates symmetric assignment losses with normalization for the number of targets.
+
+    This function first normalizes the assignment log probabilities by adding log(num_targets)
+    to account for the varying number of possible targets. This normalization ensures that
+    assignments with different numbers of targets are comparable.
+
+    The normalization term log(num_targets) can be understood as accounting for the prior
+    probability of randomly selecting the correct target from num_targets possibilities.
+
+    After normalization, the function computes the symmetric losses using focal-scaled
+    cross-entropy.
+
+    Args:
+        assignments: List of assignment tensors (log probabilities)
+        targets: List of target tensors
+        targets_mask: List of boolean masks indicating valid targets
+        num_targets: List of integers representing the number of targets for each assignment
+        focal_gamma: Focusing parameter for focal scaling
+
+    Returns:
+        Tensor containing the symmetric losses
+    """
+    # Normalize assignments by adding log(num_targets)
     assignments = [
         prediction + torch.log(torch.scalar_tensor(num_target))
         for prediction, num_target in zip(assignments, num_targets)
     ]
+
+    # Compute symmetric losses using the normalized assignments
     symmetric_losses = compute_symmetric_losses(
         assignments,
         targets,
@@ -178,6 +247,42 @@ def loss_single_process(
         particle_weights_tensor: Union[Tensor, None],
         process_weight: Union[List[Tensor], None]
 ):
+    """
+    Calculates both detection and assignment losses for a single process.
+
+    This function computes two types of losses:
+    1. Detection Loss: Cross-entropy loss for detecting the presence of particles
+    2. Assignment Loss: Focal-scaled cross-entropy loss for particle assignments
+
+    The assignment loss calculation involves several steps:
+    1. Computing symmetric losses using the symmetric_loss function
+    2. Applying particle balancing weights to handle class imbalance
+    3. Applying process weights to balance different processes
+    4. Masking invalid assignments
+    5. Normalizing by the number of valid assignments
+
+    The focal scale in the assignment loss helps to focus more on hard examples
+    by down-weighting well-classified examples according to the formula:
+    focal_scale = (1 - p)^gamma
+
+    where p is the predicted probability and gamma is the focusing parameter.
+
+    Args:
+        assignments: List of assignment tensors (log probabilities)
+        detections: List of detection tensors
+        targets: List of target tensors
+        targets_mask: List of boolean masks indicating valid targets
+        process_mask: List of boolean masks for process filtering
+        num_targets: List of integers representing the number of targets
+        event_permutations: Tuple of lists containing event permutations
+        focal_gamma: Focusing parameter for focal scaling
+        particle_index_tensor: Tensor of particle indices for balancing
+        particle_weights_tensor: Tensor of particle weights for balancing
+        process_weight: List of process weights
+
+    Returns:
+        Tuple containing (assignment_loss, detection_loss)
+    """
     ####################
     ## Detection Loss ##
     ####################
@@ -269,6 +374,38 @@ def loss(
         particle_balance: Union[Dict, None] = None,
         process_balance: Union[Tensor, None] = None
 ):
+    """
+    Main loss function that calculates assignment and detection losses across all processes.
+
+    This function orchestrates the loss calculation by:
+    1. Converting target assignments to the appropriate format
+    2. Calculating losses for each process separately
+    3. Aggregating the losses into a summary dictionary
+
+    The assignment loss uses focal scaling to address class imbalance by down-weighting
+    well-classified examples and focusing more on hard examples. The focal scale is 
+    calculated as (1 - p)^gamma, where p is the predicted probability and gamma is the
+    focusing parameter.
+
+    Higher values of gamma increase the focus on hard examples. When gamma = 0, the loss
+    is equivalent to standard cross-entropy.
+
+    Args:
+        assignments: Dictionary mapping process names to lists of assignment tensors
+        detections: Dictionary mapping process names to lists of detection tensors
+        targets: List of target tensors
+        targets_mask: List of boolean masks indicating valid targets
+        process_id: Tensor of process IDs
+        event_particles: Dictionary of event particles
+        event_permutations: Dictionary of event permutations
+        num_targets: Dictionary mapping process names to lists of target counts
+        focal_gamma: Focusing parameter for focal scaling
+        particle_balance: Optional dictionary for particle balancing
+        process_balance: Optional tensor for process balancing
+
+    Returns:
+        Dictionary containing assignment and detection losses for each process
+    """
 
     # TODO: Add class balance
     targets, targets_mask, process_mask, process_weight = convert_target_assignment_array(
@@ -283,8 +420,7 @@ def loss(
     loss_summary = dict({
         "assignment": dict(),
         "detection": dict()
-    }
-    )
+    })
 
     # num_processes = len(event_permutations.keys())
     for process in event_permutations.keys():

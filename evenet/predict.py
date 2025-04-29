@@ -28,12 +28,6 @@ def predict_func(cfg):
         prefetch_batches=cfg['prefetch_batches'],
     )
 
-    model = EveNetEngine(
-        global_config=global_config,
-        world_size=get_context().get_world_size(),
-        total_events=cfg['total_events'],
-    )
-
     if global_config.options.Training.model_checkpoint_load_path:
         ckpt_path = global_config.options.Training.model_checkpoint_load_path
         print(f"Loading checkpoint from model_checkpoint_load_path: {ckpt_path}")
@@ -45,6 +39,12 @@ def predict_func(cfg):
             "Checkpoint path required for prediction, "
             "but neither model_checkpoint_load_path nor pretrain_model_load_path is set."
         )
+
+    model = EveNetEngine(
+        global_config=global_config,
+        world_size=get_context().get_world_size(),
+        total_events=cfg['total_events'],
+    )
 
     accelerator_config = {
         "accelerator": "auto",

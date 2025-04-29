@@ -3,10 +3,8 @@ import argparse
 from functools import partial
 from pathlib import Path
 
-import numpy as np
 import ray
 import ray.train
-from ray.data import Dataset
 from ray.train.lightning import (
     prepare_trainer,
     RayDDPStrategy,
@@ -24,9 +22,6 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from evenet.control.global_config import global_config
 from shared import make_process_fn, prepare_datasets
 from evenet.engine import EveNetEngine
-from evenet.network.callbacks.ema import EMACallback
-from preprocessing.preprocess import unflatten_dict
-import json
 
 
 def train_func(cfg):

@@ -40,6 +40,8 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
         jet_mass = torch.exp(jet_mass)
 
     def gather_jets(jet_tensor):
+        assert (assignment_indices >= 0).all(), f"assignment_indices has negative values! {assignment_indices}"
+
         return torch.gather(jet_tensor.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
 
     pt = gather_jets(jet_pt)
@@ -311,7 +313,7 @@ class SingleProcessAssignmentMetrics:
             detection_cut=0.5
     ):
 
-        self.detection_cut = detection_cut # Update the self property
+        self.detection_cut = detection_cut  # Update the self property
 
         best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
 
@@ -357,7 +359,6 @@ class SingleProcessAssignmentMetrics:
 
         # Log mass distribution
         for cluster_name, names, orbit in self.clusters:
-
             truth_count = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0).int().sum(dim=0)
             truth = torch.stack([truth_indices[iorbit] for iorbit in list(sorted(orbit))], dim=0)
             truth_masking = torch.stack([truth_masks[iorbit] for iorbit in list(sorted(orbit))], dim=0)
@@ -405,29 +406,37 @@ class SingleProcessAssignmentMetrics:
                         reco_mass_correct = reconstruct_mass_peak(
                             jet[correct_local], predict_correct, input_mask[correct_local]
                         )
-                        hist, _ = np.histogram(reco_mass_correct[detection_correct>detection_cut].detach().cpu().numpy(), bins=self.bins)
+                        hist, _ = np.histogram(
+                            reco_mass_correct[detection_correct > detection_cut].detach().cpu().numpy(), bins=self.bins)
                         self.predict_metrics_correct[hist_name]["mass"] += hist
 
                         hist, _ = np.histogram(detection_correct.detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_correct[hist_name]["detection_score"] += hist
 
-                        hist, _ = np.histogram(assign_score_correct[detection_correct>detection_cut].detach().cpu().numpy(), bins=self.bins_score)
+                        hist, _ = np.histogram(
+                            assign_score_correct[detection_correct > detection_cut].detach().cpu().numpy(),
+                            bins=self.bins_score)
                         self.predict_metrics_correct[hist_name]["assignment_score"] += hist
 
                     prediction_false = prediction_local[~correct_local]
                     detection_false = detection_local[~correct_local]
                     assign_score_false = assign_score_local[~correct_local]
-                    if prediction_false.size()[0] > 0:
+                    if (prediction_false.size()[0] > 0) and (prediction_false >= 0).all():
                         reco_mass_false = reconstruct_mass_peak(
                             jet[~correct_local], prediction_false, input_mask[~correct_local]
                         )
-                        hist, _ = np.histogram(reco_mass_false[detection_false>detection_cut].detach().cpu().numpy(), bins=self.bins)
+                        hist, _ = np.histogram(
+                            reco_mass_false[detection_false > detection_cut].detach().cpu().numpy(),
+                            bins=self.bins
+                        )
                         self.predict_metrics_wrong[hist_name]["mass"] += hist
 
                         hist, _ = np.histogram(detection_false.detach().cpu().numpy(), bins=self.bins_score)
                         self.predict_metrics_wrong[hist_name]["detection_score"] += hist
 
-                        hist, _ = np.histogram(assign_score_false[detection_false>detection_cut].detach().cpu().numpy(), bins=self.bins_score)
+                        hist, _ = np.histogram(
+                            assign_score_false[detection_false > detection_cut].detach().cpu().numpy(),
+                            bins=self.bins_score)
                         self.predict_metrics_wrong[hist_name]["assignment_score"] += hist
 
     def check_correct_assignment(

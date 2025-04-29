@@ -15,7 +15,7 @@ import wandb
 class GenerationMetrics:
     def __init__(
             self, device, class_names, feature_names, hist_xmin=-15, hist_xmax=15, num_bins=60,
-            point_cloud_generation=False, neutrino_generation=False
+            point_cloud_generation=False, neutrino_generation=False, special_bin_configs: dict[str, list] = None
     ):
 
         self.sampler = DDIMSampler(device)
@@ -39,6 +39,14 @@ class GenerationMetrics:
 
         self.histogram = dict()
         self.truth_histogram = dict()
+
+        self.special_bins = dict()
+        self.special_bins_centers = dict()
+        if special_bin_configs is not None:
+            for name, special_bins in special_bin_configs.items():
+                self.special_bins[name] = np.linspace(special_bins[1], special_bins[2], special_bins[0])
+                self.special_bins_centers[name] = 0.5 * (self.special_bins[name][:-1] + self.special_bins[name][1:])
+
 
     @time_decorator(name="[Generation] update metrics")
     def update(
@@ -73,7 +81,9 @@ class GenerationMetrics:
                 pred_fn=predict_for_num_vectors,
                 normalize_fn=model.num_point_cloud_normalizer,
                 num_steps=num_steps_global,
-                eta=eta
+                eta=eta,
+                use_tqdm=True,
+                process_name=f"Global",
             )
 
             predict_distribution["num_vectors"] = torch.floor(generated_distribution.flatten() + 0.5)
@@ -99,7 +109,9 @@ class GenerationMetrics:
                 normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_point_cloud,
-                noise_mask=input_set["x_mask"].unsqueeze(-1)  # [B, T, 1] to match noise x
+                noise_mask=input_set["x_mask"].unsqueeze(-1),  # [B, T, 1] to match noise x
+                use_tqdm=True,
+                process_name=f"PointCloud",
             )
 
             masking = input_set["x_mask"]
@@ -128,6 +140,8 @@ class GenerationMetrics:
                 normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_neutrino,
+                use_tqdm=True,
+                process_name=f"Neutrino",
             )
 
             masking = input_set["x_invisible_mask"]
@@ -137,14 +151,19 @@ class GenerationMetrics:
 
         # --------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():
+
+            num_bins = self.num_bins
+            if distribution_name in self.special_bins:
+                num_bins = len(self.special_bins_centers[distribution_name])
+
             if distribution_name not in self.histogram:
                 self.histogram[distribution_name] = {
-                    class_name: np.zeros(self.num_bins)
+                    class_name: np.zeros(num_bins)
                     for class_name in self.class_names
                 }
             if distribution_name not in self.truth_histogram:
                 self.truth_histogram[distribution_name] = {
-                    class_name: np.zeros(self.num_bins)
+                    class_name: np.zeros(num_bins)
                     for class_name in self.class_names
                 }
 
@@ -160,10 +179,15 @@ class GenerationMetrics:
                 else:
                     pred = predict_distribution[distribution_name][class_mask].detach().cpu().numpy()
                     truth = truth_distribution[distribution_name][class_mask].flatten().detach().cpu().numpy()
-                hist, _ = np.histogram(pred, bins=self.bins)
+
+                hist_bins = self.bins
+                if distribution_name in self.special_bins:
+                    hist_bins = self.special_bins[distribution_name]
+
+                hist, _ = np.histogram(pred, bins=hist_bins)
                 self.histogram[distribution_name][class_name] += hist
 
-                hist, _ = np.histogram(truth, bins=self.bins)
+                hist, _ = np.histogram(truth, bins=hist_bins)
                 self.truth_histogram[distribution_name][class_name] += hist
 
     def reset(self):
@@ -186,15 +210,15 @@ class GenerationMetrics:
     def plot_histogram_func(
             self,
             truth_histogram,
-            histogram
+            histogram,
+            bin_widths,
+            bin_centers,
     ):
 
         colors = [
             "#40B0A6", "#6D8EF7", "#6E579A", "#A38E89", "#A5C8DD",
             "#CD5582", "#E1BE6A", "#E1BE6A", "#E89A7A", "#EC6B2D"
         ]
-
-        bin_widths = np.diff(self.bins)
 
         fig, ax = plt.subplots()
 
@@ -206,7 +230,7 @@ class GenerationMetrics:
                 color = colors[cls % len(colors)]
                 label = f"{cls_name} (Pred)"
                 plt.plot(
-                    self.bin_centers,
+                    bin_centers,
                     density,
                     color=color,
                     label=label,
@@ -221,7 +245,7 @@ class GenerationMetrics:
                 color = colors[cls % len(colors)]
                 label = f"{cls_name} (Truth)"
                 plt.bar(
-                    self.bin_centers,
+                    bin_centers,
                     truth_density,
                     width=bin_widths,
                     color=color,
@@ -238,10 +262,20 @@ class GenerationMetrics:
 
     def plot_histogram(self):
         figs = dict()
+
+        bin_centers = self.bin_centers
+        bin_widths = np.diff(self.bins)
         for name in self.histogram:
+
+            if name in self.special_bins:
+                bin_widths = np.diff(self.special_bins[name])
+                bin_centers = self.special_bins_centers[name]
+
             figs[name] = self.plot_histogram_func(
                 self.truth_histogram[name],
-                self.histogram[name]
+                self.histogram[name],
+                bin_widths=bin_widths,
+                bin_centers=bin_centers,
             )
         return figs
 

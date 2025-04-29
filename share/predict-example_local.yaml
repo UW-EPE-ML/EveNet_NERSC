@@ -19,14 +19,20 @@ options:
     # The filename of the prediction data
     filename: "prediction.pt"
 
+    extra_save:
+      - num_sequential_vectors
+
   Training:
-    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_4d852_00000_0_2025-04-19_14-24-56/checkpoint_000015/checkpoint.ckpt"
+    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_c8de6_00000_0_2025-04-26_16-21-46/checkpoint_000002/checkpoint.ckpt"
     #    pretrain_model_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_8685a_00000_0_2025-04-10_22-15-19/checkpoint_000000/checkpoint.ckpt"
 
     # Should follow the same components as your finetune model
     Components:
+      Classification:
+        include: true
+
       Regression:
-        include: false
+        include: true
 
       Assignment:
         include: true
