@@ -16,8 +16,8 @@ def convert_nu2flow(data: dict[str, ndarray]):
 
     n_event = leptons.shape[0]
     lep_num = 2
-    jet_num = 6
-    max_par = lep_num + jet_num
+    jet_num = data['delphes/jets'].shape[1]
+    max_par = 12
 
     point_clouds = np.zeros((n_event, max_par, 8), dtype=np.float32)
 
@@ -51,7 +51,7 @@ def convert_nu2flow(data: dict[str, ndarray]):
 
     # Fill
     point_clouds[:, :lep_num, :] = lepton_features
-    point_clouds[:, lep_num:max_par, :] = jet_features
+    point_clouds[:, lep_num:jet_num+lep_num, :] = jet_features
 
     # Sawp leptons (plus, minus)
     charges = point_clouds[:, :2, 6]  # shape (n_event, 2)
@@ -69,11 +69,11 @@ def convert_nu2flow(data: dict[str, ndarray]):
     sorted_indices = np.argsort(sort_key, axis=1)
     batch_indices = np.arange(bjet_idx.shape[0])[:, None]  # (n_event, 1)
 
-    jets = point_clouds[:, 2:, :]
+    jets = point_clouds[:, lep_num:jet_num+lep_num, :]
     jets_reordered = jets[batch_indices, sorted_indices]
     bjet_idx_reordered = bjet_idx[batch_indices, sorted_indices]
 
-    point_clouds[:, 2:, :] = jets_reordered
+    point_clouds[:, lep_num:lep_num+jet_num, :] = jets_reordered
 
     point_clouds_mask = (point_clouds > 0).sum(axis=-1) > 0
 
