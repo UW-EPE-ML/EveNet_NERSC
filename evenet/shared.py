@@ -5,6 +5,8 @@ from functools import partial
 from ray.data import Dataset
 import ray
 from ray.data.dataset import MaterializedDataset
+from rich.table import Table
+import rich
 
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
@@ -62,8 +64,9 @@ def prepare_datasets(
         train_ds, val_ds, train_count, val_count
     """
     parquet_files: list[str] = sorted(map(str, base_dir.glob("*.parquet")))
-    train_ratio = global_config.options.Dataset.train_validation_split
-    split_index = int(train_ratio * len(parquet_files))
+    val_split = global_config.options.Dataset.val_split
+    val_start_index = int(len(parquet_files) * val_split[0])
+    val_end_index = int(len(parquet_files) * val_split[1])
     dataset_limit = global_config.options.Dataset.dataset_limit
 
     if predict:
@@ -78,8 +81,8 @@ def prepare_datasets(
 
     if not load_all_in_ram:
         # No global shuffling — preserve file order
-        train_files = parquet_files[:split_index]
-        val_files = parquet_files[split_index:]
+        val_files = parquet_files[val_start_index:val_end_index]
+        train_files = parquet_files[:val_start_index] + parquet_files[val_end_index:]
 
         dataset_kwargs = {
             'process_event_batch_partial': process_event_batch_partial,
@@ -100,14 +103,44 @@ def prepare_datasets(
             ray_remote_args={"num_cpus": 0.5},
         )
 
+
+
         total_events = ds.count()
         ds = ds.limit(int(total_events * dataset_limit))
+        total_events = ds.count()
+        splits = ds.split_at_indices([int(val_split[0] * total_events), int(val_split[1] * total_events)])
+        val_ds = splits[1]
+        train_ds = splits[0].union(splits[2])
 
         # Shuffle rows (not files)
-        ds = ds.random_shuffle(seed=42)
+        train_ds = train_ds.random_shuffle(seed=42)
+        val_ds = val_ds.random_shuffle(seed=42)
 
-        # Split into train/val by rows
-        train_ds, val_ds = ds.split_proportionately([train_ratio])
+        # Create a nice table
+        train_events = train_ds.count()
+        val_events = val_ds.count()
+        split_idx_0, split_idx_1 = int(val_split[0] * total_events), int(val_split[1] * total_events)
+        table = Table(title="Dataset Split Summary")
+
+        table.add_column("Split", style="cyan", no_wrap=True)
+        table.add_column("Events", style="magenta")
+        table.add_column("Fraction", style="green")
+        table.add_column("Index Range", style="yellow")
+        table.add_row(
+            "Validation",
+            f"{val_events:,}",
+            f"{val_events / total_events:.2%}",
+            f"0 - {split_idx_0 - 1:,}, {split_idx_1:,} - {total_events - 1:,}",
+        )
+        table.add_row(
+            "Train",
+            f"{train_events:,}",
+            f"{train_events / total_events:.2%}",
+            f"{split_idx_0:,} - {split_idx_1 - 1:,}",
+        )
+
+        # Print it
+        rich.print(table)
 
         train_ds = train_ds.map_batches(
             process_event_batch_partial,
