@@ -95,6 +95,13 @@ class EveNetModel(nn.Module):
             norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool)
         )
 
+        self.invisible_normalizer = Normalizer(
+            mean=normalization_dict["invisible_mean"]["Source"].unsqueeze(-1).to(self.device),
+            std=normalization_dict["invisible_std"]["Source"].unsqueeze(-1).to(self.device),
+            norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool),
+            inv_cdf_index=self.event_info.sequential_inv_cdf_index,
+        )
+
         self.global_input_dim = global_normalizer_info["norm_mask"].size()[-1]
         self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
         self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
@@ -340,7 +347,7 @@ class EveNetModel(nn.Module):
             mask=input_point_cloud_mask,
         )
 
-        invisible_point_cloud = self.sequential_normalizer(
+        invisible_point_cloud = self.invisible_normalizer(
             x=invisible_point_cloud,
             mask=invisible_point_cloud_mask
         )
