@@ -183,7 +183,7 @@ Metrics:
     "point cloud-charge": [3, -1, 1]
 
     "neutrino-log_mass": [10, -1, 1]
-    "neutrino-log_pt": [50, -1, 10]
+    "neutrino-log_pt": [50, -1, 7]
     "neutrino-eta": [50, -4, 4]
     "neutrino-phi": [50, -4, 4]
     "neutrino-btag": [2, 0, 1]

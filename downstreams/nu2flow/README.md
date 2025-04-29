@@ -28,10 +28,10 @@ done
 
 To run the training, go to main directory and run the following command:
 ```
-python evenet/train.py downstreams/ttbar_semileptonic/train.yaml --load_all
+python evenet/train.py downstreams/nu2flow/train.yaml --load_all
 ```
 
 To run the evaluation, go to main directory and run the following command:
 ```
-python evenet/predict.py downstreams/ttbar_semileptonic/predict.yaml
+python evenet/predict.py downstreams/nu2flow/predict.yaml
 ```
