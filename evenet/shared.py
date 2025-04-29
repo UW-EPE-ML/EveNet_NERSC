@@ -128,13 +128,14 @@ def prepare_datasets(
             "Validation",
             f"{val_events:,}",
             f"{val_events / total_events:.2%}",
-            f"{split_idx_0} - {split_idx_1}",
+            f" {split_idx_0} - {split_idx_1}",
         )
         table.add_row(
             "Train",
             f"{train_events:,}",
             f"{train_events / total_events:.2%}",
-            f" 0 -{split_idx_0} , {split_idx_1} - {total_events-1}",
+            (f" 0-{split_idx_0}" if not (0 == split_idx_0) else "") +
+            (f" {split_idx_1}-{total_events}" if not (split_idx_1 == total_events) else "") ,
         )
 
         # Print it
