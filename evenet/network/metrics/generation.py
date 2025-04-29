@@ -64,8 +64,8 @@ class GenerationMetrics:
 
         predict_distribution = dict()
         truth_distribution = dict()
-        masking = None
         process_id = input_set['classification']
+        masking = dict()
         if self.point_cloud_generation:
             ####################################
             ##  Step 1: Generate num vectors  ##
@@ -116,8 +116,8 @@ class GenerationMetrics:
                 process_name=f"PointCloud",
             )
 
-            masking = input_set["x_mask"]
             for i in range(data_shape[-1]):
+                masking[f"point cloud-{self.feature_names[i]}"] = input_set["x_mask"]
                 predict_distribution[f"point cloud-{self.feature_names[i]}"] = generated_distribution[..., i]
                 truth_distribution[f"point cloud-{self.feature_names[i]}"] = input_set['x'][..., i]
 
@@ -146,16 +146,10 @@ class GenerationMetrics:
                 process_name=f"Neutrino",
             )
 
-            # truth_normalized = model.sequential_normalizer(
-            #     input_set['x_invisible'],
-            #     mask=None
-            # )
-
-            masking = input_set["x_invisible_mask"]
             for i in range(data_shape[-1]):
+                masking[f"neutrino-{self.feature_names[i]}"] = input_set["x_invisible_mask"]
                 predict_distribution[f"neutrino-{self.feature_names[i]}"] = generated_distribution[..., i]
                 truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
-                # truth_distribution[f"neutrino-{self.feature_names[i]}"] = truth_normalized[..., i]
 
         # --------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():
@@ -192,9 +186,9 @@ class GenerationMetrics:
 
             for class_index, class_name in enumerate(self.class_names):
                 class_mask = (process_id == class_index)
-                if predict_distribution[distribution_name].size() == masking.size():
+                if distribution_name in masking and (predict_distribution[distribution_name].size() == masking[distribution_name].size()):
                     # Masking for point cloud
-                    total_mask = masking[class_mask].flatten()
+                    total_mask = masking[distribution_name][class_mask].flatten()
                     pred = predict_distribution[distribution_name][class_mask].flatten()[
                         total_mask].detach().cpu().numpy()
                     truth = truth_distribution[distribution_name][class_mask].flatten()[
