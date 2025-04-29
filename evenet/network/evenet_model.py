@@ -663,7 +663,8 @@ class EveNetModel(nn.Module):
                 time=full_time,
                 label=class_label,
                 attn_mask=full_attn_mask,
-                time_masking=time_masking
+                time_masking=time_masking,
+                position_encode=self.neutrino_position_encode
             )
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
