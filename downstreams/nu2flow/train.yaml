@@ -83,6 +83,13 @@ options:
     #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     train_validation_split: 0.75
 
+  Metrics:
+    Generation-Binning:
+      "neutrino-log_pt": [ 50, 4, 4 ]
+      "neutrino-eta": [ 50, -4, 4 ]
+      "neutrino-phi": [ 50, -4, 4 ]
+
+
 network:
   default: configs/model.yaml
   #  default: configs/model_large.yaml
