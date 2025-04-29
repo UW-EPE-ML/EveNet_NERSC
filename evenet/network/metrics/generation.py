@@ -40,13 +40,15 @@ class GenerationMetrics:
         self.histogram = dict()
         self.truth_histogram = dict()
 
+        self.histogram_2d = dict()
+        self.pearson_stats = dict()
+
         self.special_bins = dict()
         self.special_bins_centers = dict()
         if special_bin_configs is not None:
             for name, special_bins in special_bin_configs.items():
                 self.special_bins[name] = np.linspace(special_bins[1], special_bins[2], special_bins[0])
                 self.special_bins_centers[name] = 0.5 * (self.special_bins[name][:-1] + self.special_bins[name][1:])
-
 
     @time_decorator(name="[Generation] update metrics")
     def update(
@@ -82,7 +84,7 @@ class GenerationMetrics:
                 normalize_fn=model.num_point_cloud_normalizer,
                 num_steps=num_steps_global,
                 eta=eta,
-                use_tqdm=True,
+                use_tqdm=False,
                 process_name=f"Global",
             )
 
@@ -110,7 +112,7 @@ class GenerationMetrics:
                 eta=eta,
                 num_steps=num_steps_point_cloud,
                 noise_mask=input_set["x_mask"].unsqueeze(-1),  # [B, T, 1] to match noise x
-                use_tqdm=True,
+                use_tqdm=False,
                 process_name=f"PointCloud",
             )
 
@@ -140,7 +142,7 @@ class GenerationMetrics:
                 normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_neutrino,
-                use_tqdm=True,
+                use_tqdm=False,
                 process_name=f"Neutrino",
             )
 
@@ -167,6 +169,21 @@ class GenerationMetrics:
                     for class_name in self.class_names
                 }
 
+            if distribution_name not in self.histogram_2d:
+                self.histogram_2d[distribution_name] = {
+                    class_name: np.zeros((num_bins, num_bins))
+                    for class_name in self.class_names
+                }
+
+            if distribution_name not in self.pearson_stats:
+                self.pearson_stats[distribution_name] = {
+                    class_name: {
+                        'sum_x': 0.0, 'sum_y': 0.0,
+                        'sum_xx': 0.0, 'sum_yy': 0.0,
+                        'sum_xy': 0.0, 'n': 0
+                    } for class_name in self.class_names
+                }
+
             for class_index, class_name in enumerate(self.class_names):
                 class_mask = (process_id == class_index)
                 if predict_distribution[distribution_name].size() == masking.size():
@@ -190,22 +207,47 @@ class GenerationMetrics:
                 hist, _ = np.histogram(truth, bins=hist_bins)
                 self.truth_histogram[distribution_name][class_name] += hist
 
+                hist2d, _, _ = np.histogram2d(pred, truth, bins=[hist_bins, hist_bins])
+                self.histogram_2d[distribution_name][class_name] += hist2d
+
+                # Pearson stats
+                stats = self.pearson_stats[distribution_name][class_name]
+                stats['sum_x'] += pred.sum()
+                stats['sum_y'] += truth.sum()
+                stats['sum_xx'] += (pred ** 2).sum()
+                stats['sum_yy'] += (truth ** 2).sum()
+                stats['sum_xy'] += (pred * truth).sum()
+                stats['n'] += pred.shape[0]
+
     def reset(self):
         self.histogram = dict()
         self.truth_histogram = dict()
 
+        self.histogram_2d = dict()
+        self.pearson_stats = dict()
+
     def reduce_across_gpus(self):
-        if torch.distributed.is_initialized():
-            for name, hist_group in self.histogram.items():
-                for class_name, hist in hist_group.items():
-                    tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
+        if not torch.distributed.is_initialized():
+            return
+
+        # Helper function to reduce a nested dict
+        def reduce_nested_histogram(nested_hist, dtype=torch.long):
+            for name_, hist_group in nested_hist.items():
+                for class_name_, data in hist_group.items():
+                    tensor_ = torch.tensor(data, dtype=dtype, device=self.device)
+                    torch.distributed.all_reduce(tensor_, op=torch.distributed.ReduceOp.SUM)
+                    nested_hist[name_][class_name_] = tensor_.cpu().numpy()
+
+        reduce_nested_histogram(self.histogram, dtype=torch.long)
+        reduce_nested_histogram(self.truth_histogram, dtype=torch.long)
+        reduce_nested_histogram(self.histogram_2d, dtype=torch.long)
+
+        for name, stats_group in self.pearson_stats.items():
+            for class_name, stats in stats_group.items():
+                for key in ['sum_x', 'sum_y', 'sum_xx', 'sum_yy', 'sum_xy', 'n']:
+                    tensor = torch.tensor(stats[key], dtype=torch.float32, device=self.device)
                     torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-                    self.histogram[name][class_name] = tensor.cpu().numpy()
-            for name, hist_group in self.truth_histogram.items():
-                for class_name, hist in hist_group.items():
-                    tensor = torch.tensor(hist, dtype=torch.long, device=self.device)
-                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
-                    self.truth_histogram[name][class_name] = tensor.cpu().numpy()
+                    stats[key] = tensor.item()
 
     def plot_histogram_func(
             self,
@@ -260,6 +302,16 @@ class GenerationMetrics:
 
         return fig
 
+    def plot_histogram2d_func(self, histogram2d, x_centers, y_centers, title="2D Histogram"):
+        fig, ax = plt.subplots()
+        X, Y = np.meshgrid(x_centers, y_centers, indexing="ij")
+        pcm = ax.pcolormesh(X, Y, histogram2d, shading='auto', cmap='viridis')
+        fig.colorbar(pcm, ax=ax, label="Counts")
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('Truth')
+        ax.set_title(title)
+        return fig
+
     def plot_histogram(self):
         figs = dict()
 
@@ -271,13 +323,41 @@ class GenerationMetrics:
                 bin_widths = np.diff(self.special_bins[name])
                 bin_centers = self.special_bins_centers[name]
 
-            figs[name] = self.plot_histogram_func(
+            figs[f"{name}-1d"] = self.plot_histogram_func(
                 self.truth_histogram[name],
                 self.histogram[name],
                 bin_widths=bin_widths,
                 bin_centers=bin_centers,
             )
-        return figs
+
+            for class_name in self.class_names:
+                fig = self.plot_histogram2d_func(
+                    self.histogram_2d[name][class_name],
+                    x_centers=bin_centers,
+                    y_centers=bin_centers,
+                    title=f"2D Histogram {name} - {class_name}"
+                )
+                figs[f"2D_{name}_{class_name}"] = fig
+
+        # Pearson correlation
+        pearson_results = dict()
+        for name in self.pearson_stats:
+            pearson_results[name] = dict()
+            for class_name in self.class_names:
+                stats = self.pearson_stats[name][class_name]
+                n = stats['n']
+                numerator = n * stats['sum_xy'] - stats['sum_x'] * stats['sum_y']
+                denominator = np.sqrt(
+                    (n * stats['sum_xx'] - stats['sum_x'] ** 2) *
+                    (n * stats['sum_yy'] - stats['sum_y'] ** 2)
+                )
+                if denominator == 0:
+                    r = 0.0
+                else:
+                    r = numerator / denominator
+                pearson_results[name][class_name] = r
+
+        return figs, pearson_results
 
 
 @time_decorator(name="[Generation] shared_step")
@@ -340,10 +420,14 @@ def shared_epoch_end(
         metrics_train.reduce_across_gpus()
 
     if global_rank == 0:
-        figs = metrics_valid.plot_histogram()
+        figs, extra = metrics_valid.plot_histogram()
         for name, fig in figs.items():
             logger.log({f"generation/{name}": wandb.Image(fig)})
             plt.close(fig)
+
+        for name in extra:
+            for class_name, value in extra[name].items():
+                logger.log({f"generation/pearson_{name}_{class_name}": value})
 
     metrics_valid.reset()
     if metrics_train:
