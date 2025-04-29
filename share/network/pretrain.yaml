@@ -100,3 +100,6 @@ EventGeneration:
   drop_probability: 0.0
   feature_drop: 0.0
   extend_batch: true
+  neutrino_position_encode: true
+  max_position_length: 36 # Must be larger than max object number
+

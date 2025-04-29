@@ -5,7 +5,7 @@ from torch import Tensor
 
 from typing import Optional, List
 
-from evenet.network.body.embedding import FourierEmbedding
+from evenet.network.body.embedding import FourierEmbedding, PointCloudPositionalEmbedding
 from evenet.network.layers.activation import create_activation
 from evenet.network.layers.linear_block import ResNetDense
 from evenet.network.layers.utils import StochasticDepth
@@ -25,7 +25,9 @@ class EventGenerationHead(nn.Module):
                  layer_scale: bool,
                  layer_scale_init: float,
                  drop_probability: float,
-                 feature_drop: float):
+                 feature_drop: float,
+                 position_encode: bool = False,
+                 max_position_length: int = 20):
         super().__init__()
         self.input_dim = input_dim
         self.projection_dim = projection_dim
@@ -39,6 +41,14 @@ class EventGenerationHead(nn.Module):
             input_dim=input_dim,
             output_dim=projection_dim
         )
+
+        self.position_encode = position_encode
+        if self.position_encode:
+            self.position_encoder = PointCloudPositionalEmbedding(
+                num_points = max_position_length,
+                embed_dim = projection_dim
+            )
+
         self.bridge_global_cond = create_residual_connection(
             skip_connection=True,
             input_dim=num_global_cond,
@@ -76,7 +86,8 @@ class EventGenerationHead(nn.Module):
                 time,
                 label,
                 attn_mask=None,
-                time_masking=None):
+                time_masking=None,
+                position_encode=False):
         """
         x: [B, T, D] <- Noised Input
         global_cond: [B, 1, D] <- Global Condition
@@ -84,7 +95,8 @@ class EventGenerationHead(nn.Module):
         num_x: [B, 1] <- Number of points_cloud
         x_mask: [B, T, 1] <- Mask
         time: [B,] <- Time
-        label: [B, 1] <- Conditional Label, one-hot in function
+        label: [B, 1] <- Conditional Label, one-hot in function,
+        time_masking: [B, T, 1] <- Mask for time embedding
         """
         time_emb = self.time_embedding(time).unsqueeze(1).expand(-1, x.shape[1], -1) # [B, 1, proj_dim]
         if time_masking is not None:
@@ -94,6 +106,14 @@ class EventGenerationHead(nn.Module):
             torch.cat([time_emb, (self.bridge_global_cond(global_cond) * global_cond_mask).expand(-1, x.shape[1],-1)], dim=-1),
         )  # After MLP, cond_token shape: torch.Size([B, 1, proj_dim])
         x = self.bridge_point_cloud(x) * x_mask
+
+        if position_encode:
+            x = self.position_encoder(
+                x = x,
+                x_mask = x_mask,
+                time_mask = time_masking
+            )
+
         if num_x is not None:
             num_x_embed = self.num_point_cloud_embedding(num_x).unsqueeze(1)  # [B, 1, proj_dim]
             cond_token = cond_token + num_x_embed

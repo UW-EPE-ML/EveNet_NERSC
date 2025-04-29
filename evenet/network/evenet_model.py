@@ -265,8 +265,14 @@ class EveNetModel(nn.Module):
                 layer_scale=self.network_cfg.EventGeneration.layer_scale,
                 layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
                 drop_probability=self.network_cfg.EventGeneration.drop_probability,
-                feature_drop=self.network_cfg.EventGeneration.feature_drop
+                feature_drop=self.network_cfg.EventGeneration.feature_drop,
+                position_encode=self.network_cfg.EventGeneration.neutrino_position_encode,
+                max_position_length=self.network_cfg.EventGeneration.max_position_length
             )
+
+            self.neutrino_position_encode = self.network_cfg.EventGeneration.neutrino_position_encode
+
+            # [6-3] Positional embedding
         self.schedule_flags = [
             (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
             (self.include_generation, "generation"),
@@ -497,7 +503,8 @@ class EveNetModel(nn.Module):
                         time=full_time,
                         label=class_label,
                         attn_mask=full_attn_mask,
-                        time_masking=time_masking
+                        time_masking=time_masking,
+                        position_encode=(self.neutrino_position_encode and schedule_name == "neutrino_generation")
                     )
 
                     if schedule_name == "neutrino_generation":

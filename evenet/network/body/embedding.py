@@ -403,3 +403,29 @@ class CombinedEmbedding(nn.Module):
         embeddings_mask = torch.cat((x_mask, y_mask), dim=1)
         embeddings = self.final_embedding(embeddings, embeddings_mask)
         return embeddings, embeddings_mask
+
+class PointCloudPositionalEmbedding(nn.Module):
+    def __init__(
+            self,
+            num_points: int,
+            embed_dim: int
+        ):
+        super().__init__()
+        self.position_embedding = nn.Embedding(num_points, embed_dim)
+
+    def forward(self, x, time_mask, x_mask):
+        # Generate position indices for each point in the sequence
+        # x: [B, N ,D ]
+        # time_mask: [ B, N ,1 ]
+        # x_mask: [B, N, 1]
+
+        time_mask = time_mask.squeeze(2)
+
+        cumsum = time_mask.int().cumsum(dim=1)
+        position_token = self.position_embedding(cumsum) # (B, N, D)
+        position_token = position_token * time_mask.unsqueeze(-1)
+
+        x = (x + position_token) * x_mask.float()
+
+        return x  # (B, N, D)
+
