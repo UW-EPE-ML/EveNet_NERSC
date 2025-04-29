@@ -139,7 +139,7 @@ class GenerationMetrics:
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
                 pred_fn=predict_for_neutrino,
-                normalize_fn=model.sequential_normalizer,
+                # normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_neutrino,
                 use_tqdm=False,

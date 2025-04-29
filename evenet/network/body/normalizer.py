@@ -3,11 +3,15 @@ from torch import nn, Tensor
 import math
 from torch.distributions import Normal
 from typing import List
+
+
 class Normalizer(nn.Module):
-    def __init__(self, mean: Tensor, std: Tensor, norm_mask: Tensor, inv_cdf_index: List = []):
+    def __init__(self, mean: Tensor, std: Tensor, norm_mask: Tensor, inv_cdf_index=None):
 
         super(Normalizer, self).__init__()
 
+        if inv_cdf_index is None:
+            inv_cdf_index = []
         """
         :param
             log_mask: mask to apply before normalization. shape (num_features,)
@@ -17,7 +21,7 @@ class Normalizer(nn.Module):
         # Initialize mean and std as parameters
         self.register_buffer("norm_mask", norm_mask)
         mean = torch.where(self.norm_mask, mean, 0.0)
-        std  = torch.where(self.norm_mask, std, 1.0)
+        std = torch.where(self.norm_mask, std, 1.0)
         self.register_buffer("mean", mean)
         self.register_buffer("std", std.clamp(min=1e-6))
         self.inv_cdf_index = inv_cdf_index
@@ -61,7 +65,7 @@ class Normalizer(nn.Module):
                 - 0: invalid point
         :return: tensor (batch_size, num_objects, num_features)
         """
-        if len(self.inv_cdf_index)>0:
+        if len(self.inv_cdf_index) > 0:
             x_partial = x[..., self.inv_cdf_index].contiguous()
             x_partial = self.normal.cdf(x_partial)
             x_partial = x_partial * 2 * (math.sqrt(3) + 0.1) - (math.sqrt(3) + 0.1)
