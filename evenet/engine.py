@@ -433,6 +433,8 @@ class EveNetEngine(L.LightningModule):
             batch=inputs,
             batch_size=batch_size,
         )
+        # No loss calculation here, drop the output
+        outputs["generations"] = None
 
         extra_save = self.config.options.prediction.get('extra_save', {})
         for key in extra_save:
