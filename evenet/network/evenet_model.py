@@ -244,12 +244,13 @@ class EveNetModel(nn.Module):
         # [6] Generation Head
         if self.include_generation:
             # [6-1] Global Generation Head
+            self.global_generation_target_indices = self.event_info.generation_target_indices
             self.GlobalGeneration = GlobalCondGenerationHead(
                 num_layer=self.network_cfg.GlobalGeneration.num_layers,
                 num_resnet_layer=self.network_cfg.GlobalGeneration.num_resnet_layers,
-                input_dim=1,  # Only target on the number of point_cloud
+                input_dim=1+ len(self.event_info.generation_target_indices),  # Only target on the number of point_cloud
                 hidden_dim=self.network_cfg.GlobalGeneration.hidden_dim,
-                output_dim=1,
+                output_dim= 1 + len(self.event_info.generation_target_indices),
                 input_cond_indices=self.event_info.generation_condition_indices,
                 num_classes=self.event_info.num_classes_total,
                 resnet_dim=self.network_cfg.GlobalGeneration.resnet_dim,
@@ -387,16 +388,24 @@ class EveNetModel(nn.Module):
 
         generations = dict()
         if self.include_generation:
-            num_point_cloud_noised, truth_num_point_cloud_vector = add_noise(num_point_cloud, time)
-            predict_num_point_cloud_vector = self.GlobalGeneration(
-                x=num_point_cloud_noised,
+            # [6-1] Global Generation Head
+            if len(self.global_generation_target_indices) > 0:
+                target_global = global_conditions[..., self.global_generation_target_indices].squeeze(1)
+                target_global = torch.cat([num_point_cloud, target_global], dim = 1)
+            else:
+                target_global = num_point_cloud
+
+            target_global_noised, truth_target_global_vector = add_noise(target_global, time)
+            predict_target_global_vector = self.GlobalGeneration(
+                x=target_global_noised,
                 time=time,
                 global_cond=global_conditions,
                 label=class_label
             )
-            generations["num_point_cloud"] = {
-                "vector": predict_num_point_cloud_vector,
-                "truth": truth_num_point_cloud_vector
+
+            generations["global"] = {
+                "vector": predict_target_global_vector,
+                "truth": truth_target_global_vector
             }
 
         outputs = dict()

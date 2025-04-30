@@ -542,6 +542,8 @@ class EveNetEngine(L.LightningModule):
                 "point_cloud_generation": self.event_generation_cfg.generate_point_cloud,
                 "neutrino_generation": self.event_generation_cfg.generate_neutrino,
                 "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),
+                "target_global_index": self.config.event_info.generation_target_indices,
+                "target_global_names": self.config.event_info.generation_target_names
             }
 
             self.generation_metrics_train = GenerationMetrics(**generation_kwargs)

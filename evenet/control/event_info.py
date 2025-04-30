@@ -232,11 +232,16 @@ class EventInfo:
         iglobal_index = 0
         seq_index = 0
         self.generation_condition_indices = []
+        self.generation_target_indices = []
+        self.generation_target_names = []
         for input_name, input_feature in self.input_features.items():
             if self.input_types[input_name] == InputType.Global:
                 for input_feature_element in input_feature:
                     if input_feature_element.name in self.generations["Conditions"]:
                         self.generation_condition_indices.append(iglobal_index)
+                    if input_feature_element.name in self.generations["GlobalTargets"]:
+                        self.generation_target_indices.append(iglobal_index)
+                        self.generation_target_names.append(input_feature_element.name)
                     iglobal_index += 1
             elif self.input_types[input_name] == InputType.Sequential:
                 for input_feature_element in input_feature:

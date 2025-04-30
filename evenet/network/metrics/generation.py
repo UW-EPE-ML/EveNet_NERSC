@@ -17,6 +17,7 @@ class GenerationMetrics:
             self, device, class_names,
             sequential_feature_names,
             invisible_feature_names,
+            target_global_names, target_global_index,
             hist_xmin=-15, hist_xmax=15, num_bins=60,
             point_cloud_generation=False,
             neutrino_generation=False,
@@ -36,6 +37,8 @@ class GenerationMetrics:
 
         self.sequential_feature_names = sequential_feature_names
         self.invisible_feature_names = invisible_feature_names
+        self.target_global_names = target_global_names
+        self.target_global_index = target_global_index
 
         self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
         self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
@@ -77,25 +80,36 @@ class GenerationMetrics:
             ##  Step 1: Generate num vectors  ##
             ####################################
 
-            predict_for_num_vectors = partial(
+            predict_for_global = partial(
                 model.predict_diffusion_vector,
                 cond_x=input_set,
                 mode="global"
             )
 
-            data_shape = [input_set['num_sequential_vectors'].shape[0], 1]
+            data_shape = [input_set['num_sequential_vectors'].shape[0], 1 + len(self.target_global_names)]
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
-                pred_fn=predict_for_num_vectors,
-                normalize_fn=model.num_point_cloud_normalizer,
+                pred_fn=predict_for_global,
+                normalize_fn=None,
                 num_steps=num_steps_global,
                 eta=eta,
                 use_tqdm=False,
                 process_name=f"Global",
             )
 
-            predict_distribution["num_vectors"] = torch.floor(generated_distribution.flatten() + 0.5)
+            generated_num_sequential_vectors = generated_distribution[..., 0]
+            generated_num_sequential_vectors = model.num_point_cloud_normalizer.denormalize(generated_num_sequential_vectors)
+
+            predict_distribution["num_vectors"] = torch.floor(generated_num_sequential_vectors.flatten() + 0.5)
             truth_distribution["num_vectors"] = input_set['num_sequential_vectors'].flatten()
+
+            if len(self.target_global_names) > 0:
+                generated_global = generated_distribution[..., 1:]
+                generated_global = model.global_normalizer.denormalize(generated_global, index = self.target_global_index)
+                for idx, name in enumerate(self.target_global_names):
+
+                    predict_distribution["global-{name}"] =  generated_global[..., idx].flatten()
+                    truth_distribution["global-{name}"] = (input_set['conditions'][..., self.target_global_index[idx]]).flatten()
 
             ####################################
             ##  Step 2: Generate point cloud  ##
@@ -417,7 +431,8 @@ def shared_step(
             mask=masking,
             feature_dim=feature_dim,
         )
-        if generation_target == "num_point_cloud":
+        # total_gen_losses += generation_loss[generation_target]
+        if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
         elif generation_target == "neutrino":
             invisible_gen_loss = invisible_gen_loss + generation_loss[generation_target]

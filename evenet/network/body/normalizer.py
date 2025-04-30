@@ -64,13 +64,14 @@ class Normalizer(nn.Module):
         return x
 
     @torch.no_grad()
-    def denormalize(self, x: Tensor, mask: Tensor = None, remove_padding: bool = False) -> Tensor:
+    def denormalize(self, x: Tensor, mask: Tensor = None, remove_padding: bool = False, index: List = None) -> Tensor:
         """
         :param remove_padding: remove the padding part (for invisible generation)
         :param x: input point cloud (batch_size, num_objects, num_features)
         :param mask: mask for point cloud (batch_size, num_objects)
                 - 1: valid point
                 - 0: invalid point
+        :param index: index of features to apply inverse transformation
         :return: tensor (batch_size, num_objects, num_features)
         """
         if remove_padding:
@@ -81,17 +82,28 @@ class Normalizer(nn.Module):
             current_std = self.std
 
         if len(self.inv_cdf_index) > 0:
-            x_partial = x[..., self.inv_cdf_index].contiguous()
+            if index is not None:
+                inv_cdf_index = []
+                for idx in index:
+                    if idx in self.inv_cdf_index:
+                        inv_cdf_index.append(idx)
+            else:
+                inv_cdf_index = self.inv_cdf_index
+
+            x_partial = x[..., inv_cdf_index].contiguous()
             x_partial = self.normal.cdf(x_partial)
             # x_partial = x_partial * 2 * (math.sqrt(3) + 0.1) - (math.sqrt(3) + 0.1)
             # Yulei: Don't add extra 0.1
             x_partial = x_partial * 2 * (math.sqrt(3)) - (math.sqrt(3))
-            x[..., self.inv_cdf_index] = x_partial
+            x[..., inv_cdf_index] = x_partial
             if mask is not None:
                 x = x * mask
-        x = (x * current_std) + current_mean
+
+        if index is not None:
+            x = x * current_std[index] + current_mean[index]
+        else:
+            x = (x * current_std) + current_mean
         # x = torch.where(self.log_mask_expanded, torch.expm1(x), x) # TODO
         if mask is not None:
             x = x * mask
-
         return x
