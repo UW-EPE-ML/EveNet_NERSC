@@ -66,7 +66,7 @@ options:
     total_epochs: 500
     epochs: 250
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/best_epoch=206.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/best_epoch=468.ckpt"
     pretrain_model_load_path: null
     #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
@@ -108,7 +108,7 @@ options:
         weight_decay: *wd
         optimizer_type: "AdamW"
       GlobalGeneration:
-        include: true
+        include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
