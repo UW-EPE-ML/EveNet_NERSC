@@ -21,6 +21,46 @@ options:
 
     extra_save:
       - EXTRA/num_bjet
+      - EXTRA/t1/b/pt
+      - EXTRA/t1/b/eta
+      - EXTRA/t1/b/phi
+      - EXTRA/t1/b/energy
+      - EXTRA/t1/l/pt
+      - EXTRA/t1/l/eta
+      - EXTRA/t1/l/phi
+      - EXTRA/t1/l/energy
+      - EXTRA/t2/b/pt
+      - EXTRA/t2/b/eta
+      - EXTRA/t2/b/phi
+      - EXTRA/t2/b/energy
+      - EXTRA/t2/l/pt
+      - EXTRA/t2/l/eta
+      - EXTRA/t2/l/phi
+      - EXTRA/t2/l/energy
+      - EXTRA/truth_t1/t/pt
+      - EXTRA/truth_t1/t/eta
+      - EXTRA/truth_t1/t/phi
+      - EXTRA/truth_t1/t/mass
+      - EXTRA/truth_t1/W/pt
+      - EXTRA/truth_t1/W/eta
+      - EXTRA/truth_t1/W/phi
+      - EXTRA/truth_t1/W/mass
+      - EXTRA/truth_t1/l/pt
+      - EXTRA/truth_t1/l/eta
+      - EXTRA/truth_t1/l/phi
+      - EXTRA/truth_t1/l/mass
+      - EXTRA/truth_t2/t/pt
+      - EXTRA/truth_t2/t/eta
+      - EXTRA/truth_t2/t/phi
+      - EXTRA/truth_t2/t/mass
+      - EXTRA/truth_t2/W/pt
+      - EXTRA/truth_t2/W/eta
+      - EXTRA/truth_t2/W/phi
+      - EXTRA/truth_t2/W/mass
+      - EXTRA/truth_t2/l/pt
+      - EXTRA/truth_t2/l/eta
+      - EXTRA/truth_t2/l/phi
+      - EXTRA/truth_t2/l/mass
 
   Training:
     total_epochs: 500

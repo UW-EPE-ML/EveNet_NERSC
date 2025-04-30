@@ -16,7 +16,17 @@ from preprocessing.preprocess import unflatten_dict
 def make_process_fn(base_dir: Path):
     """Creates a partial function for batch preprocessing."""
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
-    return partial(process_event_batch, shape_metadata=shape_metadata, unflatten=unflatten_dict)
+
+    drop_column_prefix = "EXTRA/"
+    if 'extra_save' in global_config.options.get('prediction', {}):
+        drop_column_prefix = None
+
+    return partial(
+        process_event_batch,
+        shape_metadata=shape_metadata,
+        unflatten=unflatten_dict,
+        drop_column_prefix=drop_column_prefix,
+    )
 
 
 def register_dataset(
@@ -135,7 +145,7 @@ def prepare_datasets(
             f"{train_events:,}",
             f"{train_events / total_events:.2%}",
             (f" 0-{split_idx_0}" if not (0 == split_idx_0) else "") +
-            (f" {split_idx_1}-{total_events}" if not (split_idx_1 == total_events) else "") ,
+            (f" {split_idx_1}-{total_events}" if not (split_idx_1 == total_events) else ""),
         )
 
         # Print it

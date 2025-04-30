@@ -94,8 +94,8 @@ def process_event_batch_old(batch: dict[str, np.ndarray]) -> dict[str, np.ndarra
     }
 
 
-def process_event_batch(batch: dict[str, np.ndarray], shape_metadata: dict, unflatten) -> dict[str, np.ndarray]:
-    return unflatten(batch, shape_metadata)
+def process_event_batch(batch: dict[str, np.ndarray], shape_metadata: dict, unflatten, drop_column_prefix: str = None) -> dict[str, np.ndarray]:
+    return unflatten(batch, shape_metadata, drop_column_prefix=drop_column_prefix)
 
 
 def convert_batch_to_torch_tensor(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
@@ -106,16 +106,3 @@ def convert_batch_to_torch_tensor(batch: dict[str, np.ndarray]) -> dict[str, tor
     """
     return {k: torch.tensor(v) for k, v in batch.items()}
 
-
-def process_event(batch: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
-    """
-    Process a single event batch and convert it to the desired format.
-    :param batch: Batch of data as a dictionary with numpy arrays.
-    :return: Processed batch as a dictionary with torch tensors.
-    """
-    start_time = time.time()
-    processed_batch = process_event_batch(batch)
-    converted_batch = convert_batch_to_torch_tensor(processed_batch)
-    end_time = time.time()
-    print('Processing event batch took {} seconds.'.format(end_time - start_time))
-    return converted_batch

@@ -18,7 +18,7 @@ def compute_kde(values, positions, grid_size):
     return kde(positions).reshape(grid_size, grid_size)  # Correctly reshaped
 
 
-def parallel_contour_plot(ax, kin, truth_kin, kin_range, grid_size, contour_colors, xlabel):
+def parallel_contour_plot(ax, kin, truth_kin, kin_range, grid_size, contour_colors, c_percent):
     """ Optimized parallel contour density plot using Grid-Based KDE """
     X, Y = np.meshgrid(
         np.linspace(kin_range[0], kin_range[1], grid_size),
@@ -36,7 +36,7 @@ def parallel_contour_plot(ax, kin, truth_kin, kin_range, grid_size, contour_colo
     # Plot contours
 
     # c_percent = np.array([10, 25, 75, 100])  # Define % levels for enclosed data
-    c_percent = np.array([10, 100])  # Define % levels for enclosed data
+    # Define % levels for enclosed data
     for i, Z in enumerate(kde_results):
         Z_flat = Z.ravel()  # Flatten KDE density values
         sorted_Z = np.sort(Z_flat)[::-1]  # Sort densities in descending order
@@ -88,6 +88,7 @@ def plot_kinematics_comparison(
         ratio_label=None,
         labels=None, colors=None, contour_colors=None,
         normalize_col=False, log_z=False,log_y=False,
+        c_percent = np.array([10, 25, 75, 100]),
 ):
     if ratio_label is None:
         ratio_label = ["Reco", "Truth"]
@@ -184,7 +185,7 @@ def plot_kinematics_comparison(
 
     if len(kin) > 1 and len(truth_kin) > 1:
         grid_size = 50  # Define grid size for KDE evaluation
-        parallel_contour_plot(ax3, kin, truth_kin, kin_range, grid_size, contour_colors, xlabel, )
+        parallel_contour_plot(ax3, kin, truth_kin, kin_range, grid_size, contour_colors, c_percent)
         # ax3.grid(True)
 
     else:

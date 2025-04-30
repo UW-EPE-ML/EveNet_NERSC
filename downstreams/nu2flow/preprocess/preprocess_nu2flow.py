@@ -105,8 +105,11 @@ def calculate_extra_variables(data: dict):
 
     num_bjet = (data['INPUTS/Source/btag'] * mask).sum(axis=1)
 
+    raw_extra = {k: v for k, v in data.items() if k.startswith('EXTRA/')}
+
     return {
         'EXTRA/num_bjet': num_bjet,
+        **raw_extra,
     }
 
 
