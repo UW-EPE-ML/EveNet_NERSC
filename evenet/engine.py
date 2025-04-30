@@ -256,6 +256,7 @@ class EveNetEngine(L.LightningModule):
                 model=self.model,
                 global_loss_scale=self.global_generation_cfg.loss_scale,
                 event_loss_scale=self.event_generation_cfg.loss_scale,
+                invisible_loss_scale=self.event_generation_cfg.invisible_loss_scale,
                 device=device,
                 num_steps_global=self.global_diffusion_steps,
                 num_steps_point_cloud=self.point_cloud_diffusion_steps,

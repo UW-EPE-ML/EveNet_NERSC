@@ -368,6 +368,7 @@ def shared_step(
         model: torch.nn.Module,
         global_loss_scale: float,
         event_loss_scale: float,
+        invisible_loss_scale: float,
         device: torch.device,
         loss_head_dict: dict,
         num_steps_global=20,
@@ -379,6 +380,7 @@ def shared_step(
 
     global_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     event_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    invisible_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     for generation_target, generation_result in outputs.items():
         masking = batch["x_mask"].unsqueeze(-1) if generation_target == "point_cloud" else None
         generation_loss[generation_target] = gen_loss(
@@ -403,8 +405,9 @@ def shared_step(
 
     loss_head_dict["generation-global"] = global_gen_loss
     loss_head_dict["generation-event"] = event_gen_loss
+    loss_head_dict["generation-invisible"] = invisible_gen_loss
 
-    loss = (global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale) / len(outputs)
+    loss = (global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale + invisible_gen_loss * invisible_loss_scale) / len( outputs)
     return loss, generation_loss
 
 
