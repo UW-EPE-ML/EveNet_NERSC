@@ -185,6 +185,8 @@ def convert_nu2flow(data: dict[str, ndarray]):
     extra.update(t2_info)
 
     return {
+        'EXTRA/raw_num_bjet': data['delphes/nbjets'],
+        'EXTRA/raw_num_jet': data['delphes/njets'],
         'INFO/VetoDoubleAssign': good_events,
 
         'INPUTS/Source/MASK': point_clouds_mask,
