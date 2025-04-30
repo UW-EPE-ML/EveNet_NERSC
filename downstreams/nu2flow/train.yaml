@@ -83,7 +83,7 @@ options:
     EarlyStopping:
       patience: 20
       min_delta: 0.0
-      monitor: "val/generation-event"
+      monitor: "val/generation-invisible"
       mode: "min"
       verbose: true
 
