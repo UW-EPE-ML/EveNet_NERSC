@@ -68,20 +68,20 @@ options:
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
-        loss_scale: 0.1
+        loss_scale: 0.0
       EventGeneration:
         include: true
         warm_up: true
         generate_point_cloud: false
         generate_neutrino: true
         diffusion_steps: 200
-        loss_scale: 0.1 # loss coefficient
+        loss_scale: 0.05 # loss coefficient
         invisible_loss_scale: 1.0 # loss coefficient for invisible particles
         learning_rate: *lr
         weight_decay: *wd
 
     EarlyStopping:
-      patience: 20
+      patience: 50
       min_delta: 0.0
       monitor: "val/generation-invisible"
       mode: "min"
