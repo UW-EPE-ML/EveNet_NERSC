@@ -133,11 +133,16 @@ def convert_nu2flow(data: dict[str, ndarray]):
     jets_reordered = jets[batch_indices, sorted_indices]
     bjet_idx_reordered = bjet_idx[batch_indices, sorted_indices]
 
+    # Build mask
+    cond_first_two = np.all(bjet_idx_reordered[:, :2] == [0, 1], axis=1)
+    cond_rest_are_neg1 = np.all(bjet_idx_reordered[:, 2:] == -1, axis=1)
+    good_bjet_assign = cond_first_two & cond_rest_are_neg1
+
     point_clouds[:, lep_num:lep_num + jet_num, :] = jets_reordered
 
     point_clouds_mask = (point_clouds > 0).sum(axis=-1) > 0
 
-    good_events = (charges.sum(axis=-1) == 0)
+    good_events = (charges.sum(axis=-1) == 0) & good_bjet_assign
 
     #### For assignments ####
     # lepton charge: plus -> neutrino pdg: plus -> b_jet indices: 0
