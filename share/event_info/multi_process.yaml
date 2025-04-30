@@ -408,8 +408,8 @@ PARTICLE_PROPERTIES:
 GENERATIONS:
   Conditions:
     - met
-  GlobalTargets:
     - met_phi
+  GlobalTargets:
 
   Neutrinos:
     mass: empty

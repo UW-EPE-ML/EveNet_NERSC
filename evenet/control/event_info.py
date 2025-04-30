@@ -239,7 +239,7 @@ class EventInfo:
                 for input_feature_element in input_feature:
                     if input_feature_element.name in self.generations["Conditions"]:
                         self.generation_condition_indices.append(iglobal_index)
-                    if input_feature_element.name in self.generations["GlobalTargets"]:
+                    if input_feature_element.name in self.generations.get("GlobalTargets", []):
                         self.generation_target_indices.append(iglobal_index)
                         self.generation_target_names.append(input_feature_element.name)
                     iglobal_index += 1
