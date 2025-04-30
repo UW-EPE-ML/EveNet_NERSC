@@ -128,7 +128,7 @@ model = EveNetModel(
     normalization_dict=normalization_dict,
     classification=classification,
     assignment=assignment,
-    generation=generation,
+    point_cloud_generation=generation,
     neutrino_generation=neutrino_generation
 ).to(device)
 

@@ -81,7 +81,7 @@ def predict(rank, world_size, gen_num_events, args):
         config = global_config,
         device = torch.device(device),
         normalization_dict=normalization_dict,
-        generation=True
+        point_cloud_generation=True
     ).to(device)
 
     new_state_dict = dict()

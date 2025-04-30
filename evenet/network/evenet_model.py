@@ -28,7 +28,7 @@ class EveNetModel(nn.Module):
             device,
             classification: bool = True,
             regression: bool = False,
-            generation: bool = False,
+            point_cloud_generation: bool = False,
             neutrino_generation: bool = False,
             assignment: bool = False,
             normalization_dict: dict = None,
@@ -41,7 +41,7 @@ class EveNetModel(nn.Module):
         # # self.save_hyperparameters(self.options)
         self.include_classification = classification
         self.include_regression = regression
-        self.include_generation = generation
+        self.include_point_cloud_generation = point_cloud_generation
         self.include_neutrino_generation = neutrino_generation
         self.include_assignment = assignment
         self.device = device
@@ -241,16 +241,15 @@ class EveNetModel(nn.Module):
                 device=self.device
             )
 
-        # [6] Generation Head
-        if self.include_generation:
-            # [6-1] Global Generation Head
+        # [6-1] Global Generation Head (for point cloud generation only)
+        if self.include_point_cloud_generation:
             self.global_generation_target_indices = self.event_info.generation_target_indices
             self.GlobalGeneration = GlobalCondGenerationHead(
                 num_layer=self.network_cfg.GlobalGeneration.num_layers,
                 num_resnet_layer=self.network_cfg.GlobalGeneration.num_resnet_layers,
-                input_dim=1+ len(self.event_info.generation_target_indices),  # Only target on the number of point_cloud
+                input_dim=1 + len(self.event_info.generation_target_indices),
                 hidden_dim=self.network_cfg.GlobalGeneration.hidden_dim,
-                output_dim= 1 + len(self.event_info.generation_target_indices),
+                output_dim=1 + len(self.event_info.generation_target_indices),
                 input_cond_indices=self.event_info.generation_condition_indices,
                 num_classes=self.event_info.num_classes_total,
                 resnet_dim=self.network_cfg.GlobalGeneration.resnet_dim,
@@ -259,7 +258,9 @@ class EveNetModel(nn.Module):
                 activation=self.network_cfg.GlobalGeneration.activation,
                 dropout=self.network_cfg.GlobalGeneration.dropout
             )
-            # [6-2] Event Generation Head
+
+        # [6-2] Event Generation Head (for neutrino generation OR point cloud)
+        if self.include_point_cloud_generation or self.include_neutrino_generation:
             self.EventGeneration = EventGenerationHead(
                 input_dim=pet_config.hidden_dim,
                 projection_dim=self.network_cfg.EventGeneration.hidden_dim,
@@ -276,13 +277,12 @@ class EveNetModel(nn.Module):
                 position_encode=self.network_cfg.EventGeneration.neutrino_position_encode,
                 max_position_length=self.network_cfg.EventGeneration.max_position_length
             )
-
             self.neutrino_position_encode = self.network_cfg.EventGeneration.neutrino_position_encode
 
             # [6-3] Positional embedding
         self.schedule_flags = [
             (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
-            (self.include_generation, "generation"),
+            (self.include_point_cloud_generation, "generation"),
             (self.include_neutrino_generation, "neutrino_generation"),
         ]
 
@@ -387,11 +387,11 @@ class EveNetModel(nn.Module):
         ###########################
 
         generations = dict()
-        if self.include_generation:
+        if self.include_point_cloud_generation:
             # [6-1] Global Generation Head
             if len(self.global_generation_target_indices) > 0:
                 target_global = global_conditions[..., self.global_generation_target_indices].squeeze(1)
-                target_global = torch.cat([num_point_cloud, target_global], dim = 1)
+                target_global = torch.cat([num_point_cloud, target_global], dim=1)
             else:
                 target_global = num_point_cloud
 
@@ -516,7 +516,7 @@ class EveNetModel(nn.Module):
                 ##  Output Head For Diffusion Model  ##
                 #######################################
 
-                if self.include_generation:
+                if self.include_point_cloud_generation or self.include_neutrino_generation:
                     pred_point_cloud_vector = self.EventGeneration(
                         x=full_input_point_cloud,
                         x_mask=full_input_point_cloud_mask,
@@ -698,7 +698,7 @@ class EveNetModel(nn.Module):
 
             # remove the padding
             if self.invisible_padding > 0:
-                pred_point_cloud_vector = pred_point_cloud_vector[... , :-self.invisible_padding]
+                pred_point_cloud_vector = pred_point_cloud_vector[..., :-self.invisible_padding]
 
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None

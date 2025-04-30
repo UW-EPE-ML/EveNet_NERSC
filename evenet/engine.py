@@ -761,7 +761,7 @@ class EveNetEngine(L.LightningModule):
             device=self.device,
             classification=self.classification_cfg.include,
             regression=self.regression_cfg.include,
-            generation=self.global_generation_cfg.include,
+            point_cloud_generation=self.global_generation_cfg.include,
             neutrino_generation=self.event_generation_cfg.include,
             assignment=self.assignment_cfg.include,
             normalization_dict=self.normalization_dict,
