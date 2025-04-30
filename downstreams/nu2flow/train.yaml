@@ -75,6 +75,8 @@ options:
         generate_point_cloud: false
         generate_neutrino: true
         diffusion_steps: 200
+        loss_scale: 0.1 # loss coefficient
+        invisible_loss_scale: 1.0 # loss coefficient for invisible particles
         learning_rate: *lr
         weight_decay: *wd
 
