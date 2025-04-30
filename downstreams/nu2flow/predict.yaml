@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
     # The filename of the prediction data
-    filename: "prediction-mg5.pt"
+    filename: "prediction-mg5-300.pt"
 
     extra_save:
       - EXTRA/num_bjet
@@ -78,7 +78,7 @@ options:
         warm_up: true
         generate_point_cloud: false
         generate_neutrino: true
-        diffusion_steps: 200
+        diffusion_steps: 300
         learning_rate: *lr
         weight_decay: *wd
 
