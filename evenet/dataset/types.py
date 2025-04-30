@@ -146,6 +146,7 @@ class SpecialKey(str, Enum):
     ClassLabel = "CLASSLABEL"
     ParticleProperties = "PARTICLE_PROPERTIES"
     Generations = "GENERATIONS"
+    Invisible = "Neutrinos"
 
 
 class Source(NamedTuple):

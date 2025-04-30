@@ -166,10 +166,10 @@ class EveNetDataConverter:
         self.total_length = n_event_current
 
     def load_invisible(self, max_num_neutrinos: int, direct_from_spanet: bool = False):
-        source_len = len(self.event_info.input_features['Source'])
+        # source_len = len(self.event_info.input_features['Source'])
         feature_len = len(self.event_info.generations['Neutrinos'])
-
-        assert source_len == feature_len, "Mismatch in feature length, check Generation[Neutrinos] block in event_info"
+        #
+        # assert source_len == feature_len, "Mismatch in feature length, check Generation[Neutrinos] block in event_info"
 
         x_inv = np.zeros((self.total_length, max_num_neutrinos, feature_len), dtype=np.float32)
         x_inv_mask = np.zeros((self.total_length, max_num_neutrinos), dtype=bool)

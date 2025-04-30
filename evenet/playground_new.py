@@ -159,7 +159,8 @@ if classification:
 if generation:
     gen_metrics = GenerationMetrics(
         class_names=global_config.event_info.class_label['EVENT']['signal'][0],
-        feature_names=global_config.event_info.sequential_feature_names,
+        sequential_feature_names=global_config.event_info.sequential_feature_names,
+        invisible_feature_names=global_config.event_info.invisible_feature_names,
         device=device
     )
 
