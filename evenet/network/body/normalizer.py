@@ -6,7 +6,7 @@ from typing import List
 
 
 class Normalizer(nn.Module):
-    def __init__(self, mean: Tensor, std: Tensor, norm_mask: Tensor, inv_cdf_index=None):
+    def __init__(self, mean: Tensor, std: Tensor, norm_mask: Tensor, inv_cdf_index=None, padding_size=0):
 
         super(Normalizer, self).__init__()
 
@@ -26,6 +26,12 @@ class Normalizer(nn.Module):
         self.register_buffer("std", std.clamp(min=1e-6))
         self.inv_cdf_index = inv_cdf_index
         self.normal = Normal(0, 1)
+        self.padding = padding_size
+
+        if self.padding > 0:
+            # padding mean and std to fit the padding size
+            self.mean = torch.cat([self.mean, torch.zeros(self.padding).to(self.mean.device)])
+            self.std = torch.cat([self.std, torch.ones(self.padding).to(self.mean.device)])
 
         # self.log_mask_expanded = self.log_mask.unsqueeze(0).unsqueeze(0) if self.log_mask is not None else None
 
@@ -58,15 +64,22 @@ class Normalizer(nn.Module):
         return x
 
     @torch.no_grad()
-    def denormalize(self, x: Tensor, mask: Tensor = None) -> Tensor:
+    def denormalize(self, x: Tensor, mask: Tensor = None, remove_padding: bool = False) -> Tensor:
         """
-
+        :param remove_padding: remove the padding part (for invisible generation)
         :param x: input point cloud (batch_size, num_objects, num_features)
         :param mask: mask for point cloud (batch_size, num_objects)
                 - 1: valid point
                 - 0: invalid point
         :return: tensor (batch_size, num_objects, num_features)
         """
+        if remove_padding:
+            current_mean = self.mean[:-self.padding]
+            current_std = self.std[:-self.padding]
+        else:
+            current_mean = self.mean
+            current_std = self.std
+
         if len(self.inv_cdf_index) > 0:
             x_partial = x[..., self.inv_cdf_index].contiguous()
             x_partial = self.normal.cdf(x_partial)
@@ -76,8 +89,9 @@ class Normalizer(nn.Module):
             x[..., self.inv_cdf_index] = x_partial
             if mask is not None:
                 x = x * mask
-        x = (x * self.std) + self.mean
+        x = (x * current_std) + current_mean
         # x = torch.where(self.log_mask_expanded, torch.expm1(x), x) # TODO
         if mask is not None:
             x = x * mask
+
         return x

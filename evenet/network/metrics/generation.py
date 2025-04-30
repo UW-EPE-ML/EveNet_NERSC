@@ -14,8 +14,13 @@ import wandb
 
 class GenerationMetrics:
     def __init__(
-            self, device, class_names, feature_names, hist_xmin=-15, hist_xmax=15, num_bins=60,
-            point_cloud_generation=False, neutrino_generation=False, special_bin_configs: dict[str, list] = None
+            self, device, class_names,
+            sequential_feature_names,
+            invisible_feature_names,
+            hist_xmin=-15, hist_xmax=15, num_bins=60,
+            point_cloud_generation=False,
+            neutrino_generation=False,
+            special_bin_configs: dict[str, list] = None
     ):
 
         self.sampler = DDIMSampler(device)
@@ -29,7 +34,8 @@ class GenerationMetrics:
         self.hist_xmin = hist_xmin
         self.hist_xmax = hist_xmax
 
-        self.feature_names = feature_names
+        self.sequential_feature_names = sequential_feature_names
+        self.invisible_feature_names = invisible_feature_names
 
         self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
         self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
@@ -117,9 +123,9 @@ class GenerationMetrics:
             )
 
             for i in range(data_shape[-1]):
-                masking[f"point cloud-{self.feature_names[i]}"] = input_set["x_mask"]
-                predict_distribution[f"point cloud-{self.feature_names[i]}"] = generated_distribution[..., i]
-                truth_distribution[f"point cloud-{self.feature_names[i]}"] = input_set['x'][..., i]
+                masking[f"point cloud-{self.sequential_feature_names[i]}"] = input_set["x_mask"]
+                predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[..., i]
+                truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
 
         if self.neutrino_generation:
             #####################################
@@ -144,12 +150,13 @@ class GenerationMetrics:
                 num_steps=num_steps_neutrino,
                 use_tqdm=False,
                 process_name=f"Neutrino",
+                remove_padding=True,
             )
 
             for i in range(data_shape[-1]):
-                masking[f"neutrino-{self.feature_names[i]}"] = input_set["x_invisible_mask"]
-                predict_distribution[f"neutrino-{self.feature_names[i]}"] = generated_distribution[..., i]
-                truth_distribution[f"neutrino-{self.feature_names[i]}"] = input_set['x_invisible'][..., i]
+                masking[f"neutrino-{self.invisible_feature_names[i]}"] = input_set["x_invisible_mask"]
+                predict_distribution[f"neutrino-{self.invisible_feature_names[i]}"] = generated_distribution[..., i]
+                truth_distribution[f"neutrino-{self.invisible_feature_names[i]}"] = input_set['x_invisible'][..., i]
 
         # --------------- working line -----------------
         for distribution_name, distribution in predict_distribution.items():
@@ -186,7 +193,8 @@ class GenerationMetrics:
 
             for class_index, class_name in enumerate(self.class_names):
                 class_mask = (process_id == class_index)
-                if distribution_name in masking and (predict_distribution[distribution_name].size() == masking[distribution_name].size()):
+                if distribution_name in masking and (
+                        predict_distribution[distribution_name].size() == masking[distribution_name].size()):
                     # Masking for point cloud
                     total_mask = masking[distribution_name][class_mask].flatten()
                     pred = predict_distribution[distribution_name][class_mask].flatten()[
@@ -375,6 +383,8 @@ def shared_step(
         num_steps_point_cloud=100,
         num_steps_neutrino=100,
         diffusion_on: bool = False,
+
+        invisible_padding: int = 0,
 ):
     generation_loss = dict()
 
@@ -382,16 +392,36 @@ def shared_step(
     event_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     invisible_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     for generation_target, generation_result in outputs.items():
-        masking = batch["x_mask"].unsqueeze(-1) if generation_target == "point_cloud" else None
+        feature_dim = generation_result["vector"].shape[-1]
+        if generation_target == "point_cloud":
+            masking = batch["x_mask"].unsqueeze(-1)
+        elif generation_target == "neutrino":
+            masking = batch["x_invisible_mask"].unsqueeze(-1)  # (B, N, 1)
+
+            if invisible_padding > 0:
+                B, N, _ = masking.shape
+                # Expand to (B, N, F), with True for real features, False for padded ones
+                masking = masking.expand(B, N, feature_dim).clone()
+                masking[:, :, -invisible_padding:] = False  # mask out padded features
+                feature_dim = 1
+        elif generation_target == "num_point_cloud":
+            masking = None
+            feature_dim = None
+        else:
+            masking = None
+            feature_dim = None
+
         generation_loss[generation_target] = gen_loss(
             predict=generation_result["vector"],
             target=generation_result["truth"],
-            mask=masking
+            mask=masking,
+            feature_dim=feature_dim,
         )
-        # total_gen_losses += generation_loss[generation_target]
         if generation_target == "num_point_cloud":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
-        else:
+        elif generation_target == "neutrino":
+            invisible_gen_loss = invisible_gen_loss + generation_loss[generation_target]
+        elif generation_target == "point_cloud":
             event_gen_loss = event_gen_loss + generation_loss[generation_target]
 
         if diffusion_on:

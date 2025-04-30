@@ -12,6 +12,7 @@ from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
 from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead, EventGenerationHead
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
+import torch.nn.functional as F
 
 from evenet.utilities.diffusion_sampler import add_noise
 from evenet.utilities.tool import gather_index
@@ -68,13 +69,6 @@ class EveNetModel(nn.Module):
             else:
                 input_normalizers_setting[input_type] = input_normalizers_setting_local
 
-        self.sequential_normalizer = Normalizer(
-            norm_mask=input_normalizers_setting["SEQUENTIAL"]["norm_mask"].to(self.device),
-            mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
-            std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device),
-            inv_cdf_index=self.event_info.sequential_inv_cdf_index
-        )
-
         global_normalizer_info = input_normalizers_setting.get(
             "GLOBAL",
             {
@@ -83,6 +77,21 @@ class EveNetModel(nn.Module):
                 "std": torch.ones(1).to(self.device)
             }
         )
+
+        self.global_input_dim = global_normalizer_info["norm_mask"].size()[-1]
+        self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
+        self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
+        self.invisible_input_dim = len(normalization_dict["invisible_mean"]["Source"])
+        self.invisible_padding = self.sequential_input_dim - self.invisible_input_dim
+        assert self.invisible_padding >= 0, f"Invisible Padding size {self.invisible_padding} is negative. "
+
+        self.sequential_normalizer = Normalizer(
+            norm_mask=input_normalizers_setting["SEQUENTIAL"]["norm_mask"].to(self.device),
+            mean=input_normalizers_setting["SEQUENTIAL"]["mean"].to(self.device),
+            std=input_normalizers_setting["SEQUENTIAL"]["std"].to(self.device),
+            inv_cdf_index=self.event_info.sequential_inv_cdf_index
+        )
+
         self.global_normalizer = Normalizer(
             norm_mask=global_normalizer_info["norm_mask"].to(self.device),
             mean=global_normalizer_info["mean"].to(self.device),
@@ -99,12 +108,9 @@ class EveNetModel(nn.Module):
             mean=normalization_dict["invisible_mean"]["Source"].to(self.device),
             std=normalization_dict["invisible_std"]["Source"].to(self.device),
             norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool),
-            inv_cdf_index=self.event_info.sequential_inv_cdf_index,
+            inv_cdf_index=self.event_info.invisible_inv_cdf_index,
+            padding_size=self.invisible_padding,
         )
-
-        self.global_input_dim = global_normalizer_info["norm_mask"].size()[-1]
-        self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
-        self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
 
         # [1] Body
         global_embedding_cfg = self.network_cfg.Body.GlobalEmbedding
@@ -323,8 +329,16 @@ class EveNetModel(nn.Module):
             x['conditions_mask']).long()  # (batch_size, 1)
         num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
-        invisible_point_cloud = x['x_invisible'] if 'x_invisible' in x else torch.zeros_like(
-            input_point_cloud[:, [0], :])
+        B, _, num_features = input_point_cloud.shape
+        if 'x_invisible' in x:
+            invisible_point_cloud = x['x_invisible']
+            pad_size = self.invisible_padding
+
+            # Pad invisible features to match input
+            invisible_point_cloud = F.pad(invisible_point_cloud, (0, pad_size), value=0.0)
+        else:
+            invisible_point_cloud = torch.zeros(B, 1, num_features, device=input_point_cloud.device)
+
         invisible_point_cloud_mask = x['x_invisible_mask'].unsqueeze(
             -1) if 'x_invisible_mask' in x else torch.zeros_like(input_point_cloud_mask[:, [0], :]).bool()
 
@@ -622,6 +636,12 @@ class EveNetModel(nn.Module):
             invisible_point_cloud_noised = noise_x
             invisible_point_cloud_mask = noise_mask
 
+            # padding invisible features to match input
+            if self.invisible_padding > 0:
+                invisible_point_cloud_noised = F.pad(
+                    invisible_point_cloud_noised, (0, self.invisible_padding), value=0.0
+                )
+
             # Create attention mask
             n_vis = input_point_cloud_mask.shape[1]
             n_invis = invisible_point_cloud_mask.shape[1]
@@ -666,6 +686,11 @@ class EveNetModel(nn.Module):
                 time_masking=time_masking,
                 position_encode=self.neutrino_position_encode
             )
+
+            # remove the padding
+            if self.invisible_padding > 0:
+                pred_point_cloud_vector = pred_point_cloud_vector[... , :-self.invisible_padding]
+
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
 

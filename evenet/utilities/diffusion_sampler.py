@@ -60,6 +60,7 @@ class DDIMSampler:
             noise_mask: Optional[torch.Tensor] = None,
             use_tqdm: bool = False,
             process_name: str = "Sampling",
+            remove_padding: bool = False,
     ) -> Tensor:
         """
         time: time tensor (B,)
@@ -100,5 +101,5 @@ class DDIMSampler:
                 x = x * noise_mask
 
         if normalize_fn is not None:
-            x = normalize_fn.denormalize(x, noise_mask)
+            x = normalize_fn.denormalize(x, noise_mask, remove_padding=remove_padding)
         return x

@@ -268,8 +268,8 @@ class EveNetEngine(L.LightningModule):
                         and ((batch_idx % self.diffusion_every_n_steps) == 0)
                 ),
                 loss_head_dict=loss_head_dict,
+                invisible_padding=self.model.invisible_padding,
             )
-            # loss_head_dict["generation"] = scaled_gen_loss
             loss_raw["generation"] = scaled_gen_loss
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
@@ -465,7 +465,7 @@ class EveNetEngine(L.LightningModule):
                 "target": {}
             }
             data_shape = inputs['x_invisible'].shape
-            feature_names = self.config.event_info.sequential_feature_names
+            feature_names = self.config.event_info.invisible_feature_names
 
             predict_for_neutrino = partial(
                 self.model.predict_diffusion_vector,
@@ -536,7 +536,8 @@ class EveNetEngine(L.LightningModule):
         if self.generation_include:
             generation_kwargs = {
                 "class_names": self.config.event_info.class_label['EVENT']['signal'][0],
-                "feature_names": self.config.event_info.sequential_feature_names,
+                "sequential_feature_names": self.config.event_info.sequential_feature_names,
+                "invisible_feature_names": self.config.event_info.invisible_feature_names,
                 "device": self.device,
                 "point_cloud_generation": self.event_generation_cfg.generate_point_cloud,
                 "neutrino_generation": self.event_generation_cfg.generate_neutrino,
@@ -885,6 +886,7 @@ class EveNetEngine(L.LightningModule):
         if self.event_generation_cfg.include:
             gradient_heads["generation-event"] = self.model.EventGeneration
             loss_heads["generation-event"] = torch.zeros(1, device=self.device, requires_grad=True)
+            loss_heads["generation-invisible"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.assignment_cfg.include:
             assignment_heads = self.model.Assignment.multiprocess_assign_head

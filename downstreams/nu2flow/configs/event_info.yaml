@@ -84,10 +84,10 @@ GENERATIONS:
     - met_phi
 
   Neutrinos:
-    mass: empty
+#    mass: empty
     pt: log_normalize
     eta: normalize
     phi: normalize_uniform
-    btag: empty
-    isLepton: empty
-    charge: empty
+#    btag: empty
+#    isLepton: empty
+#    charge: empty

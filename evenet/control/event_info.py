@@ -78,6 +78,8 @@ class EventInfo:
             resonance_info: Dict[str, Dict],
             resonance_particle_properties: List,
             generations: Dict[str, Dict],
+
+            invisible_input_features: Tuple[FeatureInfo, ...],
     ):
 
         self.input_types = input_types
@@ -96,6 +98,7 @@ class EventInfo:
         self.resonance_info = resonance_info
         self.resonance_particle_properties = resonance_particle_properties
         self.generations = generations
+        self.invisible_input_features = invisible_input_features
 
         for process in self.event_particles:
 
@@ -210,7 +213,7 @@ class EventInfo:
             for event_particle, daughter_particles in self.product_particles[process].items():
                 self.assignment_names[process].append(event_particle)
 
-        if (len(resonance_particle_properties_summary) == 0):
+        if len(resonance_particle_properties_summary) == 0:
             self.resonance_particle_properties_mean = np.array([0.0])
             self.resonance_particle_properties_std = np.array([1.0])
         else:
@@ -223,7 +226,7 @@ class EventInfo:
         self.resonance_particle_properties_std = torch.Tensor(self.resonance_particle_properties_std)
 
         # Generation Head setting
-
+        # For point cloud generation
         self.sequential_feature_names = []
         self.sequential_inv_cdf_index = []
         iglobal_index = 0
@@ -244,6 +247,16 @@ class EventInfo:
                         self.sequential_inv_cdf_index.append(seq_index)
                     seq_index += 1
 
+        # For invisible generation
+        self.invisible_feature_names = []
+        self.invisible_inv_cdf_index = []
+        for idx, input_feature_element in enumerate(self.invisible_input_features):
+            log_prefix = "log_" if input_feature_element.log_scale else ""
+            name = f"{log_prefix}{input_feature_element.name}"
+            self.invisible_feature_names.append(name)
+            if input_feature_element.uniform:
+                self.invisible_inv_cdf_index.append(idx)
+
         search_name = ["pt", "eta", "phi", "mass"]
         self.ptetaphimass_index = []
         for target_name in search_name:
@@ -261,11 +274,11 @@ class EventInfo:
             self.product_mappings, self.pairing_topology
         )
 
-    def normalized_features(self, input_name: str) -> NDArray[bool]:
-        return np.array([feature.normalize for feature in self.input_features[input_name]])
-
-    def log_features(self, input_name: str) -> NDArray[bool]:
-        return np.array([feature.log_scale for feature in self.input_features[input_name]])
+    # def normalized_features(self, input_name: str) -> NDArray[bool]:
+    #     return np.array([feature.normalize for feature in self.input_features[input_name]])
+    #
+    # def log_features(self, input_name: str) -> NDArray[bool]:
+    #     return np.array([feature.log_scale for feature in self.input_features[input_name]])
 
     @cached_property
     def event_symbolic_group(self) -> ODict[str, SymbolicPermutationGroup]:
@@ -457,6 +470,22 @@ class EventInfo:
 
         resonance_particle_property = key_with_default(config, SpecialKey.ParticleProperties, default=[])
 
+        # Extract Neutrino Information.
+        # Extract input feature information.
+        # ----------------------------------
+        current_inputs = with_default(config[SpecialKey.Generations][SpecialKey.Invisible], default={})
+        invisible_input_features = tuple(
+            FeatureInfo(
+                name=name,
+                normalize=("normalize" in normalize.lower()) or ("true" in normalize.lower()),
+                log_scale="log" in normalize.lower(),
+                uniform="uniform" in normalize.lower()
+            )
+
+            for name, normalize in current_inputs.items()
+        )
+
+
         # TODO: feynman_fill (not necessary, but would be nice)
 
         return cls(
@@ -469,5 +498,6 @@ class EventInfo:
             class_label,
             resonance_info,
             resonance_particle_property,
-            generations
+            generations,
+            invisible_input_features
         )
