@@ -178,7 +178,8 @@ def plot_kinematics_comparison(
 
     ax2.set_ylabel("/".join(ratio_label))
     ax2.axhline(y=1, color='gray', linestyle='--')  # Reference line
-    ax2.set_ylim(0.5, 1.5)
+    # ax2.set_ylim(0.5, 1.5)
+    ax2.set_ylim(0.0, 2.0)
 
     # Lower panel: Fast Contour Density Plot using Grid-Based KDE
     ax3 = axs[2]
