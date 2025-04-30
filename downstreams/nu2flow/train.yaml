@@ -13,7 +13,7 @@ wandb:
   project: "nu2flow-tt2l"
   entity: "ytchou97-university-of-washington"
   name: "tt2l"
-  tags: [ "Pretrain", "Parquet", "NERSC", "TT2L", "Neutrinos" ]
+  tags: [ "NERSC", "TT2L", "Neutrinos" ]
 
 options:
   default: configs/options.yaml
