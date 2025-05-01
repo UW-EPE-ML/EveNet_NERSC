@@ -410,6 +410,16 @@ GENERATIONS:
     - met
     - met_phi
   GlobalTargets: []
+
+  Events:
+    - mass
+    - pt
+    - eta
+    - phi
+    - btag
+    - isLepton
+    - charge
+
   Neutrinos:
     mass: empty
     pt: log_normalize
