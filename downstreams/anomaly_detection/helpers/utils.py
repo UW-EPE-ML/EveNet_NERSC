@@ -5,6 +5,8 @@ NOT MY CODE -- minimally adapted from https://debuggercafe.com/using-learning-ra
 import torch, os, json
 from preprocessing.preprocess import unflatten_dict, flatten_dict
 import pyarrow.parquet as pq
+import numpy as np
+import awkward as ak
 
 class LRScheduler():
     """
@@ -83,7 +85,9 @@ def save_file(
 
     os.makedirs(save_dir, exist_ok=True)
     if event_filter is not None:
-        filtered_df = {col: data_df[col][event_filter.to_numpy()] for col in data_df}
+        if not isinstance(event_filter, np.ndarray):
+            event_filter = ak.to_numpy(event_filter)
+        filtered_df = {col: data_df[col][event_filter] for col in data_df}
     else:
         filtered_df = data_df
     flatten_data, meta_data = flatten_dict(filtered_df)
