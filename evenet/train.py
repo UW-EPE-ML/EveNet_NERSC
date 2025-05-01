@@ -149,6 +149,7 @@ def main(args):
 
     run_config = RunConfig(
         name="EveNet-Training",
+        storage_path=args.ray_dir
     )
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
@@ -191,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument("config", help="Path to config file")
     # argument for loading all dataset files into RAM
     parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
+    parser.add_argument("--ray_dir", type=str, default = "~/ray_results")
 
     args, _ = parser.parse_known_args()
 

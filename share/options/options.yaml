@@ -132,6 +132,8 @@ Training:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
+      use_generation_result: false # whether to use the generation result as input for the next step
+
 
   ProgressiveTraining:
     - name: "vanilla"
@@ -175,3 +177,7 @@ Dataset:
   normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
   balance_file: null
   val_split: [0.7, 1.0]
+
+Metrics:
+  Generation-Binning:
+    num_vectors: [21, -1, 20]
