@@ -117,8 +117,9 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
         if products[product] is not None:
 
             ranking = None if ((symmetry_map is None) or (product not in symmetry_map)) else symmetry_map[product]
-            product_decay_array, process_summary = select_by_products(parton, product_from_mother, products[product],
-                                                                      product_name, rank=ranking)
+            product_decay_array, process_summary = select_by_products(
+                parton, product_from_mother, products[product], product_name, rank=ranking
+            )
             # print('---product decay---')
             # for i in product_decay_array[1]:
             #     print(candidate_name, i)
@@ -132,8 +133,9 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
                 candidate_array[sub_product] = product_from_mother[sub_product]
 
         if symmetry_map is not None and product in symmetry_map:
-            product_from_mother, candidate_array = select_by_rank(product_from_mother, candidate_array,
-                                                                  symmetry_map[product])
+            product_from_mother, candidate_array = select_by_rank(
+                product_from_mother, candidate_array, symmetry_map[product]
+            )
 
         if rank is not None and product_idx == 0:
             candidate_array = ak.pad_none(candidate_array, rank + 1, axis=1)
@@ -177,8 +179,10 @@ def assign_Reco_LorentzVector(Event_dict, products, parton, candidate_name, reco
                                                                     reconstructed_momentum_dict)
         else:
             reconstructed_momentum_dict[product_name] = ak.fill_none(
-                ak.pad_none(parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
-                            1, axis=-1)[..., 0],
+                ak.pad_none(
+                    parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
+                    1, axis=-1
+                )[..., 0],
                 default_reco_v4)  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
             # print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
 

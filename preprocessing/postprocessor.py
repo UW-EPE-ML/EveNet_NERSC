@@ -268,7 +268,11 @@ class PostProcessor:
         regression_stats = masked_stats(regression)
         num_vectors_stats = masked_stats(num_vectors)
 
-        invisible_stats = masked_stats(invisible.reshape(-1, invisible.shape[-1]))
+        if invisible.size == 0:
+            reshaped = np.empty((0, invisible.shape[-1]))  # safe manual reshape
+        else:
+            reshaped = invisible.reshape(-1, invisible.shape[-1])
+        invisible_stats = masked_stats(reshaped)
 
         self.stats.append({
             "x": x_stats,

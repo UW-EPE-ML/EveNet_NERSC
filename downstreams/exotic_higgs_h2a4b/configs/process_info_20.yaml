@@ -26,4 +26,10 @@ haa_ma20:
     H:
       a_twenty1: *a_had
       a_twenty2: *a_had
-  SYMMETRY: [ a_twenty1, a_twenty2 ]
+      SYMMETRY: [ a_twenty1, a_twenty2 ]
+
+#    a_twenty1: *a_had
+#    a_twenty2: *a_had
+#    SYMMETRY: [ H/a_twenty1, H/a_twenty2 ]
+  store_full_name: false
+  skip_first_particle: true

@@ -29,10 +29,10 @@ INPUTS:
 EVENT:
 
   haa_ma20:
-    H/a_twenty1:
+    a_twenty1:
       - b1
       - b2
-    H/a_twenty2:
+    a_twenty2:
       - b1
       - b2
 
@@ -43,10 +43,10 @@ PERMUTATIONS:
 
   haa_ma20:
     EVENT:
-      - [ H/a_twenty1, H/a_twenty2 ]
-    H/a_twenty1:
+      - [ a_twenty1, a_twenty2 ]
+    a_twenty1:
       - [ b1, b2 ]
-    H/a_twenty2:
+    a_twenty2:
       - [ b1, b2 ]
 
 # ------------------------------------------------------------------------------

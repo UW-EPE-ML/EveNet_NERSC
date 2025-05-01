@@ -60,6 +60,8 @@ def build_output_name(product: str, process: str, diagram: dict, tag: str = "TAR
     if len(parts) > 2:
         if diagram.get("store_full_name", False):
             return "/".join([parts[0], process] + parts[1:])
+        elif diagram.get("skip_first_particle", False):
+            return "/".join([parts[0], process] + parts[2:])
         else:
             return "/".join([parts[0], process, parts[1], parts[-1]])
     else:

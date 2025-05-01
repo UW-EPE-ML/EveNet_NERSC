@@ -409,7 +409,7 @@ GENERATIONS:
   Conditions:
     - met
     - met_phi
-  GlobalTargets:
+  GlobalTargets: []
 
   Neutrinos:
     mass: empty
