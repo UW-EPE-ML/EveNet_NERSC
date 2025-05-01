@@ -17,8 +17,8 @@ for mass in 20; do
   
     YAML_CONFIG="downstreams/exotic_higgs_h2a4b/preprocess_${mass}.yaml"
     shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
-        --pretrain_dirs "$IN_BASE/Run_2.Haa.20250114.$dataset" "$IN_BASE/Run_2.QCD_extra.20250205.$dataset" \
-        --store_dir "$OUT_BASE/$dataset_$mass"
+        --pretrain_dirs "$IN_BASE/Run_2.Haa.20250114.${dataset}" "$IN_BASE/Run_2.QCD_extra.20250205.${dataset}" \
+        --store_dir "$OUT_BASE/${dataset}_$mass"
   done
 done
 ```
