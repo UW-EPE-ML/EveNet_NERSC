@@ -17,6 +17,10 @@ PDG_Dict = {
     "gamma": [22],
     "H": [25],
     "a": [36],
+    "a_twenty": [36],
+    "a_thirty": [36],
+    "a_forty": [36],
+    "a_sixty": [36],
 }
 
 neutrino_representation = []

@@ -1,0 +1,29 @@
+EXCLUDE:
+  a_had: &a_had
+    b1: null
+    b2: null
+    SYMMETRY: [ b1, b2 ]
+
+QCD_2b:
+  category: QCD
+  process_id: 0
+  diagram: { }
+
+QCD_2b2j:
+  category: QCD
+  process_id: 0
+  diagram: { }
+
+QCD_4b:
+  category: QCD
+  process_id: 0
+  diagram: { }
+
+haa_ma20:
+  category: HAA
+  process_id: 1
+  diagram:
+    H:
+      a_twenty1: *a_had
+      a_twenty2: *a_had
+  SYMMETRY: [ a_twenty1, a_twenty2 ]

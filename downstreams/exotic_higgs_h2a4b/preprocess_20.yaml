@@ -1,0 +1,17 @@
+process_info:
+  default: configs/process_info_20.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: configs/event_info_20.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: configs/resonance.yaml
+
+  # overwrites
+  # ...
