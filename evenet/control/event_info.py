@@ -234,14 +234,23 @@ class EventInfo:
         self.generation_condition_indices = []
         self.generation_target_indices = []
         self.generation_target_names = []
+        self.generation_pc_condition_indices = []
+        self.generation_pc_condition_names = []
+
+        self.generation_pc_indices = []
+
         for input_name, input_feature in self.input_features.items():
             if self.input_types[input_name] == InputType.Global:
                 for input_feature_element in input_feature:
                     if input_feature_element.name in self.generations["Conditions"]:
                         self.generation_condition_indices.append(iglobal_index)
-                    if input_feature_element.name in self.generations.get("GlobalTargets", []):
+                        self.generation_pc_condition_indices.append(iglobal_index)
+                        self.generation_pc_condition_names.append(input_feature_element.name)
+                    elif input_feature_element.name in self.generations.get("GlobalTargets", []):
                         self.generation_target_indices.append(iglobal_index)
                         self.generation_target_names.append(input_feature_element.name)
+                        self.generation_pc_condition_indices.append(iglobal_index)
+                        self.generation_pc_condition_names.append(input_feature_element.name)
                     iglobal_index += 1
             elif self.input_types[input_name] == InputType.Sequential:
                 for input_feature_element in input_feature:
@@ -250,6 +259,9 @@ class EventInfo:
                     self.sequential_feature_names.append(name)
                     if input_feature_element.uniform:
                         self.sequential_inv_cdf_index.append(seq_index)
+
+                    if input_feature_element.name in self.generations.get("Events", []):
+                        self.generation_pc_indices.append(seq_index)
                     seq_index += 1
 
         # For invisible generation

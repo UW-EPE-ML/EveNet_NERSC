@@ -26,7 +26,7 @@ class EveNetModel(nn.Module):
             self,
             config: DotDict,
             device,
-            classification: bool = True,
+            classification: bool = False,
             regression: bool = False,
             point_cloud_generation: bool = False,
             neutrino_generation: bool = False,
@@ -261,6 +261,8 @@ class EveNetModel(nn.Module):
 
         # [6-2] Event Generation Head (for neutrino generation OR point cloud)
         if self.include_point_cloud_generation or self.include_neutrino_generation:
+            self.generation_pc_condition_indices = self.event_info.generation_pc_condition_indices
+            self.generation_pc_indices = self.event_info.generation_pc_indices
             self.EventGeneration = EventGenerationHead(
                 input_dim=pet_config.hidden_dim,
                 projection_dim=self.network_cfg.EventGeneration.hidden_dim,
@@ -385,7 +387,6 @@ class EveNetModel(nn.Module):
         ###########################
         ## Global Generator Head ##
         ###########################
-
         generations = dict()
         if self.include_point_cloud_generation:
             # [6-1] Global Generation Head
@@ -423,31 +424,39 @@ class EveNetModel(nn.Module):
                 full_attn_mask = None
                 full_time = torch.zeros_like(time)
                 time_masking = torch.zeros_like(full_input_point_cloud_mask).float()
+                global_feature_mask = torch.ones_like(global_conditions).float()
             elif schedule_name == "generation":
                 input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
-                full_input_point_cloud = input_point_cloud_noised.contiguous()
-                full_input_point_cloud_mask = input_point_cloud_mask.contiguous()
+                input_point_cloud_noised_tmp_mask = torch.zeros_like(input_point_cloud_noised)
+                input_point_cloud_noised_tmp_mask[..., self.local_feature_indices] = 1.0
+                input_point_cloud_noised = input_point_cloud_noised * input_point_cloud_noised_tmp_mask
+                full_input_point_cloud = input_point_cloud_noised
+                full_input_point_cloud_mask = input_point_cloud_mask
                 full_attn_mask = None
-                full_time = time.contiguous()
+                full_time = time
                 time_masking = full_input_point_cloud_mask.float()
+                global_feature_mask = torch.zeros_like(global_conditions).float()
+                global_feature_mask[..., self.generation_pc_condition_indices] = 1.0
             else:
                 invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(
                     invisible_point_cloud, time
                 )
                 full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
                 full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
-                full_attn_mask = invisible_attn_mask.contiguous()
-                full_time = time.contiguous()
+                full_attn_mask = invisible_attn_mask
+                full_time = time
                 time_masking = torch.cat(
                     [torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1
                 ).float()
+                global_feature_mask = torch.ones_like(global_conditions).float()
+
 
             #############################
             ## Central embedding (PET) ##
             #############################
 
             full_global_conditions = self.GlobalEmbedding(
-                x=global_conditions,
+                x=global_conditions * global_feature_mask,
                 mask=global_conditions_mask
             )
 
@@ -537,8 +546,8 @@ class EveNetModel(nn.Module):
                         }
                     else:
                         generations["point_cloud"] = {
-                            "vector": pred_point_cloud_vector,
-                            "truth": truth_input_point_cloud_vector
+                            "vector": pred_point_cloud_vector[..., self.generation_pc_indices],
+                            "truth": truth_input_point_cloud_vector[..., self.generation_pc_indices]
                         }
 
         return {
@@ -588,8 +597,11 @@ class EveNetModel(nn.Module):
             class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
             num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
+            global_feature_mask = torch.zeros_like(global_conditions).float()
+            global_feature_mask[..., self.generation_pc_condition_indices] = 1.0
+
             global_conditions = self.global_normalizer(
-                x=global_conditions,
+                x=global_conditions * global_feature_mask,
                 mask=global_conditions_mask
             )
             num_point_cloud = self.num_point_cloud_normalizer(
@@ -600,6 +612,11 @@ class EveNetModel(nn.Module):
                 x=global_conditions,
                 mask=global_conditions_mask
             )
+
+
+            noise_x_mask = torch.zeros_like(noise_x)
+            noise_x_mask[..., self.generation_pc_indices] = 1.0
+            noise_x = noise_x * noise_x_mask
 
             local_points = noise_x[..., self.local_feature_indices]
             input_point_cloud = self.PET(
@@ -617,7 +634,7 @@ class EveNetModel(nn.Module):
                 time=time,
                 label=class_label
             )
-            return pred_point_cloud_vector
+            return pred_point_cloud_vector * noise_x_mask
 
         elif mode == "neutrino":
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
@@ -663,8 +680,8 @@ class EveNetModel(nn.Module):
 
             full_input_point_cloud = torch.cat([input_point_cloud, invisible_point_cloud_noised], dim=1)
             full_input_point_cloud_mask = torch.cat([input_point_cloud_mask, invisible_point_cloud_mask], dim=1)
-            full_attn_mask = invisible_attn_mask.contiguous()
-            full_time = time.contiguous()
+            full_attn_mask = invisible_attn_mask
+            full_time = time
             time_masking = torch.cat(
                 [torch.zeros_like(input_point_cloud_mask), invisible_point_cloud_mask], dim=1
             ).float()
