@@ -478,7 +478,7 @@ class EventInfo:
         # Extract Neutrino Information.
         # Extract input feature information.
         # ----------------------------------
-        current_inputs = with_default(config[SpecialKey.Generations][SpecialKey.Invisible], default={})
+        invisible = key_with_default(config, SpecialKey.Invisible, default={})
         invisible_input_features = tuple(
             FeatureInfo(
                 name=name,
@@ -487,7 +487,7 @@ class EventInfo:
                 uniform="uniform" in normalize.lower()
             )
 
-            for name, normalize in current_inputs.items()
+            for name, normalize in invisible.items()
         )
 
 
