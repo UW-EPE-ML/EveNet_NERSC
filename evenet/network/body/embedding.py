@@ -319,12 +319,12 @@ class PETBody(nn.Module):
         encoded = self.random_drop(input_features)
         encoded = self.feature_embedding(encoded)
 
-        time_emb = self.time_embedding(time)
-        time_emb = time_emb.squeeze(1).unsqueeze(1).repeat(1, encoded.shape[1], 1)
-        time_emb = time_emb * mask
-
+        time = time.unsqueeze(1).unsqueeze(1).repeat(1, encoded.shape[1], 1)
         if time_masking is not None:
-            time_emb = time_emb * time_masking
+            time = time * time_masking # (batch_size, num_objects, 1)
+
+        time_emb = self.time_embedding(time)
+        time_emb = time_emb * mask
 
         time_emb = self.time_embed_linear(time_emb)
         scale, shift = torch.chunk(time_emb, 2, dim=-1)
