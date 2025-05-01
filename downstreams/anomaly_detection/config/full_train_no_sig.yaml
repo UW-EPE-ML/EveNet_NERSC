@@ -1,11 +1,11 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB"
-  number_of_workers: 1
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput_no_signal/SB"
+  number_of_workers: 16
   resources_per_worker: {
-    "CPU": 1,
+    "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 1024
+  batch_size: 2048
   prefetch_batches: 2
 
 wandb:
@@ -19,13 +19,12 @@ options:
 
   # overwrites
   Training:
-    epochs: 10
-    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB-debug"
+    epochs: 300
+    patience: 30
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput_no_signal/SB"
     model_checkpoint_load_path: null
 
     pretrain_model_load_path: null
-    diffusion_every_n_epochs: 1 # how often to run diffusion
-    diffusion_every_n_steps: 1
 
     Components:
       GlobalGeneration:
@@ -34,8 +33,8 @@ options:
         include: true
 
   Dataset:
-    dataset_limit: 0.01
-    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB/normalization.pt"
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput_no_signal/SB/normalization.pt"
 
 network:
   default: network.yaml
