@@ -10,6 +10,8 @@ from evenet.network.loss.generation import loss as gen_loss
 from evenet.utilities.debug_tool import time_decorator
 from typing import Dict
 import wandb
+import copy
+from scipy.spatial.distance import jensenshannon
 
 
 class GenerationMetrics:
@@ -17,10 +19,11 @@ class GenerationMetrics:
             self, device, class_names,
             sequential_feature_names,
             invisible_feature_names,
-            target_global_names, target_global_index,
+            target_global_names, target_global_index, target_event_index,
             hist_xmin=-15, hist_xmax=15, num_bins=60,
             point_cloud_generation=False,
             neutrino_generation=False,
+            use_generation_result=False,
             special_bin_configs: dict[str, list] = None
     ):
 
@@ -29,6 +32,7 @@ class GenerationMetrics:
 
         self.point_cloud_generation = point_cloud_generation
         self.neutrino_generation = neutrino_generation
+        self.use_generation_result = use_generation_result
 
         # Default values for histogram
         self.num_bins = num_bins
@@ -39,6 +43,7 @@ class GenerationMetrics:
         self.invisible_feature_names = invisible_feature_names
         self.target_global_names = target_global_names
         self.target_global_index = target_global_index
+        self.target_event_index = target_event_index
 
         self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
         self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
@@ -58,7 +63,6 @@ class GenerationMetrics:
             for name, special_bins in special_bin_configs.items():
                 self.special_bins[name] = np.linspace(special_bins[1], special_bins[2], special_bins[0])
                 self.special_bins_centers[name] = 0.5 * (self.special_bins[name][:-1] + self.special_bins[name][1:])
-
     @time_decorator(name="[Generation] update metrics")
     def update(
             self,
@@ -108,8 +112,12 @@ class GenerationMetrics:
                 generated_global = model.global_normalizer.denormalize(generated_global, index = self.target_global_index)
                 for idx, name in enumerate(self.target_global_names):
 
-                    predict_distribution["global-{name}"] =  generated_global[..., idx].flatten()
-                    truth_distribution["global-{name}"] = (input_set['conditions'][..., self.target_global_index[idx]]).flatten()
+                    predict_distribution[f"global-{name}"] =  generated_global[..., idx].flatten()
+                    truth_distribution[f"global-{name}"] = (input_set['conditions'][..., self.target_global_index[idx]]).flatten()
+
+                if self.use_generation_result:
+                    input_set = copy.deepcopy(input_set)
+                    input_set['conditions'][..., self.target_global_index] = generated_global
 
             ####################################
             ##  Step 2: Generate point cloud  ##
@@ -137,9 +145,10 @@ class GenerationMetrics:
             )
 
             for i in range(data_shape[-1]):
-                masking[f"point cloud-{self.sequential_feature_names[i]}"] = input_set["x_mask"]
-                predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[..., i]
-                truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
+                if i in self.target_event_index:
+                    masking[f"point cloud-{self.sequential_feature_names[i]}"] = input_set["x_mask"]
+                    predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[..., i]
+                    truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
 
         if self.neutrino_generation:
             #####################################
@@ -223,6 +232,7 @@ class GenerationMetrics:
                 if distribution_name in self.special_bins:
                     hist_bins = self.special_bins[distribution_name]
 
+
                 hist, _ = np.histogram(pred, bins=hist_bins)
                 self.histogram[distribution_name][class_name] += hist
 
@@ -286,6 +296,8 @@ class GenerationMetrics:
 
         fig, ax = plt.subplots()
 
+
+        jsd = dict()
         for cls, cls_name in enumerate(self.class_names):
             # Plot training histogram (bars)
             counts = histogram[cls_name]
@@ -317,12 +329,17 @@ class GenerationMetrics:
                     label=f"{cls_name} (Truth)", edgecolor=color, fill=False
                 )
 
+            if (np.sum(counts) > 0) and (np.sum(truth_counts) > 0):
+                p = truth_counts/np.sum(truth_counts)
+                q = counts / np.sum(counts)
+                jsd[cls_name] = (jensenshannon(p, q))**2
+
         ax.set_xlabel('Value')
         ax.set_ylabel('Frequency')
         ax.legend()
         # plt.show()
 
-        return fig
+        return fig, jsd
 
     def plot_histogram2d_func(self, histogram2d, x_centers, y_centers, title="2D Histogram"):
         fig, ax = plt.subplots()
@@ -337,20 +354,24 @@ class GenerationMetrics:
     def plot_histogram(self):
         figs = dict()
 
-        bin_centers = self.bin_centers
-        bin_widths = np.diff(self.bins)
+        jsd_results = dict()
         for name in self.histogram:
+            bin_centers = self.bin_centers
+            bin_widths = np.diff(self.bins)
 
             if name in self.special_bins:
                 bin_widths = np.diff(self.special_bins[name])
                 bin_centers = self.special_bins_centers[name]
 
-            figs[f"{name}-1d"] = self.plot_histogram_func(
+            figs[f"{name}-1d"], jsd = self.plot_histogram_func(
                 self.truth_histogram[name],
                 self.histogram[name],
                 bin_widths=bin_widths,
                 bin_centers=bin_centers,
             )
+            for cls_name, score in jsd.items():
+                jsd_results[f"{name}-{cls_name}"] = score
+            
 
             for class_name in self.class_names:
                 fig = self.plot_histogram2d_func(
@@ -379,7 +400,7 @@ class GenerationMetrics:
                     r = numerator / denominator
                 pearson_results[name][class_name] = r
 
-        return figs, pearson_results
+        return figs, pearson_results, jsd_results
 
 
 @time_decorator(name="[Generation] shared_step")
@@ -468,7 +489,7 @@ def shared_epoch_end(
         metrics_train.reduce_across_gpus()
 
     if global_rank == 0:
-        figs, extra = metrics_valid.plot_histogram()
+        figs, extra, jsd_results = metrics_valid.plot_histogram()
         for name, fig in figs.items():
             logger.log({f"generation/{name}": wandb.Image(fig)})
             plt.close(fig)
@@ -476,6 +497,10 @@ def shared_epoch_end(
         for name in extra:
             for class_name, value in extra[name].items():
                 logger.log({f"generation/pearson_{name}_{class_name}": value})
+        for name in jsd_results:
+            for jsd_name, jsd_score in jsd_results.items():
+                logger.log({f"generation/jsd_{jsd_name}": jsd_score})
+
 
     metrics_valid.reset()
     if metrics_train:
