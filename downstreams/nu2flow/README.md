@@ -90,3 +90,28 @@ plt.grid(True)
 plt.show()
 ```
 ![phi_test](aux/phi_test.png)
+
+
+
+## Unfolding 
+
+The library I used is [RooUnfold](https://gitlab.cern.ch/RooUnfold/RooUnfold/-/tree/master?ref_type=heads).
+
+```bash
+# install
+git clone ssh://git@gitlab.cern.ch:7999/yulei/RooUnfold.git
+cd RooUnfold
+
+mkdir build && cd build
+cmake ..
+make -j 4
+source setup.sh
+
+# setup.sh is equivalent to
+# export PATH=$PATH:$PWD
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD
+# export PYTHONPATH=$PYTHONPATH:$PWD
+```
+
+> Remember to add `ROOT::RooFitCore ROOT::RooFit ROOT::RooFitJSONInterface` to CMake if you are using ROOT 6.34 or later. 
+
