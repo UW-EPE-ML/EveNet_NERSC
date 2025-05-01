@@ -232,10 +232,12 @@ def produce_dataset(args):
     jet = jet[event_filter]
     data_df = {col: data_df[col][event_filter.to_numpy()] for col in data_df}
     inv_mass = (jet[...,0] + jet[...,1]).mass
+    pt_sum = (jet[...,0].pt + jet[...,1].pt)
 
     # Mass wondows cut
     mass_windows_filter = (inv_mass < config['mass-windows']['SB-right']) & (inv_mass > config['mass-windows']['SB-left'])
     inv_mass = inv_mass[mass_windows_filter]
+    pt_sum = pt_sum[mass_windows_filter]
     jet = jet[mass_windows_filter]
     data_df = {col: data_df[col][mass_windows_filter.to_numpy()] for col in data_df}
 
@@ -262,12 +264,15 @@ def produce_dataset(args):
     data_df['x_mask'] = ak.to_numpy(jet.MASK)
     data_df['x'] = np.zeros((batch_size, config['padding']['pad-number'], nfeature), dtype = np.float32)
     data_df['x'] = fill_value(data_df['x'], event_info, jet)
-    data_df['conditions'] = np.expand_dims(ak.to_numpy(inv_mass), axis = 1)
+    data_df['conditions'] = np.concatenate(
+        [np.expand_dims(ak.to_numpy(inv_mass), axis = 1),
+        np.expand_dims(ak.to_numpy(pt_sum), axis = 1)], axis = -1
+    )
     data_df['num_sequential_vectors'] = ak.to_numpy(ak.num(jet))
     data_df['num_vectors'] = data_df['num_sequential_vectors'] + 1
 
     mean_x, std_x = mean_std_last_dim(data_df['x'], data_df['x_mask'])
-    mean_cond, std_cond = mean_std_last_dim(data_df['conditions'], data_df['conditions_mask'])
+    mean_cond, std_cond = mean_std_last_dim(np.expand_dims(data_df['conditions'], axis = 1), data_df['conditions_mask'])
 
     norm_dict = dict()
     norm_dict['input_mean'] = {'Source': torch.tensor(mean_x.flatten(), dtype=torch.float32), 'Conditions': torch.tensor(mean_cond.flatten(), dtype=torch.float32)}

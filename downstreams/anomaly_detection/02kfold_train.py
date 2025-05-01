@@ -10,16 +10,17 @@ def prepare_script(args):
     with open(args.train_config) as f:
         config = yaml.safe_load(f)
     config_dir = os.path.dirname(args.train_config)
+    print(config_dir)
     command = []
     init = 0.0
     step = 1.0 / args.fold
     for ifold in range(args.fold):
         file_path = os.path.join(work_dir, args.farm, f"fold_{ifold}.yaml")
         fold_config = deepcopy(config)
-        fold_config['network']['default'] = os.path.join(work_dir, "config", fold_config['network']['default'])
-        fold_config['event_info']['default'] = os.path.join(work_dir, "config", fold_config['event_info']['default'])
-        fold_config['resonance']['default'] = os.path.join(work_dir, "config", fold_config['resonance']['default'])
-        fold_config['options']['default'] = os.path.join(work_dir, "config", fold_config['options']['default'])
+        fold_config['network']['default'] = os.path.join(work_dir, config_dir, fold_config['network']['default'])
+        fold_config['event_info']['default'] = os.path.join(work_dir, config_dir, fold_config['event_info']['default'])
+        fold_config['resonance']['default'] = os.path.join(work_dir, config_dir, fold_config['resonance']['default'])
+        fold_config['options']['default'] = os.path.join(work_dir, config_dir, fold_config['options']['default'])
 
         fold_config["options"]["Training"]["model_checkpoint_save_path"] = os.path.join(fold_config["options"]["Training"]["model_checkpoint_save_path"], f"fold_{ifold}")
         fold_config["options"]["Dataset"]["val_split"] = [init, init + step]
@@ -27,7 +28,7 @@ def prepare_script(args):
         with open(file_path, 'w') as f:
             yaml.dump(fold_config, f)
 
-        command.append(f"shifter python3 evenet/train.py {file_path} --load_all")
+        command.append(f"shifter python3 evenet/train.py {file_path} --load_all --ray_dir {args.ray_dir}")
 
     # Write the command to a shell script
     script_path = os.path.join(args.farm, "train.sh")
@@ -44,6 +45,7 @@ def main():
     parser.add_argument("train_config", type = str)
     parser.add_argument("--farm", type = str)
     parser.add_argument("--fold", type = int, default = 5)
+    parser.add_argument("--ray_dir", type=str, default = "~/ray_results")
     # Parse command-line arguments
     args = parser.parse_args()
     # Explore the provided HDF5 file

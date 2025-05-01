@@ -99,46 +99,46 @@ def mix(args):
     )
 
     # Check for peaks in the background
-    gen_sample = read_from_files(os.path.join(clean_and_append(config["output"]["storedir"], "_gen"), args.region, "data*.parquet"))
+    gen_sample = read_from_files(os.path.join(clean_and_append(config["output"]["storedir"], f"_gen{postfix}"), args.region, "data*.parquet"))
     gen_sample = process_event_batch(
         gen_sample,
         shape_metadata=shape_metadata,
         unflatten=unflatten_dict,
     )
 
-    jet = ak.from_regular(vector.zip(
-        {
-            "pt": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'pt')),
-            "eta": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'eta')),
-            "phi": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'phi')),
-            "mass": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'mass')),
-            "MASK": ak.from_numpy(gen_sample['x_mask'])
-        }
-    ))
+#    jet = ak.from_regular(vector.zip(
+#        {
+#            "pt": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'pt')),
+#            "eta": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'eta')),
+#            "phi": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'phi')),
+#            "mass": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'mass')),
+#            "MASK": ak.from_numpy(gen_sample['x_mask'])
+#        }
+#    ))
 
-    inv_mass_gen = (jet[..., 0] + jet[..., 1]).mass
-    _ = plot_mass_distribution(
-        inv_mass_gen,
-        SR_left=config['mass-windows']['SR-left'],
-        SR_right=config['mass-windows']['SR-right'],
-        SB_left=config['mass-windows']['SB-left'],
-        SB_right=config['mass-windows']['SB-right'],
-        bkg_fit_degree=config['fit']['bkg-fit-degree'],
-        num_bins_SR=config['mass-windows']['SR-bins'],
-        save_name=os.path.join(config['output']['plotdir'], step_dir, f"gen_mass_distribution_{args.region}.png")
-    )
-
-    gen_sample["conditions"] = inv_mass_gen.to_numpy().reshape(-1, 1)
-
-    SR_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SR-left']) & (
-                inv_mass_gen.to_numpy() < config['mass-windows']['SR-right'])
-    SB_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SB-left']) & (
-                inv_mass_gen.to_numpy() < config['mass-windows']['SB-right'])
-    SB_filter = SB_filter & ~SR_filter
-    if args.region == "SR":
-        gen_sample = {k: v[SR_filter] for k, v in gen_sample.items()}
-    else:
-        gen_sample = {k: v[SB_filter] for k, v in gen_sample.items()}
+#    inv_mass_gen = (jet[..., 0] + jet[..., 1]).mass
+#    _ = plot_mass_distribution(
+#        inv_mass_gen,
+#        SR_left=config['mass-windows']['SR-left'],
+#        SR_right=config['mass-windows']['SR-right'],
+#        SB_left=config['mass-windows']['SB-left'],
+#        SB_right=config['mass-windows']['SB-right'],
+#        bkg_fit_degree=config['fit']['bkg-fit-degree'],
+#        num_bins_SR=config['mass-windows']['SR-bins'],
+#        save_name=os.path.join(config['output']['plotdir'], step_dir, f"gen_mass_distribution_{args.region}.png")
+#    )
+#
+#    gen_sample["conditions"] = inv_mass_gen.to_numpy().reshape(-1, 1)
+#
+#    SR_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SR-left']) & (
+#                inv_mass_gen.to_numpy() < config['mass-windows']['SR-right'])
+#    SB_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SB-left']) & (
+#                inv_mass_gen.to_numpy() < config['mass-windows']['SB-right'])
+#    SB_filter = SB_filter & ~SR_filter
+#    if args.region == "SR":
+#        gen_sample = {k: v[SR_filter] for k, v in gen_sample.items()}
+#    else:
+#        gen_sample = {k: v[SB_filter] for k, v in gen_sample.items()}
 
 
     if args.region == "SR":
@@ -160,7 +160,7 @@ def mix(args):
     norm_dict['subprocess_balance'] = norm_dict['class_balance']
 
     df_hybrid = {k: np.concatenate([gen_sample[k], df_data[k]], axis=0) for k in gen_sample}
-    df_hybrid["conditions"] = np.ones_like(df_hybrid["conditions"]) # Remove the mass condition
+    df_hybrid["conditions"][..., 0]  = 0 # Remove the mass condition
 
     perm = np.random.permutation(len(next(iter(df_hybrid.values()))))
     df_hybrid = {k: v[perm] for k, v in df_hybrid.items()}

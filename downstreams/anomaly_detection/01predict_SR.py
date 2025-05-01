@@ -138,7 +138,7 @@ def predict(rank, world_size, gen_num_events, args):
     mass_sample = torch.tensor(mass_sample, dtype=torch.float32).to(device).unsqueeze(-1)
 
     num_generated_sample = 0
-    dummy_batch = convert_batch_to_torch_tensor(df_SR)
+    dummy_batch = convert_batch_to_torch_tensor(df_SB)
     dummy_batch = {
         k: v[:args.batch_size].to(device) for k, v in dummy_batch.items()
     }
@@ -163,7 +163,37 @@ def predict(rank, world_size, gen_num_events, args):
             # ...
 
             condition_x = {k: v.clone()[:batch_num] for k, v in dummy_batch.items()}
-            condition_x["conditions"] = mass_sample[num_generated_sample:num_generated_sample + batch_num]
+            condition_x["conditions"] = torch.zeros_like(condition_x["conditions"])
+            condition_x["conditions"][..., 0] = (mass_sample[num_generated_sample:num_generated_sample + batch_num])[...,0]
+            ####################################
+            ##  Step 1: Generate num vectors  ##
+            ####################################
+
+            predict_for_global = partial(
+                model.predict_diffusion_vector,
+                cond_x=condition_x,
+                mode="global"
+            )
+
+
+            target_global_index = [1] # HT
+            data_shape = [batch_num,  1 + len(target_global_index)]
+            generated_distribution = sampler.sample(
+                data_shape=data_shape,
+                pred_fn=predict_for_global,
+                normalize_fn=None,
+                num_steps=args.num_steps,
+                eta=1.0,
+                use_tqdm=False,
+                process_name=f"Global",
+            )
+
+            generated_global = generated_distribution[..., 1:]
+            generated_global = model.global_normalizer.denormalize(generated_global, index = target_global_index)
+            for local_idx in range(len(target_global_index)):
+                condition_x['conditions'][..., target_global_index[local_idx]] = generated_global[..., local_idx]
+
+
 
             predict_for_point_cloud = partial(
                 model.predict_diffusion_vector,
@@ -194,29 +224,31 @@ def predict(rank, world_size, gen_num_events, args):
 
 
     gen_sample = {k: torch.cat(v, dim=0).detach().cpu().numpy() for k, v in gen_sample.items()}
-    jet = ak.from_regular(vector.zip(
-        {
-            "pt": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'pt')),
-            "eta": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'eta')),
-            "phi": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'phi')),
-            "mass": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'mass')),
-            "MASK": ak.from_numpy(gen_sample['x_mask'])
-        }
-    ))
+#    jet = ak.from_regular(vector.zip(
+#        {
+#            "pt": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'pt')),
+#            "eta": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'eta')),
+#            "phi": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'phi')),
+#            "mass": ak.from_numpy(read_feature(gen_sample["x"], event_info, 'mass')),
+#            "MASK": ak.from_numpy(gen_sample['x_mask'])
+#        }
+#    ))
 
-    inv_mass_gen = (jet[..., 0] + jet[..., 1]).mass
-    _ = plot_mass_distribution(
-        inv_mass_gen,
-        SR_left=config['mass-windows']['SR-left'],
-        SR_right=config['mass-windows']['SR-right'],
-        SB_left=config['mass-windows']['SB-left'],
-        SB_right=config['mass-windows']['SB-right'],
-        bkg_fit_degree=config['fit']['bkg-fit-degree'],
-        num_bins_SR=config['mass-windows']['SR-bins'],
-        save_name=os.path.join(config['output']['plotdir'], step_dir, f"gen_mass_distribution_{args.region}.png")
-    )
+#    inv_mass_gen = (jet[..., 0] + jet[..., 1]).mass
+#    _ = plot_mass_distribution(
+#        inv_mass_gen,
+#        SR_left=config['mass-windows']['SR-left'],
+#        SR_right=config['mass-windows']['SR-right'],
+#        SB_left=config['mass-windows']['SB-left'],
+#        SB_right=config['mass-windows']['SB-right'],
+#        bkg_fit_degree=config['fit']['bkg-fit-degree'],
+#        num_bins_SR=config['mass-windows']['SR-bins'],
+#        save_name=os.path.join(config['output']['plotdir'], step_dir, f"gen_mass_distribution_{args.region}.png")
+#    )
+#
+#    gen_sample["conditions"] = inv_mass_gen.to_numpy().reshape(-1, 1)
 
-    gen_sample["conditions"] = inv_mass_gen.to_numpy().reshape(-1, 1)
+    inv_mass_gen = ak.from_numpy(gen_sample["conditions"][..., 0])
 
     SR_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SR-left']) & (
                 inv_mass_gen.to_numpy() < config['mass-windows']['SR-right'])
@@ -234,6 +266,8 @@ def predict(rank, world_size, gen_num_events, args):
     else:
         df_data = df_SB
 
+
+    gen_sample["conditions"][..., 0] = np.zeros_like(gen_sample["conditions"][..., 0]) # Remove invariant mass information
     gen_sample["classification"] = np.zeros_like(gen_sample["classification"])
     df_data["classification"] = np.ones_like(df_data["classification"])
 
@@ -253,7 +287,7 @@ def predict(rank, world_size, gen_num_events, args):
     # perm = np.random.permutation(len(next(iter(df_hybrid.values()))))
     # df_hybrid = {k: v[perm] for k, v in df_hybrid.items()}
 
-    outputdir = clean_and_append(config["output"]["storedir"], "_gen")
+    outputdir = clean_and_append(config["output"]["storedir"], f"_gen{postfix}")
 
     save_file(
         save_dir = os.path.join(outputdir, f"{args.region}"),
