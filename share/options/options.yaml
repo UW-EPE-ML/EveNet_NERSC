@@ -179,5 +179,22 @@ Dataset:
   val_split: [0.7, 1.0]
 
 Metrics:
+  # plotting bins: [bin_num, bin_min, bin_max]
   Generation-Binning:
     num_vectors: [21, -1, 20]
+
+    "point cloud-log_mass": [50, -1, 10]
+    "point cloud-log_pt": [50, -1, 10]
+    "point cloud-eta": [50, -4, 4]
+    "point cloud-phi": [50, -4, 4]
+    "point cloud-btag": [2, 0, 1]
+    "point cloud-isLepton": [2, 0, 1]
+    "point cloud-charge": [3, -1, 1]
+
+    "neutrino-log_mass": [10, -1, 1]
+    "neutrino-log_pt": [50, 0, 7]
+    "neutrino-eta": [50, -4, 4]
+    "neutrino-phi": [50, -4, 4]
+    "neutrino-btag": [2, 0, 1]
+    "neutrino-isLepton": [2, 0, 1]
+    "neutrino-charge": [3, -1, 1]
