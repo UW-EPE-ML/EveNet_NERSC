@@ -545,7 +545,7 @@ class EveNetEngine(L.LightningModule):
                 "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),
                 "target_global_index": self.config.event_info.generation_target_indices,
                 "target_global_names": self.config.event_info.generation_target_names,
-                "use_generation_result": self.event_generation_cfg.use_generation_result,
+                "use_generation_result": self.event_generation_cfg.get("use_generation_result", False),
                 "target_event_index": self.config.event_info.generation_pc_indices,
             }
 
