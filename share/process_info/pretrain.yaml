@@ -62,6 +62,7 @@ TTHadronics:
 TTHadronics_mlm:
   category: TT
   process_id: 1
+  rename_to: TTHadronics
   diagram: *TTHadronics
 
 TT1L:
@@ -74,6 +75,7 @@ TT1L:
 TT1L_mlm:
   category: TT
   process_id: 1
+  rename_to: TT1L
   diagram: *TT1L
 
 TT2L:
@@ -94,6 +96,7 @@ TT2L:
 TT2L_mlm:
   category: TT
   process_id: 1
+  rename_to: TT2L
   diagram: *TT2L
 
 ttW_FullHadronics:

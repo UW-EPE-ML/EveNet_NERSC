@@ -23,6 +23,14 @@ INPUTS:
     Conditions:
       met: log_normalize
       met_phi: normalize
+      nLepton: none
+      nbJet: none
+      nJet: none
+      HT: log_normalize
+      HT_lep: log_normalize
+      M_all: log_normalize
+      M_leps: log_normalize
+      M_bjets: log_normalize
 
 # ----------------------------------------------------------------------
 # REQUIRED - EVENT - Complete list of resonance particles and daughters.
@@ -109,7 +117,7 @@ EVENT:
     Z:
       - l1
       - l2
-  
+
 
   ttW_FullHadronics:
     t1:
@@ -410,7 +418,9 @@ GENERATIONS:
   Conditions:
     - met
     - met_phi
-  GlobalTargets: []
+    - M_all
+  GlobalTargets:
+    - HT
 
   Events:
     - mass
@@ -422,10 +432,6 @@ GENERATIONS:
     - charge
 
   Neutrinos:
-    mass: empty
     pt: log_normalize
     eta: normalize
     phi: normalize_uniform
-    btag: empty
-    isLepton: empty
-    charge: empty
