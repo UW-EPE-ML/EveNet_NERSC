@@ -177,7 +177,7 @@ if assignment:
         event_symbolic_group=event_info.event_symbolic_group[process],
         event_particles=event_info.event_particles[process],
         product_symbolic_groups=event_info.product_symbolic_groups[process],
-        ptetaphimass_index=event_info.ptetaphimass_index,
+        ptetaphienergy_index=event_info.ptetaphienergy_index,
         process=process
     ) for process in event_info.process_names}
 

@@ -7,7 +7,8 @@ INPUTS:
   # -----------------------------------------------------------------------------
   SEQUENTIAL:
     Source:
-      mass: log_normalize
+#      mass: log_normalize
+      energy: log_normalize
       pt: log_normalize
       eta: normalize
       phi: normalize_uniform

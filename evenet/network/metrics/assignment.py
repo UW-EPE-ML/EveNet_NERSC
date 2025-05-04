@@ -24,7 +24,7 @@ from matplotlib.lines import Line2D
 
 
 @time_decorator(name="[Assignment] reconstruct_mass_peak")
-def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
+def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_energy=True):
     """
     *** input Jet with log pt and log mass ***
     Jet: [batch_size, num_jets, 4]
@@ -33,11 +33,12 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     jet_pt = Jet[..., 0]
     jet_eta = Jet[..., 1]
     jet_phi = Jet[..., 2]
-    jet_mass = Jet[..., 3]
+    # jet_mass = Jet[..., 3]
+    jet_energy = Jet[..., 3]
 
-    if log_mass:
-        jet_pt = torch.exp(jet_pt)
-        jet_mass = torch.exp(jet_mass)
+    if log_energy:
+        jet_pt = torch.expm1(jet_pt)
+        jet_energy = torch.expm1(jet_energy)
 
     def gather_jets(jet_tensor):
         assert (assignment_indices >= 0).all(), f"assignment_indices has negative values! {assignment_indices}"
@@ -47,7 +48,7 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     pt = gather_jets(jet_pt)
     eta = gather_jets(jet_eta)
     phi = gather_jets(jet_phi)
-    mass = gather_jets(jet_mass)
+    energy = gather_jets(jet_energy)
 
     selected_mask = torch.gather(padding_mask.unsqueeze(1), 2, assignment_indices.unsqueeze(1)).squeeze(1)
     is_valid_event = selected_mask.all(dim=1)
@@ -56,7 +57,7 @@ def reconstruct_mass_peak(Jet, assignment_indices, padding_mask, log_mass=True):
     px = pt * torch.cos(phi)
     py = pt * torch.sin(phi)
     pz = pt * torch.sinh(eta)
-    E = torch.sqrt(px ** 2 + py ** 2 + pz ** 2 + mass ** 2)
+    E = energy
 
     total_e = E.sum(dim=1)
     total_px = px.sum(dim=1)
@@ -189,7 +190,7 @@ class SingleProcessAssignmentMetrics:
             event_symbolic_group,
             event_particles,
             product_symbolic_groups,
-            ptetaphimass_index,
+            ptetaphienergy_index,
             process,
             detection_WP=[0.0, 0.5, 0.8],
             hist_xmin=0,
@@ -206,7 +207,7 @@ class SingleProcessAssignmentMetrics:
         self.hist_xmax = hist_xmax
         self.num_bins = num_bins
         self.detection_WP = detection_WP
-        self.ptetaphimass_index = ptetaphimass_index
+        self.ptetaphienergy_index = ptetaphienergy_index
         self.process = process
         self.detection_cut = 0.0
 
@@ -382,7 +383,7 @@ class SingleProcessAssignmentMetrics:
 
                     input = inputs[truth_mask_local]
                     input_mask = inputs_mask[truth_mask_local]
-                    jet = input[:, :, self.ptetaphimass_index]
+                    jet = input[:, :, self.ptetaphienergy_index]
 
                     # Fill truth metrics
                     truth_mass = reconstruct_mass_peak(

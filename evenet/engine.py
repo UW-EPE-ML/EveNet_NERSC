@@ -526,7 +526,7 @@ class EveNetEngine(L.LightningModule):
                         event_symbolic_group=self.config.event_info.event_symbolic_group[process],
                         event_particles=self.config.event_info.event_particles[process],
                         product_symbolic_groups=self.config.event_info.product_symbolic_groups[process],
-                        ptetaphimass_index=self.config.event_info.ptetaphimass_index,
+                        ptetaphienergy_index=self.config.event_info.ptetaphienergy_index,
                         process=process
                     ) for process in self.config.event_info.process_names
                 }
