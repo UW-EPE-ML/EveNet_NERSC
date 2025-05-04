@@ -38,7 +38,7 @@ srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --
 sleep 5
 ##############################################################################################
 
-echo  --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0  --exclude $head_node shifter ./start-worker.sh $head_node_ip:$port > ~/ray.run
+echo srun -n 4 --nodes=4 --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0  --exclude $head_node shifter ./start-worker.sh $head_node_ip:$port > ~/ray.run
 
 ##############################################################################################
 
