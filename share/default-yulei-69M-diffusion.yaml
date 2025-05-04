@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250504.69M"
   number_of_workers: 32
   resources_per_worker: {
     "CPU": 30,
@@ -78,7 +78,7 @@ options:
 
   Dataset:
     dataset_limit: 1.0
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250504.69M/normalization.pt"
     val_split: [0.7, 1.0]
 
 network:

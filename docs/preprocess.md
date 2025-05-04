@@ -54,7 +54,7 @@ For every sub-run folder:
             ${pretrain_dir}/Run_2.Dec20 \
             ${pretrain_dir}/Run_2.Dec21 \
             ${pretrain_dir}/Run_2.Dec22 \
-        --store_dir ${output_dir}/run.20250403 | tee ${output_dir}/run.20250403.log
+        --store_dir ${output_dir}/run.20250504.69M | tee ${output_dir}/run.20250504.69M.log
     ```
 
     This command will:
