@@ -407,7 +407,7 @@ CLASSLABEL:
       - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ ]
 
 PARTICLE_PROPERTIES:
-  - Mass
+  - Energy
   - Spin
   - nProduct_BJet
   - nProduct_Jet
@@ -423,7 +423,7 @@ GENERATIONS:
     - HT
 
   Events:
-    - mass
+    - energy
     - pt
     - eta
     - phi
