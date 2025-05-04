@@ -38,11 +38,12 @@ srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --
 sleep 5
 ##############################################################################################
 
+echo  --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0  --exclude $head_node shifter ./start-worker.sh $head_node_ip:$port > ~/ray.run
+
+##############################################################################################
+
 # export the parent directory of the script to the PYTHONPATH
 PYTHONPATH=$(dirname "$(dirname "$(realpath "$0")")"):$PYTHONPATH
-export PYTHONPATH
+echo $PYTHONPATH && export PYTHONPATH
 
-shifter python3 ../evenet/train.py ../share/default-yulei.yaml
-
-#### call your code below
-exit
+#shifter python3 ../evenet/train.py ../share/default-yulei.yaml
