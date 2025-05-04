@@ -50,6 +50,19 @@ def generate_regression_names(event_info: EventInfo):
     return regression_keys, regression_key_map
 
 
+def calculate_extra_variables(data: dict):
+    mask = data['INPUTS/Source/MASK']
+
+    num_bjet = (data['INPUTS/Source/btag'] * mask).sum(axis=1)
+
+    raw_extra = {k: v for k, v in data.items() if k.startswith('EXTRA/')}
+
+    return {
+        'EXTRA/num_bjet': num_bjet,
+        **raw_extra,
+    }
+
+
 def flatten_dict(data: dict, delimiter: str = ":"):
     flat_columns = {}
     shape_metadata = {}
@@ -117,7 +130,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
     shape_metadata = None
 
     for process in global_config.process_info:
-        # for process in ["TT2L", "WZ_3L"]:
+    # for process in ["TT2L_mlm"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -134,6 +147,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             raw_data=deepcopy(matched_data),
             event_info=global_config.event_info,
             process=process,
+            rename_to=process_info[process].get('rename_to', None),
         )
 
         # Filter the data

@@ -69,9 +69,12 @@ def build_output_name(product: str, process: str, diagram: dict, tag: str = "TAR
 
 
 def store_valid_components(data_dict, base_name, momentum, mask, components):
+    invalid = momentum.pt < 0
+
     for comp in components:
         arr = getattr(momentum, comp)
-        data_dict[f"{base_name}/{comp}"] = np.nan_to_num(ak.to_numpy(arr), nan=0.0)
+        arr = ak.where(invalid, np.nan, arr)
+        data_dict[f"{base_name}/{comp}"] = ak.to_numpy(arr)
     data_dict[f"{base_name}/MASK"] = valid_components_mask(momentum, mask, components)
 
 
@@ -269,11 +272,38 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
         data_dict['INPUTS/Source/eta'] = pad_object(v4_combined.eta, nMaxJet)
         data_dict['INPUTS/Source/phi'] = pad_object(v4_combined.phi, nMaxJet)
         data_dict['INPUTS/Source/mass'] = pad_object(v4_combined.mass, nMaxJet)
+        data_dict['INPUTS/Source/energy'] = pad_object(v4_combined.energy, nMaxJet)
         data_dict['INPUTS/Source/btag'] = pad_object(v4_combined.isBTag, nMaxJet)
         data_dict['INPUTS/Source/isLepton'] = pad_object(v4_combined.isLepton, nMaxJet)
         data_dict['INPUTS/Source/charge'] = pad_object(v4_combined.charge, nMaxJet)
+
         data_dict['INPUTS/Conditions/met'] = ak.to_numpy(objects['event'][:, 0])
         data_dict['INPUTS/Conditions/met_phi'] = ak.to_numpy(objects['event'][:, 1])
+
+        data_dict['INPUTS/Conditions/HT'] = data_dict['INPUTS/Source/pt'].sum(axis=1)
+        data_dict['INPUTS/Conditions/HT_MET'] = data_dict['INPUTS/Conditions/HT'] + data_dict['INPUTS/Conditions/met']
+        data_dict['INPUTS/Conditions/HT_lep'] = (
+                data_dict['INPUTS/Source/pt'] * data_dict['INPUTS/Source/isLepton'] > 0
+        ).sum(axis=1)
+        data_dict['INPUTS/Conditions/HT_lep_MET'] = data_dict['INPUTS/Conditions/HT_lep'] + data_dict[
+            'INPUTS/Conditions/met']
+
+        data_dict['INPUTS/Conditions/nLepton'] = ak.to_numpy(ak.num(objects["els"]) + ak.num(objects["mus"]))
+        data_dict['INPUTS/Conditions/nJet'] = ak.to_numpy(ak.num(objects["jets"]))
+        data_dict['INPUTS/Conditions/nbJet'] = data_dict['INPUTS/Source/btag'].sum(axis=1)
+
+        for k, v4_mask in zip(
+                ["M_all", "M_leps", "M_bjets"],
+                [
+                    v4_combined,
+                    v4_combined[v4_combined.isLepton == True],
+                    v4_combined[v4_combined.isBTag == True]
+                ]
+        ):
+            m = ak.to_numpy(ak.sum(v4_mask, axis=1).mass)
+            m = np.where(m < 0, 0, m)  # set negative mass to 0
+            data_dict['INPUTS/Conditions/' + k] = m
+
         # Store matched indices
         for product, value in matched_index_dict.items():
             output_name = build_output_name(product, process, diagram, tag="TARGETS")
@@ -345,7 +375,6 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
                 data_dict[key_] = np.concatenate([data_dict[key_], np.array(list(h5fr[key_]))])
 
         h5fr.close()
-
 
     ##########################
     # Plot Basic Information #

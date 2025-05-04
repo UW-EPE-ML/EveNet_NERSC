@@ -17,12 +17,21 @@ class EveNetDataConverter:
             raw_data: dict,
             event_info: EventInfo,
             process: str,
+            rename_to: Optional[str] = None,
     ):
 
         self.raw_data = raw_data
         self.event_info = event_info
         self.process = process
+        self.rename_to = rename_to
         self.total_length = len(self.raw_data["INFO/VetoDoubleAssign"])
+
+        if self.rename_to:
+            for key in list(self.raw_data.keys()):
+                # print(f"Renaming {key} to {key.replace(self.process, self.rename_to)}")
+                if f'/{self.process}/' in key:
+                    new_key = key.replace(self.process, self.rename_to)
+                    self.raw_data[new_key] = self.raw_data.pop(key)
 
     def load_sources(self):
         label = "INPUTS"
@@ -37,9 +46,12 @@ class EveNetDataConverter:
                 log_scale = feature_info[2]
                 # print(k, log_scale)
                 if log_scale:
-                    features_ak.append(np.log(self.raw_data[k] + 1))
+                    if not (self.raw_data[k] >= 0).all():
+                        raise ValueError(f"Negative value found in {k}: {self.raw_data[k]}")
+
+                    features_ak.append(np.log1p(self.raw_data[k]).astype(np.float32))
                 else:
-                    features_ak.append(self.raw_data[k])
+                    features_ak.append(self.raw_data[k].astype(np.float32))
             features_ak = np.stack(features_ak, axis=-1)  # (num_events, num_features)
             mask_np = ~np.all(features_ak == 0, axis=-1)
 
@@ -61,15 +73,16 @@ class EveNetDataConverter:
         full_mask = np.zeros((num_events, n_targets), dtype=bool)
         index_mask = np.zeros((num_events, n_targets, max_daughters), dtype=bool)
 
+        process_name = self.process if self.rename_to is None else self.rename_to
         for row_idx, (process, product, daughters) in enumerate(assignment_map):
-            if process != self.process:
+            if process != process_name:
                 continue  # Skip if this target doesn't belong to current process
 
             if not daughters:
-                print(f"[WARN] No daughters for {process}/{product}, skipping.")
+                print(f"[WARN] No daughters for {process_name}/{product}, skipping.")
                 continue
 
-            target_prefix = f"{label}/{process}/{product}" if not direct_from_spanet else f"{label}/{product}"
+            target_prefix = f"{label}/{process_name}/{product}" if not direct_from_spanet else f"{label}/{product}"
             daughter_fields = [f"{target_prefix}/{d}" for d in daughters]
 
             try:
@@ -149,10 +162,14 @@ class EveNetDataConverter:
             data_selected['INFO/VetoDoubleAssign'], dtype=int
         ) + process_id
 
-        if process in self.event_info.event_mapping:
-            subprocess_id = list(self.event_info.event_mapping.keys()).index(process)
+        process_name = process
+        if 'rename_to' in process_info:
+            process_name = process_info['rename_to']
+        if process_name in self.event_info.event_mapping:
+            subprocess_id = list(self.event_info.event_mapping.keys()).index(process_name)
         else:
             subprocess_id = -1
+            print(f"[INFO] Process {process_name} not found in event mapping, using -1 as subprocess ID.")
         data_selected['METADATA/PROCESS'] = np.zeros_like(
             data_selected['INFO/VetoDoubleAssign'], dtype=int
         ) + subprocess_id
@@ -205,7 +222,7 @@ class EveNetDataConverter:
             i_raw = 0
             for keys in self.raw_data.keys():
                 if keys.startswith("REGRESSIONS") and "/v/MASK" in keys:
-                    x_inv_mask[:, i_raw] = self.raw_data[keys]
+                    # x_inv_mask[:, i_raw] = self.raw_data[keys]
 
                     for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
                         if norm == "empty":
@@ -222,8 +239,14 @@ class EveNetDataConverter:
                     if i_raw >= max_num_neutrinos:
                         break
 
+            num_leptons = self.raw_data['INPUTS/Conditions/nLepton']
             num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * i_raw
+
+            x_inv_mask = np.any(~np.isnan(x_inv), axis=-1) & (num_leptons >= num_raw_invisible)[:, None]
             num_valid_invisible = np.sum(x_inv_mask, axis=-1)
+            x_inv_mask = np.broadcast_to((num_valid_invisible == num_raw_invisible)[:,None], x_inv_mask.shape)
+
+            x_inv = np.nan_to_num(x_inv, nan=0.0)
 
         return {
             "invisible-data": x_inv,
