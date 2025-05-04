@@ -1,6 +1,6 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full"
-  number_of_workers: 16
+  number_of_workers: 32
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
@@ -12,13 +12,13 @@ wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
-  tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node", "Full", "69M", "Diffusion"]
+  tags: [ "Pretrain", "NERSC", "Multi-Node", "Full", "69M", "Diffusion"]
 
 options:
   default: options/options.yaml
 
   Training:
-    total_epochs: 5
+    total_epochs: 10
     epochs: 2
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion"
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=2.ckpt"
@@ -67,7 +67,7 @@ options:
         weight_decay: *wd
 
     ProgressiveTraining:
-      - name: "assignment"
+      - name: "everything"
         epoch_ratio: 1.0
         components:
           - body
@@ -79,6 +79,7 @@ options:
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
+    val_split: [0.7, 1.0]
 
 network:
   default: network/pretrain.yaml
