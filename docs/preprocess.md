@@ -46,15 +46,14 @@ For every sub-run folder:
     ```bash
     pretrain_dir="/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/data"
     output_dir="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/"
-    
-    # in case of `ModuleNotFoundError: No module named 'evenet'`
-    # use as module `python3 -m preprocessing.preprocess`
-    python3 EveNet/preprocessing/preprocess.py EveNet/share/preprocess_pretrain.yaml \
+
+    python3 preprocessing/preprocess.py share/preprocess_pretrain.yaml \
         --pretrain_dirs \
             ${pretrain_dir}/Run_2.Dec20 \
             ${pretrain_dir}/Run_2.Dec21 \
             ${pretrain_dir}/Run_2.Dec22 \
-        --store_dir ${output_dir}/run.20250504.69M | tee ${output_dir}/run.20250504.69M.log
+            ${pretrain_dir}/Run_2.Pretrain.20250505 \
+        --store_dir ${output_dir}/run.20250505.135M | tee ${output_dir}/run.20250505.135M.log
     ```
 
     This command will:
