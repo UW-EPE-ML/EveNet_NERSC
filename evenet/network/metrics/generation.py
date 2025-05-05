@@ -63,6 +63,7 @@ class GenerationMetrics:
             for name, special_bins in special_bin_configs.items():
                 self.special_bins[name] = np.linspace(special_bins[1], special_bins[2], special_bins[0])
                 self.special_bins_centers[name] = 0.5 * (self.special_bins[name][:-1] + self.special_bins[name][1:])
+
     @time_decorator(name="[Generation] update metrics")
     def update(
             self,
@@ -102,18 +103,19 @@ class GenerationMetrics:
             )
 
             generated_num_sequential_vectors = generated_distribution[..., 0]
-            generated_num_sequential_vectors = model.num_point_cloud_normalizer.denormalize(generated_num_sequential_vectors)
+            generated_num_sequential_vectors = model.num_point_cloud_normalizer.denormalize(
+                generated_num_sequential_vectors)
 
             predict_distribution["num_vectors"] = torch.floor(generated_num_sequential_vectors.flatten() + 0.5)
             truth_distribution["num_vectors"] = input_set['num_sequential_vectors'].flatten()
 
             if len(self.target_global_names) > 0:
                 generated_global = generated_distribution[..., 1:]
-                generated_global = model.global_normalizer.denormalize(generated_global, index = self.target_global_index)
+                generated_global = model.global_normalizer.denormalize(generated_global, index=self.target_global_index)
                 for idx, name in enumerate(self.target_global_names):
-
-                    predict_distribution[f"global-{name}"] =  generated_global[..., idx].flatten()
-                    truth_distribution[f"global-{name}"] = (input_set['conditions'][..., self.target_global_index[idx]]).flatten()
+                    predict_distribution[f"global-{name}"] = generated_global[..., idx].flatten()
+                    truth_distribution[f"global-{name}"] = (
+                        input_set['conditions'][..., self.target_global_index[idx]]).flatten()
 
                 if self.use_generation_result:
                     input_set = copy.deepcopy(input_set)
@@ -147,7 +149,8 @@ class GenerationMetrics:
             for i in range(data_shape[-1]):
                 if i in self.target_event_index:
                     masking[f"point cloud-{self.sequential_feature_names[i]}"] = input_set["x_mask"]
-                    predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[..., i]
+                    predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[
+                        ..., i]
                     truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
 
         if self.neutrino_generation:
@@ -232,7 +235,6 @@ class GenerationMetrics:
                 if distribution_name in self.special_bins:
                     hist_bins = self.special_bins[distribution_name]
 
-
                 hist, _ = np.histogram(pred, bins=hist_bins)
                 self.histogram[distribution_name][class_name] += hist
 
@@ -296,7 +298,6 @@ class GenerationMetrics:
 
         fig, ax = plt.subplots()
 
-
         jsd = dict()
         for cls, cls_name in enumerate(self.class_names):
             # Plot training histogram (bars)
@@ -330,9 +331,9 @@ class GenerationMetrics:
                 )
 
             if (np.sum(counts) > 0) and (np.sum(truth_counts) > 0):
-                p = truth_counts/np.sum(truth_counts)
+                p = truth_counts / np.sum(truth_counts)
                 q = counts / np.sum(counts)
-                jsd[cls_name] = (jensenshannon(p, q))**2
+                jsd[cls_name] = (jensenshannon(p, q)) ** 2
 
         ax.set_xlabel('Value')
         ax.set_ylabel('Frequency')
@@ -371,9 +372,13 @@ class GenerationMetrics:
             )
             for cls_name, score in jsd.items():
                 jsd_results[f"{name}-{cls_name}"] = score
-            
 
             for class_name in self.class_names:
+                if class_name not in jsd:
+                    continue
+                if 'neutrino' not in name:
+                    continue
+
                 fig = self.plot_histogram2d_func(
                     self.histogram_2d[name][class_name],
                     x_centers=bin_centers,
@@ -385,8 +390,15 @@ class GenerationMetrics:
         # Pearson correlation
         pearson_results = dict()
         for name in self.pearson_stats:
+            if 'neutrino' not in name:
+                continue
+
             pearson_results[name] = dict()
             for class_name in self.class_names:
+
+                if class_name not in jsd_results:
+                    continue
+
                 stats = self.pearson_stats[name][class_name]
                 n = stats['n']
                 numerator = n * stats['sum_xy'] - stats['sum_x'] * stats['sum_y']
@@ -473,7 +485,9 @@ def shared_step(
     loss_head_dict["generation-event"] = event_gen_loss
     loss_head_dict["generation-invisible"] = invisible_gen_loss
 
-    loss = (global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale + invisible_gen_loss * invisible_loss_scale) / len( outputs)
+    loss = (
+                   global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale + invisible_gen_loss * invisible_loss_scale) / len(
+        outputs)
     return loss, generation_loss
 
 
@@ -489,18 +503,41 @@ def shared_epoch_end(
         metrics_train.reduce_across_gpus()
 
     if global_rank == 0:
+        category_map = {
+            "neutrino-": "generation-invisible",
+            "point cloud-": "generation-event",
+            "global-": "generation-global"
+        }
         figs, extra, jsd_results = metrics_valid.plot_histogram()
         for name, fig in figs.items():
-            logger.log({f"generation/{name}": wandb.Image(fig)})
+
+            for prefix, category in category_map.items():
+                if prefix in name:
+                    tag = name.replace(prefix, "")
+                    logger.log({f"{category}/{tag}": wandb.Image(fig)})
+                    break
+
             plt.close(fig)
 
         for name in extra:
             for class_name, value in extra[name].items():
-                logger.log({f"generation/pearson_{name}_{class_name}": value})
-        for name in jsd_results:
-            for jsd_name, jsd_score in jsd_results.items():
-                logger.log({f"generation/jsd_{jsd_name}": jsd_score})
+                # logger.log({f"generation/pearson_{name}_{class_name}": value})
 
+                for prefix, category in category_map.items():
+                    if prefix in name:
+                        tag = name.replace(prefix, "")
+                        logger.log({f"{category}/pearson/{tag}_{class_name}": value})
+                        break
+
+        for _ in jsd_results:
+            for jsd_name, jsd_score in jsd_results.items():
+                # logger.log({f"generation/jsd_{jsd_name}": jsd_score})
+
+                for prefix, category in category_map.items():
+                    if prefix in jsd_name:
+                        tag = jsd_name.replace(prefix, "")
+                        logger.log({f"{category}/jsd/{tag}": jsd_score})
+                        break
 
     metrics_valid.reset()
     if metrics_train:
