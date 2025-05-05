@@ -197,8 +197,7 @@ class EveNetDataConverter:
         #
         # assert source_len == feature_len, "Mismatch in feature length, check Generation[Neutrinos] block in event_info"
 
-        x_inv = np.zeros((self.total_length, max_num_neutrinos, feature_len), dtype=np.float32)
-        x_inv_mask = np.zeros((self.total_length, max_num_neutrinos), dtype=bool)
+        x_inv = np.full((self.total_length, max_num_neutrinos, feature_len), np.nan, dtype=np.float32)
 
         if direct_from_spanet:
             # In SPANet output, neutrino features are already aligned neutrino-wise
@@ -242,9 +241,12 @@ class EveNetDataConverter:
             num_leptons = self.raw_data['INPUTS/Conditions/nLepton']
             num_raw_invisible = np.ones(self.total_length, dtype=np.int32) * i_raw
 
-            x_inv_mask = np.any(~np.isnan(x_inv), axis=-1) & (num_leptons >= num_raw_invisible)[:, None]
+            x_inv_mask = np.any(~np.isnan(x_inv), axis=-1)
+            lepton_sel = np.broadcast_to((num_leptons >= num_raw_invisible)[:, None], x_inv_mask.shape)
+            x_inv_mask = np.logical_and(x_inv_mask, lepton_sel)
             num_valid_invisible = np.sum(x_inv_mask, axis=-1)
-            x_inv_mask = np.broadcast_to((num_valid_invisible == num_raw_invisible)[:,None], x_inv_mask.shape)
+
+            x_inv_mask = np.logical_and(x_inv_mask, (num_valid_invisible == num_raw_invisible)[:, None])
 
             x_inv = np.nan_to_num(x_inv, nan=0.0)
 
