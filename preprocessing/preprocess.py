@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -129,8 +130,9 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     shape_metadata = None
 
+    cutflows = {}
     for process in global_config.process_info:
-    # for process in ["TT2L_mlm"]:
+    # for process in ["TT2L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -184,6 +186,45 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             **assignments,
             **regressions,
         }
+
+        # Apply Selections
+        sel_config = global_config.get("selections", {})
+        if "selections" in sel_config and "aliases" in sel_config and process in sel_config["selections"]:
+
+            aliases = sel_config["aliases"]
+            selection_map = sel_config["selections"]
+
+            def resolve_expr(expr: str):
+                """Resolve key to raw_data value."""
+                return converter.raw_data[expr]
+
+            def make_context(aliases):
+                return {alias: resolve_expr(key) for alias, key in aliases.items()}
+
+            def apply_selection(selection_name):
+                context = make_context(aliases)
+                mask = np.ones_like(next(iter(context.values())), dtype=bool)
+                cutflow = {
+                    "cut_0: all": np.count_nonzero(mask),
+                }
+
+                for i, expr in enumerate(selection_map[selection_name]):
+                    new_mask = mask & eval(expr, {"np": np}, context)
+                    passed = np.count_nonzero(new_mask)
+                    cutflow[f"cut_{i + 1}: {expr}"] = passed
+                    mask = new_mask
+
+                return mask, cutflow
+
+            selection_mask, cutflow = apply_selection(process)
+
+            # Apply mask to all NumPy arrays in process_data
+            process_data = {
+                k: v[selection_mask] if isinstance(v, np.ndarray) else v
+                for k, v in process_data.items()
+            }
+
+            cutflows[process] = cutflow
 
         flattened_data, meta_data = flatten_dict(process_data)
         # Count the number of unique processes
@@ -244,10 +285,10 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
         print(f"[Saving] Saving {final_table.num_rows} rows to {store_dir}/data_{unique_id}.parquet")
 
-        return converted_statistics
+        return converted_statistics, cutflows
 
     else:
-        return converted_statistics, final_table, shape_metadata
+        return converted_statistics, final_table, shape_metadata, cutflows
 
 
 def process_single_run(args):
@@ -258,9 +299,12 @@ def process_single_run(args):
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
     print(f"[INFO] Processing {in_tag}")
-    single_statistics = preprocess(run_folder, store_dir, process_info, unique_id=in_tag, cfg_dir=cfg_dir, save=True)
+    single_statistics, cut_flows = preprocess(
+        run_folder, store_dir, process_info,
+        unique_id=in_tag, cfg_dir=cfg_dir, save=True
+    )
 
-    return single_statistics
+    return single_statistics, cut_flows
 
 
 def run_parallel(cfg, cfg_dir, num_workers=8):
@@ -282,10 +326,22 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
 
     # Merge statistics
     PostProcessor.merge(
-        results,
+        [r[0] for r in results],
         regression_names=global_config.event_info.regression_names,
         saved_results_path=cfg.store_dir,
     )
+
+    # Merge cutflows
+    cutflows = defaultdict(lambda: defaultdict(int))
+
+    for result in results:
+        for process, cuts in result[1].items():
+            for cut, count in cuts.items():
+                cutflows[process][cut] += count
+
+    # save cutflows to json
+    with open(f"{cfg.store_dir}/cutflows.json", "w") as f:
+        json.dump(cutflows, f, indent=4)
 
 
 def main(cfg):
@@ -303,7 +359,7 @@ def main(cfg):
 
     else:
         in_tag = Path(cfg.in_dir).name
-        norm_stats = preprocess(
+        norm_stats, cutflows = preprocess(
             cfg.in_dir, cfg.store_dir, global_config.process_info, unique_id=in_tag,
             cfg_dir=cfg.preprocess_config, save=True
         )
@@ -316,6 +372,15 @@ def main(cfg):
             regression_names=global_config.event_info.regression_names,
             saved_results_path=cfg.store_dir,
         )
+
+        # print cutflows
+        for process, cutflow in cutflows.items():
+            for cut, count in cutflow.items():
+                print(f"{process}: {cut} => {count} events")
+
+        # save cutflows to json
+        with open(f"{cfg.store_dir}/cutflows.json", "w") as f:
+            json.dump(cutflows, f, indent=4)
 
 
 if __name__ == '__main__':
