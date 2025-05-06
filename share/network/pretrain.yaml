@@ -8,19 +8,19 @@ Body:
     linear_block_type: GRU
     transformer_dim_scale: 2.0
     initial_embedding_dim: 16
-    hidden_dim: 128
+    hidden_dim: 256
     normalization: LayerNorm
     linear_activation: GELU
-    num_embedding_layers: 3
+    num_embedding_layers: 4
     dropout: 0.1
     skip_connection: true
 
   PET:
     num_feature_keep: 0
     feature_drop: 0.0
-    hidden_dim: 128
+    hidden_dim: 256
     enable_local_embedding: true
-    local_Krank: 5
+    local_Krank: 3
     local_point_index:
       - 2
       - 3
