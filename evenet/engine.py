@@ -354,7 +354,7 @@ class EveNetEngine(L.LightningModule):
             update_metric=True,
         )
 
-        famo_loss = self.famo.step(loss_raw)
+        famo_loss, famo_logs = self.famo.step(loss_raw)
 
         # === Manual optimization ===
         for opt in optimizers:
@@ -386,8 +386,8 @@ class EveNetEngine(L.LightningModule):
 
             self.famo.update(loss_raw)
 
-        for k, v in self.famo.log().items():
-            self.log(k, v, prog_bar=False, sync_dist=True)
+        for k, v in famo_logs.items():
+            self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
 
         self.log("train/loss", loss.mean(), prog_bar=False, sync_dist=True)
         self.log("train/famo-loss", famo_loss.mean(), prog_bar=True, sync_dist=True)

@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import nn, Tensor
 from typing import Dict, List
 
 
@@ -29,7 +29,7 @@ class FAMO(nn.Module):
         self.prev_task_list = []
         self.prev_losses = None
 
-    def step(self, loss_dict: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def step(self, loss_dict: Dict[str, torch.Tensor]) -> tuple[Tensor, dict[str, Tensor]]:
         self.prev_task_list = list(loss_dict.keys())
         losses = torch.stack([loss_dict[k].flatten()[0] for k in self.prev_task_list])  # [N]
 
@@ -43,7 +43,11 @@ class FAMO(nn.Module):
         self.prev_losses = losses.detach()
 
         weighted_loss = (D.log() * weights / c).sum()
-        return weighted_loss
+        return weighted_loss, {
+            **{f'logits-{task}': logits[i] for i, task in enumerate(self.prev_task_list)},
+            **{f'weights-{task}': weights[i] for i, task in enumerate(self.prev_task_list)},
+            'entropy': -(weights * weights.log()).sum(),
+        }
 
     def update(self, current_loss_dict: Dict[str, torch.Tensor]) -> None:
         delta = []
@@ -72,14 +76,3 @@ class FAMO(nn.Module):
             self.w[k].grad = grads[i].unsqueeze(0)  # [1]
 
         self.optimizer.step()
-
-    def log(self, prefix: str = "famo") -> Dict[str, float]:
-        logits = torch.cat([self.w[k] for k in self.w])
-        weights = F.softmax(logits, dim=0)
-        log_data = {
-            f"{prefix}/weight_entropy": -(weights * weights.log()).sum().item()
-        }
-        for i, k in enumerate(self.w):
-            log_data[f"{prefix}/weight/{k}"] = weights[i].item()
-            log_data[f"{prefix}/logit/{k}"] = self.w[k].item()
-        return log_data
