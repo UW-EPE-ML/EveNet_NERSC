@@ -168,6 +168,9 @@ Training:
     mode: "min"
     verbose: true
 
+  FAMO:
+    lr: 0.025
+
 #  GradientNorm:
 #    alpha: 0.12
 #    learning_rate: 0.0001

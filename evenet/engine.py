@@ -24,6 +24,7 @@ from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
 from evenet.network.loss.grad_norm import GradNormController
+from evenet.network.loss.famo import FAMO
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
 from evenet.utilities.tool import get_transition
@@ -113,6 +114,7 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Loss ######
         self.grad_norm: Union[GradNormController, None] = None
+        self.famo: Union[FAMO, None] = None
 
         self.cls_loss = None
         if self.classification_cfg.include:
@@ -248,7 +250,7 @@ class EveNetEngine(L.LightningModule):
                 **self.ass_args['step']
             )
 
-            loss_raw['assignment'] = scaled_ass_loss
+            loss_raw['assignment'] = scaled_ass_loss.flatten()[0]
 
         if self.generation_include:
             scaled_gen_loss, detailed_gen_loss = gen_step(
@@ -303,7 +305,7 @@ class EveNetEngine(L.LightningModule):
 
         self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
 
-        return loss, loss_head_dict, loss_detailed_dict, ass_predicts
+        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -344,18 +346,21 @@ class EveNetEngine(L.LightningModule):
                 )
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _ = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
             loss_head_dict=loss_head,
             transition_factor=t,
+            update_metric=True,
         )
+
+        famo_loss = self.famo.step(loss_raw)
 
         # === Manual optimization ===
         for opt in optimizers:
             opt.zero_grad()
 
-        self.safe_manual_backward(loss.mean())
+        self.safe_manual_backward(famo_loss.mean())
 
         clip_grad_norm_(self.model.parameters(), 1.0)
 
@@ -370,7 +375,22 @@ class EveNetEngine(L.LightningModule):
         # -------------------------------------
         # logging
         # -------------------------------------
-        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
+        with torch.no_grad():
+            loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
+                batch=batch, batch_idx=batch_idx,
+                active_components=active_components,
+                loss_head_dict=loss_head,
+                transition_factor=t,
+                update_metric=False,
+            )
+
+            self.famo.update(loss_raw)
+
+        for k, v in self.famo.log().items():
+            self.log(k, v, prog_bar=False, sync_dist=True)
+
+        self.log("train/loss", loss.mean(), prog_bar=False, sync_dist=True)
+        self.log("train/famo-loss", famo_loss.mean(), prog_bar=True, sync_dist=True)
         for name, val in loss_head.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
@@ -380,7 +400,7 @@ class EveNetEngine(L.LightningModule):
 
         # self.current_step += 1
 
-        return loss.mean()
+        return famo_loss.mean()
 
     # @time_decorator
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -406,12 +426,12 @@ class EveNetEngine(L.LightningModule):
                 )
 
         _, loss_head = self.prepare_heads_loss()
-
-        loss, loss_head, loss_dict, _ = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
             loss_head_dict=loss_head,
             transition_factor=t,
+            update_metric=True,
         )
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
@@ -866,6 +886,19 @@ class EveNetEngine(L.LightningModule):
 
             print(f"{self.__class__.__name__} GRADIENT NORM Applied [Currently DISABLED for development]!")
             print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
+
+        ### Initialize FAMO ###
+        if self.famo is None and self.config.options.Training.get("FAMO", False):
+            self.famo = FAMO(
+                task_list=[
+                    "classification", "regression", "assignment", "generation",
+                ],
+                lr=self.config.options.Training.FAMO.get("lr", 0.025),
+                device=self.device
+            )
+            self.register_module("famo", self.famo)
+            print(f"{self.__class__.__name__} FAMO Applied!")
+            print("[WARNING] ❌Transition❌ will turn off with FAMO applied!")
 
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)
