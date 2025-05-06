@@ -839,6 +839,7 @@ def shared_step(
         subprocess_id,
         metrics: dict[str, SingleProcessAssignmentMetrics],
         process_to_topology: dict[str, dict[str, float]],
+        update_metric: bool = True,
 ):
     num_processes = len(event_permutations)
 
@@ -874,15 +875,16 @@ def shared_step(
             event_permutations=event_permutations[process],
         )
 
-        metrics[process].update(
-            best_indices=assignment_predict[process]["best_indices"],
-            assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
-            detection_probabilities=assignment_predict[process]["detection_probabilities"],
-            truth_indices=ass_target_metric[process],
-            truth_masks=ass_mask_metric[process],
-            inputs=point_cloud,
-            inputs_mask=point_cloud_mask,
-        )
+        if update_metric:
+            metrics[process].update(
+                best_indices=assignment_predict[process]["best_indices"],
+                assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
+                detection_probabilities=assignment_predict[process]["detection_probabilities"],
+                truth_indices=ass_target_metric[process],
+                truth_masks=ass_mask_metric[process],
+                inputs=point_cloud,
+                inputs_mask=point_cloud_mask,
+            )
 
         loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
         loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]

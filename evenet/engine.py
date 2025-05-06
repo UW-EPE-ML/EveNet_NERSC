@@ -174,10 +174,10 @@ class EveNetEngine(L.LightningModule):
         pass
 
     @time_decorator()
-    def shared_step(
-            self, batch: Any, batch_idx: int, active_components: dict[str, list[str]], loss_head_dict: dict,
-            transition_factor
-    ):
+    def shared_step(self, batch: Any, batch_idx: int,
+                    active_components: dict[str, list[str]], loss_head_dict: dict,
+                    transition_factor,
+                    update_metric: bool = True, ):
         batch_size = batch["x"].shape[0]
         device = self.device
 
@@ -202,6 +202,7 @@ class EveNetEngine(L.LightningModule):
                 loss_scale=self.classification_cfg.loss_scale,
                 metrics=self.classification_metrics_train if self.training else self.classification_metrics_valid,
                 device=device,
+                update_metric=update_metric,
             )
 
             loss_raw["classification"] = scaled_cls_loss
@@ -243,6 +244,7 @@ class EveNetEngine(L.LightningModule):
                 point_cloud=inputs['x'],
                 point_cloud_mask=inputs['x_mask'],
                 subprocess_id=inputs["subprocess_id"],
+                update_metric=update_metric,
                 **self.ass_args['step']
             )
 
@@ -269,6 +271,7 @@ class EveNetEngine(L.LightningModule):
                 ),
                 loss_head_dict=loss_head_dict,
                 invisible_padding=self.model.invisible_padding,
+                update_metric=update_metric,
             )
             loss_raw["generation"] = scaled_gen_loss
 

@@ -432,6 +432,7 @@ def shared_step(
         diffusion_on: bool = False,
 
         invisible_padding: int = 0,
+        update_metric: bool = True,
 ):
     generation_loss = dict()
 
@@ -472,7 +473,7 @@ def shared_step(
         elif generation_target == "point_cloud":
             event_gen_loss = event_gen_loss + generation_loss[generation_target]
 
-        if diffusion_on:
+        if diffusion_on and update_metric:
             gen_metrics.update(
                 model=model,
                 input_set=batch,

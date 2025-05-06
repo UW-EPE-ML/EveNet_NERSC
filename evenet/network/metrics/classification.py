@@ -222,6 +222,7 @@ class ClassificationMetrics:
 
         return results
 
+
 @time_decorator(name="[Classification] shared_step")
 def shared_step(
         target_classification: torch.Tensor,
@@ -232,6 +233,7 @@ def shared_step(
         loss_scale: float,
         metrics: ClassificationMetrics,
         device: torch.device,
+        update_metric: bool = True,
 ):
     cls_loss = cls_loss_fn(
         cls_output,
@@ -242,12 +244,14 @@ def shared_step(
     loss = cls_loss * loss_scale
     loss_dict["classification"] = cls_loss
 
-    metrics.update(
-        y_true=target_classification,
-        y_pred_raw=cls_output
-    )
+    if update_metric:
+        metrics.update(
+            y_true=target_classification,
+            y_pred_raw=cls_output
+        )
 
     return loss
+
 
 @time_decorator(name="[Classification] shared_epoch_end")
 def shared_epoch_end(
