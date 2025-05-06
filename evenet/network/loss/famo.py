@@ -55,7 +55,7 @@ class FAMO(nn.Module):
                 - torch.log(curr - self.min_losses[k].flatten()[0] + 1e-8)
             )
 
-            print(f"prev: {prev} curr: {curr} delta: {delta[-1]}")
+            # print(f"prev: {prev} curr: {curr} delta: {delta[-1]}")
         delta = torch.stack(delta)  # [N]
 
         # Instead of using weights saved from step()
@@ -63,11 +63,9 @@ class FAMO(nn.Module):
             logits = torch.stack([self.w[k] for k in self.prev_task_list]).squeeze(-1)
             weights = F.softmax(logits, dim=0)
 
-            print(f"logits: {logits} weights: {weights}")
+            # print(f"logits: {logits} weights: {weights}")
 
             grads = torch.autograd.grad(weights, [logits], grad_outputs=delta, retain_graph=False)[0]
-
-        print(delta, weights, grads)
 
         self.optimizer.zero_grad()
         for i, k in enumerate(self.prev_task_list):
