@@ -5,6 +5,7 @@ from typing import Dict, List
 
 
 class FAMO(nn.Module):
+    # https://github.com/Cranial-XIX/FAMO/tree/main
     def __init__(
         self,
         task_list: List[str],
