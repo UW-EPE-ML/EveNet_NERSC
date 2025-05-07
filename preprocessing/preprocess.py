@@ -9,6 +9,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 import numpy as np
+import pandas as pd
 from multiprocessing import Pool, cpu_count
 
 from evenet.control.global_config import global_config
@@ -115,6 +116,36 @@ def unflatten_dict(
 
     return reconstructed
 
+def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
+    # First build the DataFrame with basic stats
+    summary_data = []
+    for process, cuts in cutflows.items():
+        cut0 = cuts["cut_0: all"]
+        final = list(cuts.values())[-1]
+        efficiency = final / cut0 if cut0 else 0
+        summary_data.append({
+            "Process": process,
+            "Initial": cut0,
+            "Final": final,
+            "Eff.": efficiency
+        })
+
+    df = pd.DataFrame(summary_data)
+
+    # Now compute portions
+    total_cut0 = df["Initial"].sum()
+    total_final = df["Final"].sum()
+
+    df["I. Portion [%]"] = df["Initial"] / total_cut0
+    df["F. Portion [%]"] = df["Final"] / total_final
+
+    def format_float(x):
+        return f"{x:.2%}" if isinstance(x, float) else x
+
+    analyzed_str = df.to_string(float_format=format_float, index=False)
+    print(analyzed_str)
+
+    return analyzed_str
 
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
@@ -339,6 +370,9 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
             for cut, count in cuts.items():
                 cutflows[process][cut] += count
 
+    analyzed_str = analyze_cutflow(cutflows)
+    with open(f"{cfg.store_dir}/cutflow_summary.txt", "w") as f:
+        f.write(analyzed_str)
     # save cutflows to json
     with open(f"{cfg.store_dir}/cutflows.json", "w") as f:
         json.dump(cutflows, f, indent=4)
@@ -378,6 +412,10 @@ def main(cfg):
             for cut, count in cutflow.items():
                 print(f"{process}: {cut} => {count} events")
 
+        # analyze cutflow(cutflows)
+        analyzed_str = analyze_cutflow(cutflows)
+        with open(f"{cfg.store_dir}/cutflow_summary.txt", "w") as f:
+            f.write(analyzed_str)
         # save cutflows to json
         with open(f"{cfg.store_dir}/cutflows.json", "w") as f:
             json.dump(cutflows, f, indent=4)
