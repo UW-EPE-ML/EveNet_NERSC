@@ -909,6 +909,7 @@ class EveNetEngine(L.LightningModule):
             lr=self.config.options.Training.FAMO.get("lr", 0.025),
             device=self.device,
             turn_on=self.include_famo,
+            logits_bound=self.config.options.Training.FAMO.get("logits_bound", 1.0),
         ))
         print(f"[FAMO] {self.__class__.__name__} FAMO Applied? --> {self.include_famo}")
         print(f"[FAMO]  ✅FAMO✅ will be applied to {famo_task_list}!")

@@ -13,11 +13,13 @@ class FAMO(nn.Module):
             lr: float = 0.025,
             gamma: float = 0.01,
             turn_on: bool = True,
+            logits_bound: float = 1.0,
     ):
         super().__init__()
         self.device = device
         self.task_list = task_list
         self.turn_on = turn_on
+        self.logits_bound = logits_bound
 
         # Parameters (logits) for each task
         self.w = nn.ParameterDict({
@@ -53,7 +55,8 @@ class FAMO(nn.Module):
         if not self.turn_on:
             return losses.sum(), default_log
 
-        logits = torch.cat([self.w[k] for k in self.prev_task_list])  # [N]
+        logits = torch.stack([self.w[k] for k in self.prev_task_list]).squeeze(-1)
+        logits = self.logits_bound * torch.tanh(logits)
         weights = F.softmax(logits, dim=0)  # [N]
 
         min_vec = torch.stack([self.min_losses[k].flatten()[0] for k in self.prev_task_list])
@@ -94,9 +97,10 @@ class FAMO(nn.Module):
             # print(f"prev: {prev} curr: {curr} delta: {delta[-1]}")
         delta = torch.stack(delta)  # [N]
 
-        # Instead of using weights saved from step()
         with torch.enable_grad():
             logits = torch.stack([self.w[k] for k in self.prev_task_list]).squeeze(-1)
+            logits = self.logits_bound * torch.tanh(logits)
+
             weights = F.softmax(logits, dim=0)
 
             # print(f"logits: {logits} weights: {weights}")

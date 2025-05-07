@@ -178,6 +178,7 @@ Training:
       - generation-invisible
       - assignment
       - detection
+    logits_bound: 1.0
     lr: 0.025
 
 #  GradientNorm:
