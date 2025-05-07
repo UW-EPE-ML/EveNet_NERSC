@@ -426,12 +426,12 @@ class EveNetEngine(L.LightningModule):
         )
 
         # 🔁 Manually sync gradients (if DDP is used)
-        # if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
-        #     world_size = torch.distributed.get_world_size()
-        #     for param in self.model.parameters():
-        #         if param.grad is not None:
-        #             torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM)
-        #             param.grad /= world_size
+        if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
+            world_size = torch.distributed.get_world_size()
+            for param in self.model.parameters():
+                if param.grad is not None:
+                    torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM)
+                    param.grad /= world_size
 
         # ✅ Now you can safely apply gradients
         clip_grad_norm_(self.model.parameters(), 1.0)
@@ -494,10 +494,12 @@ class EveNetEngine(L.LightningModule):
             return True
 
         if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
-            print("Checking param sync...")
-            check_ddp_param_sync(self.model)
-            print("Checking grad sync...")
-            check_ddp_grad_sync(self.model)
+            if self.current_step % 500 == 0:
+                print(f"[RANK {torch.distributed.get_rank()}] Checking DDP sync...")
+                print("Checking param sync...")
+                check_ddp_param_sync(self.model)
+                print("Checking grad sync...")
+                check_ddp_grad_sync(self.model)
 
         return final_loss.mean()
 
