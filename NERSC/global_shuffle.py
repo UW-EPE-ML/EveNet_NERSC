@@ -59,7 +59,7 @@ def main():
             "num_cpus": 0.5,
         },
     )
-    logging.info(f"Dataset loaded with {ds.count()} rows across {ds.num_blocks()} blocks.")
+    logging.info(f"Dataset loaded with {ds.count()} rows")
 
     logging.info("Shuffling dataset globally...")
     ds_shuffled = ds.random_shuffle()
