@@ -5,10 +5,10 @@ from pathlib import Path
 
 import ray
 import ray.data
-from ray.data.context import DataContext
+from ray.data import Dataset
 
 
-def setup_logging():
+def setup_logging() -> None:
     logging.basicConfig(
         format="%(asctime)s [%(levelname)s] %(message)s",
         level=logging.INFO,
@@ -16,70 +16,74 @@ def setup_logging():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Globally shuffle a large Parquet dataset with Ray.")
+    parser = argparse.ArgumentParser(description="Two-pass partial shuffle for large Parquet datasets.")
     parser.add_argument("n_cpus", type=int, help="Number of CPUs to use")
-    parser.add_argument("input_folder", type=Path, help="Path to input folder containing Parquet files")
-    parser.add_argument("n_parts", type=int, help="Number of output parts to save the shuffled dataset")
+    parser.add_argument("input_folder", type=Path, help="Input folder containing Parquet files")
+    parser.add_argument("n_parts", type=int, help="Number of parts to save final output")
+    parser.add_argument("--first_shuffle_percent", type=float, default=1.0,
+                        help="First pass shuffle buffer size (percent of rows)")
+    parser.add_argument("--second_shuffle_percent", type=float, default=5.0,
+                        help="Second pass shuffle buffer size (percent of rows)")
     return parser.parse_args()
+
+
+def copy_non_parquet_files(src: Path, dst: Path) -> None:
+    for file in src.iterdir():
+        if file.is_file() and file.suffix != ".parquet":
+            shutil.copy(file, dst)
+            logging.info(f"Copied non-parquet file: {file.name}")
+
+
+def compute_buffer_sizes(ds: Dataset, first_pct: float, second_pct: float) -> tuple[int, int, int]:
+    total_rows = ds.count()
+    first_buf = int(total_rows * (first_pct / 100))
+    second_buf = int(total_rows * (second_pct / 100))
+    logging.info(f"Dataset has {total_rows:,} rows.")
+    logging.info(f"Stage 1 buffer size: {first_buf:,} rows (~{first_pct}%)")
+    logging.info(f"Stage 2 buffer size: {second_buf:,} rows (~{second_pct}%)")
+    return total_rows, first_buf, second_buf
+
+
+def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, prefix: str = "part") -> int:
+    count = 0
+    for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size):
+        ray.data.from_pandas(batch).write_parquet(output_dir / f"{prefix}_{count:05d}")
+        count += 1
+    return count
 
 
 def main():
     setup_logging()
     args = parse_args()
 
-    input_folder = args.input_folder.resolve()
-    output_folder = input_folder.parent / f"{input_folder.name}_shuffled"
-    output_folder.mkdir(parents=True, exist_ok=True)
+    input_dir = args.input_folder.resolve()
+    temp_dir = input_dir.parent / f"{input_dir.name}_shuffle_temp"
+    output_dir = input_dir.parent / f"{input_dir.name}_shuffled"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    logging.info(f"Initializing Ray with {args.n_cpus} CPUs...")
-    ray.init(
-        num_cpus=args.n_cpus,
-        _memory=250 * 1024 * 1024 * 1024,  # 30 GB object store
-        runtime_env={"env_vars": {"RAY_memory_monitor_refresh_ms": "5000"}},
-        # include_dashboard=True,
+    ray.init(num_cpus=args.n_cpus, include_dashboard=True)
+    logging.info(f"Shuffling data from {input_dir} to {output_dir} using {args.n_cpus} CPUs...")
+
+    copy_non_parquet_files(input_dir, output_dir)
+
+    parquet_files = list(input_dir.glob("*.parquet"))
+    ds = ray.data.read_parquet([str(f) for f in parquet_files], shuffle="files")
+    total_rows, first_buffer, second_buffer = compute_buffer_sizes(
+        ds, args.first_shuffle_percent, args.second_shuffle_percent
     )
-    # Enable push-based shuffle
-    ctx = DataContext.get_current()
-    ctx.use_push_based_shuffle = True
-    ctx.optimize_fuse_read_stages = True
-    ctx.streaming_read = True
 
-    # List all Parquet files
-    parquet_files = sorted([f for f in input_folder.glob("*.parquet")])
-    if not parquet_files:
-        raise RuntimeError(f"No .parquet files found in {input_folder}")
-    logging.info(f"Found {len(parquet_files)} parquet files.")
+    logging.info("Stage 1: Partial shuffle and write to temp...")
+    stage1_parts = save_batches(ds, first_buffer, temp_dir, prefix="temp")
+    logging.info(f"Stage 1 complete: wrote {stage1_parts} temp batches.")
 
-    # Copy non-Parquet files to output
-    non_parquet_files = [f for f in input_folder.iterdir() if f.is_file() and f.suffix != ".parquet"]
-    for f in non_parquet_files:
-        shutil.copy(f, output_folder)
-        logging.info(f"Copied non-parquet file: {f.name}")
+    logging.info("Stage 2: Re-shuffle from temp and write final output...")
+    temp_files = list(temp_dir.rglob("*.parquet"))
+    ds2 = ray.data.read_parquet([str(f) for f in temp_files],shuffle="files")
+    stage2_parts = save_batches(ds2, second_buffer, output_dir, prefix="part")
+    logging.info(f"Stage 2 complete: wrote {stage2_parts} final batches.")
 
-    # Read and shuffle dataset
-    logging.info("Reading dataset into Ray...")
-    ds = ray.data.read_parquet(
-        [str(f) for f in parquet_files],
-        # override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
-        ray_remote_args={
-            "num_cpus": 0.5,
-        },
-    )
-    logging.info(f"Dataset loaded with {ds.count()} rows")
-
-    logging.info("Shuffling dataset globally...")
-    ds_shuffled = ds.random_shuffle()
-
-    logging.info(f"Repartitioning into {args.n_parts} parts...")
-    ds_shuffled = ds_shuffled.repartition(args.n_parts)
-
-    logging.info(f"Saving shuffled dataset to: {output_folder}")
-    ds_shuffled.write_parquet(str(output_folder))
-
-    stats = ray.data.DataContext.get_current().stats
-    logging.info("Shuffling and saving complete.")
-    logging.info(f"Dataset stats:\n{stats}")
-
+    logging.info(f"✅ Final shuffled dataset saved to {output_dir}")
     ray.shutdown()
 
 
