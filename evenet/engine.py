@@ -112,6 +112,8 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Loss ######
         self.grad_norm: Union[GradNormController, None] = None
+        self.include_famo: bool = self.config.options.Training.get("FAMO", {}).get("turn_on", False)
+        self.famo_detailed_loss: bool = self.config.options.Training.FAMO.get("detailed_loss", False)
 
         self.cls_loss = None
         if self.classification_cfg.include:
@@ -302,6 +304,10 @@ class EveNetEngine(L.LightningModule):
 
         self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
 
+        for name in loss_raw:
+            if name not in active_components['current'] and active_components['current']:
+                loss_raw[name] = loss_raw[name] * 0.0
+
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw
 
     @time_decorator()
@@ -351,13 +357,17 @@ class EveNetEngine(L.LightningModule):
             update_metric=True,
         )
 
-        famo_loss, famo_logs = self.model.famo.step(loss_raw)
+        final_loss = loss
+        famo_logs = None
+        if self.include_famo:
+            in_loss = loss_head if self.famo_detailed_loss else loss_raw
+            final_loss, famo_logs = self.model.famo.step(in_loss)
 
         # === Manual optimization ===
         for opt in optimizers:
             opt.zero_grad()
 
-        self.safe_manual_backward(famo_loss.mean())
+        self.safe_manual_backward(final_loss.mean())
 
         clip_grad_norm_(self.model.parameters(), 1.0)
 
@@ -372,22 +382,23 @@ class EveNetEngine(L.LightningModule):
         # -------------------------------------
         # logging
         # -------------------------------------
-        with torch.no_grad():
-            loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
-                batch=batch, batch_idx=batch_idx,
-                active_components=active_components,
-                loss_head_dict=loss_head,
-                transition_factor=t,
-                update_metric=False,
-            )
+        if self.include_famo:
+            with torch.no_grad():
+                loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
+                    batch=batch, batch_idx=batch_idx,
+                    active_components=active_components,
+                    loss_head_dict=loss_head,
+                    transition_factor=t,
+                    update_metric=False,
+                )
+                in_loss = loss_head if self.famo_detailed_loss else loss_raw
+                self.model.famo.update(in_loss)
 
-            self.model.famo.update(loss_raw)
+            for k, v in famo_logs.items():
+                self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
+                self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
-        for k, v in famo_logs.items():
-            self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
-
-        self.log("train/loss", loss.mean(), prog_bar=False, sync_dist=True)
-        self.log("train/famo-loss", famo_loss.mean(), prog_bar=True, sync_dist=True)
+        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
         for name, val in loss_head.items():
             self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
 
@@ -397,7 +408,7 @@ class EveNetEngine(L.LightningModule):
 
         # self.current_step += 1
 
-        return famo_loss.mean()
+        return final_loss.mean()
 
     # @time_decorator
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -617,7 +628,20 @@ class EveNetEngine(L.LightningModule):
         pass
 
     def on_train_epoch_start(self) -> None:
-        pass
+        # Remove completed progressive stages
+        while len(self.progressive_training) > 0 and self.current_epoch >= self.progressive_training[0]["epoch"]:
+            self.previous_progress = self.progressive_training.pop(0)
+            self.progressive_index += 1
+
+        # Log for debugging
+        if len(self.progressive_training) > 0:
+            print(
+                f"[ProgressiveTraining] Current Epoch: {self.current_epoch}, "
+                f"Next Stage Target Epoch: {self.progressive_training[0]['epoch']}, "
+                f"Next Stage Name: {self.progressive_training[0]['name']}"
+            )
+        else:
+            print(f"[ProgressiveTraining] All progressive stages completed at epoch {self.current_epoch}.")
 
     @time_decorator()
     def on_validation_epoch_end(self) -> None:
@@ -651,16 +675,7 @@ class EveNetEngine(L.LightningModule):
     @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
-
         self.log("progress", self.progressive_index, prog_bar=True, sync_dist=False)
-
-        if len(self.progressive_training) > 0:
-            print(f"--> Current Epoch: {self.current_epoch}, Target: {self.progressive_training[0]['epoch']}")
-            if self.current_epoch + 1 == self.progressive_training[0]['epoch']:
-                self.previous_progress = self.progressive_training.pop(0)
-                self.progressive_index += 1
-
-        pass
 
     @time_decorator()
     def safe_manual_backward(self, loss, *args, **kwargs):
@@ -764,7 +779,6 @@ class EveNetEngine(L.LightningModule):
                 "frequency": 1,
                 "name": f"lr-{name}"
             })
-
 
         # Add FAMO optimizer
         if hasattr(self.model, "famo") and hasattr(self.model.famo, "optimizer"):
@@ -886,16 +900,20 @@ class EveNetEngine(L.LightningModule):
             print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
 
         ### Initialize FAMO ###
-        if self.config.options.Training.get("FAMO", False):
-            self.model.register_module('famo', FAMO(
-                task_list=[
-                    "classification", "regression", "assignment", "generation",
-                ],
-                lr=self.config.options.Training.FAMO.get("lr", 0.025),
-                device=self.device
-            ))
-            print(f"[FAMO] {self.__class__.__name__} FAMO Applied!")
-            print("[FAMO]  ❌Transition❌ will turn off with FAMO applied!")
+        famo_task_list = ["classification", "regression", "assignment", "generation"]
+        if self.include_famo and self.famo_detailed_loss:
+            _, detailed_loss = self.prepare_heads_loss()
+            famo_task_list = detailed_loss.keys()
+
+        self.model.register_module('famo', FAMO(
+            task_list=famo_task_list,
+            lr=self.config.options.Training.FAMO.get("lr", 0.025),
+            device=self.device,
+            turn_on=self.include_famo,
+        ))
+        print(f"[FAMO] {self.__class__.__name__} FAMO Applied? --> {self.include_famo}")
+        print(f"[FAMO]  ✅FAMO✅ will be applied to {famo_task_list}!")
+        print(f"[FAMO]  ❌Transition❌ will turn off if FAMO applied!")
 
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)

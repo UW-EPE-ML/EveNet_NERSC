@@ -169,6 +169,8 @@ Training:
     verbose: true
 
   FAMO:
+    turn_on: false
+    detailed_loss: false
     lr: 0.025
 
 #  GradientNorm:
