@@ -43,7 +43,6 @@ def main():
     ctx.use_push_based_shuffle = True
     ctx.optimize_fuse_read_stages = True
     ctx.streaming_read = True
-    ctx.execution_options = {"verbose_progress": True}
 
     # List all Parquet files
     parquet_files = sorted([f for f in input_folder.glob("*.parquet")])
