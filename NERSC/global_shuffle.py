@@ -5,6 +5,7 @@ from pathlib import Path
 
 import ray
 import ray.data
+from ray.data.context import DataContext
 
 
 def setup_logging():
@@ -37,6 +38,8 @@ def main():
         runtime_env={"env_vars": {"RAY_memory_monitor_refresh_ms": "5000"}},
         # include_dashboard=True,
     )
+    ctx = ray.data.DataContext.get_current()
+    ctx.use_push_based_shuffle = True
 
     # List all Parquet files
     parquet_files = sorted([f for f in input_folder.glob("*.parquet")])
