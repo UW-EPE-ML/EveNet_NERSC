@@ -1,6 +1,6 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M"
-  number_of_workers: 4
+  number_of_workers: 32
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
@@ -79,7 +79,7 @@ options:
     FAMO:
       turn_on: true
       detailed_loss: true
-      lr: 0.025
+      lr: 0.001
 
   Dataset:
     dataset_limit: 1.0
