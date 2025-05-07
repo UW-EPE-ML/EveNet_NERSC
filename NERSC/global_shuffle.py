@@ -33,7 +33,7 @@ def main():
     logging.info(f"Initializing Ray with {args.n_cpus} CPUs...")
     ray.init(
         num_cpus=args.n_cpus,
-        # _memory=30 * 1024 * 1024 * 1024,  # 30 GB object store
+        _memory=250 * 1024 * 1024 * 1024,  # 30 GB object store
         runtime_env={"env_vars": {"RAY_memory_monitor_refresh_ms": "5000"}},
         # include_dashboard=True,
     )
