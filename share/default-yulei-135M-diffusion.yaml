@@ -27,7 +27,7 @@ options:
     diffusion_every_n_epochs: 1 # how often to run diffusion
     diffusion_every_n_steps: 100 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.00005
+    learning_rate: &lr 0.00003
     weight_decay: &wd 0.001
     Components:
       GlobalEmbedding:
@@ -79,7 +79,15 @@ options:
     FAMO:
       turn_on: true
       detailed_loss: true
-      lr: 0.001
+      detailed_loss_list:
+        - classification
+        - generation-global
+        - generation-event
+        - generation-invisible
+        - assignment
+        - detection
+
+      lr: 0.025
 
   Dataset:
     dataset_limit: 1.0

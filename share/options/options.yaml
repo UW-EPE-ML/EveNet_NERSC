@@ -171,6 +171,13 @@ Training:
   FAMO:
     turn_on: false
     detailed_loss: false
+    detailed_loss_list:
+      - classification
+      - generation-global
+      - generation-event
+      - generation-invisible
+      - assignment
+      - detection
     lr: 0.025
 
 #  GradientNorm:

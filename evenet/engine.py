@@ -902,8 +902,7 @@ class EveNetEngine(L.LightningModule):
         ### Initialize FAMO ###
         famo_task_list = ["classification", "regression", "assignment", "generation"]
         if self.include_famo and self.famo_detailed_loss:
-            _, detailed_loss = self.prepare_heads_loss()
-            famo_task_list = detailed_loss.keys()
+            famo_task_list = self.config.options.Training.FAMO.detailed_loss_list
 
         self.model.register_module('famo', FAMO(
             task_list=famo_task_list,
