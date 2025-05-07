@@ -898,8 +898,8 @@ def shared_step(
             loss_dict[ass_name] = loss_dict[ass_name] + topo_weight * ass_total
             active_heads_sum[ass_name] += topo_weight
 
-    loss_dict['assignment'] = assignment_loss / num_processes * assignment_loss_scale
-    loss_dict['detection'] = detected_loss / num_processes * detection_loss_scale
+    loss_dict['assignment'] = (assignment_loss / num_processes * assignment_loss_scale).mean()
+    loss_dict['detection'] = (detected_loss / num_processes * detection_loss_scale).mean()
 
     for actives, active_sum in active_heads_sum.items():
         loss_dict[actives] = loss_dict[actives] / active_sum
