@@ -395,7 +395,6 @@ class EveNetEngine(L.LightningModule):
                 self.model.famo.update(in_loss)
 
             for k, v in famo_logs.items():
-                print(k)
                 self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
