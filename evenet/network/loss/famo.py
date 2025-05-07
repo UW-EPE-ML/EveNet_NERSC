@@ -62,8 +62,8 @@ class FAMO(nn.Module):
         # print(f"weights: {weights} logits: {logits}")
 
         return weighted_loss, {
-            **{f'logits-{task}': logits[i] for i, task in enumerate(self.prev_task_list)},
-            **{f'weights-{task}': weights[i] for i, task in enumerate(self.prev_task_list)},
+            **{f'logits-{task}': logits[i] for i, task in enumerate(self.w.keys())},
+            **{f'weights-{task}': weights[i] for i, task in enumerate(self.w.keys())},
             'entropy': -(weights * weights.log()).sum(),
         }
 
