@@ -52,7 +52,13 @@ def main():
 
     # Read and shuffle dataset
     logging.info("Reading dataset into Ray...")
-    ds = ray.data.read_parquet([str(f) for f in parquet_files])
+    ds = ray.data.read_parquet(
+        [str(f) for f in parquet_files],
+        # override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
+        ray_remote_args={
+            "num_cpus": 0.5,
+        },
+    )
     logging.info(f"Dataset loaded with {ds.count()} rows across {ds.num_blocks()} blocks.")
 
     logging.info("Shuffling dataset globally...")
