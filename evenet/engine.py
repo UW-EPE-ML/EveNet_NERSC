@@ -23,7 +23,6 @@ from evenet.network.metrics.assignment import shared_step as ass_step, shared_ep
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
-from evenet.network.loss.grad_norm import GradNormController
 from evenet.network.loss.famo import FAMO
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
@@ -111,7 +110,6 @@ class EveNetEngine(L.LightningModule):
         self.neutrino_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
 
         ###### Initialize Loss ######
-        self.grad_norm: Union[GradNormController, None] = None
         self.include_famo: bool = self.config.options.Training.get("FAMO", {}).get("turn_on", False)
         self.famo_detailed_loss: bool = self.config.options.Training.FAMO.get("detailed_loss", False)
 
@@ -533,13 +531,6 @@ class EveNetEngine(L.LightningModule):
     def on_fit_start(self) -> None:
         self.current_step = 0
 
-        # for i, (name, param) in enumerate(self.model.named_parameters()):
-        #     if param.requires_grad:
-        #         print(f"[Rank {torch.distributed.get_rank()}] {name}: {param.view(-1)[:5]}")
-        #
-        #     if i == 3:
-        #         break
-
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
                 num_classes=len(self.num_classes), normalize=True, device=self.device
@@ -882,22 +873,6 @@ class EveNetEngine(L.LightningModule):
                     print(f"  --> Optimizer: {component} ✅")
                 else:
                     print(f"  --> Optimizer: {component} ❌")
-
-        ### Initialize Gradient Norm ###
-        ### DISABLED for now ###
-        if self.grad_norm is None and self.config.options.Training.get("GradientNorm", False):
-            self.grad_norm = GradNormController(
-                task_names=[
-                    "classification",
-                    "regression",
-                    *[f"assignment_{name}" for name in self.config.resonance],
-                ],
-                **self.config.options.Training.GradientNorm,
-            )
-            self.register_module("grad_norm", self.grad_norm)
-
-            print(f"{self.__class__.__name__} GRADIENT NORM Applied [Currently DISABLED for development]!")
-            print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
 
         ### Initialize FAMO ###
         famo_task_list = ["classification", "regression", "assignment", "generation"]
