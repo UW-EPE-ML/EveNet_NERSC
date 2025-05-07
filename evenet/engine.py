@@ -48,8 +48,6 @@ class EveNetEngine(L.LightningModule):
         self.steps_per_epoch = None
         self.total_steps = None
         self.current_step = None  # hack global_step due to incorrect behavior in lightning for multiple optimizers
-        self.optimizer_name_map = None
-        self.optimizer_name_list = []
         self.classification_metrics_train = None
         self.classification_metrics_valid = None
         self.assignment_metrics_train = None
@@ -114,7 +112,6 @@ class EveNetEngine(L.LightningModule):
 
         ###### Initialize Loss ######
         self.grad_norm: Union[GradNormController, None] = None
-        self.famo: Union[FAMO, None] = None
 
         self.cls_loss = None
         if self.classification_cfg.include:
@@ -354,7 +351,7 @@ class EveNetEngine(L.LightningModule):
             update_metric=True,
         )
 
-        famo_loss, famo_logs = self.famo.step(loss_raw)
+        famo_loss, famo_logs = self.model.famo.step(loss_raw)
 
         # === Manual optimization ===
         for opt in optimizers:
@@ -384,7 +381,7 @@ class EveNetEngine(L.LightningModule):
                 update_metric=False,
             )
 
-            self.famo.update(loss_raw)
+            self.model.famo.update(loss_raw)
 
         for k, v in famo_logs.items():
             self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
@@ -767,11 +764,12 @@ class EveNetEngine(L.LightningModule):
                 "frequency": 1,
                 "name": f"lr-{name}"
             })
-            self.optimizer_name_list.append(name)
 
-        self.optimizer_name_map = {
-            name: idx for idx, name in enumerate(self.optimizer_name_list)
-        }
+
+        # Add FAMO optimizer
+        if hasattr(self.model, "famo") and hasattr(self.model.famo, "optimizer"):
+            print(f"[FAMO] --> Adding FAMO optimizer")
+            optimizers.append(self.model.famo.optimizer)
 
         return optimizers, schedulers
 
@@ -888,17 +886,16 @@ class EveNetEngine(L.LightningModule):
             print(f"  --> GRADIENT NORM List: {self.grad_norm.task_names}")
 
         ### Initialize FAMO ###
-        if self.famo is None and self.config.options.Training.get("FAMO", False):
-            self.famo = FAMO(
+        if self.config.options.Training.get("FAMO", False):
+            self.model.register_module('famo', FAMO(
                 task_list=[
                     "classification", "regression", "assignment", "generation",
                 ],
                 lr=self.config.options.Training.FAMO.get("lr", 0.025),
                 device=self.device
-            )
-            self.register_module("famo", self.famo)
-            print(f"{self.__class__.__name__} FAMO Applied!")
-            print("[WARNING] ❌Transition❌ will turn off with FAMO applied!")
+            ))
+            print(f"[FAMO] {self.__class__.__name__} FAMO Applied!")
+            print("[FAMO]  ❌Transition❌ will turn off with FAMO applied!")
 
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)
