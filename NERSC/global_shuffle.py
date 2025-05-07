@@ -38,8 +38,12 @@ def main():
         runtime_env={"env_vars": {"RAY_memory_monitor_refresh_ms": "5000"}},
         # include_dashboard=True,
     )
-    ctx = ray.data.DataContext.get_current()
+    # Enable push-based shuffle
+    ctx = DataContext.get_current()
     ctx.use_push_based_shuffle = True
+    ctx.optimize_fuse_read_stages = True
+    ctx.streaming_read = True
+    ctx.execution_options = {"verbose_progress": True}
 
     # List all Parquet files
     parquet_files = sorted([f for f in input_folder.glob("*.parquet")])
