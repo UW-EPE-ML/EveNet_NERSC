@@ -423,6 +423,7 @@ class EveNetEngine(L.LightningModule):
             tasks_params=task_param_sets,
             shared_params=shared_params,
             retain_graph=True,
+            parallel_chunk_size=1,
         )
 
         clip_grad_norm_(self.model.parameters(), 1.0)
