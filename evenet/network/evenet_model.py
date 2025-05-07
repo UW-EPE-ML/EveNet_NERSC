@@ -557,7 +557,8 @@ class EveNetModel(nn.Module):
             "detections": outputs.get("deterministic", {}).get("detections", None),
             "classification-noised": outputs.get("generation", {}).get("classification", None),
             "regression-noised": outputs.get("generation", {}).get("regression", None),
-            "generations": generations
+            "generations": generations,
+            "full_input_point_cloud": full_input_point_cloud,
         }
 
     def predict_diffusion_vector(

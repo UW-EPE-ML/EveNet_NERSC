@@ -28,6 +28,9 @@ from evenet.network.loss.famo import FAMO
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
 from evenet.utilities.tool import get_transition
 
+from torchjd import mtl_backward
+from torchjd.aggregation import UPGrad
+
 
 def get_total_gradient(module, norm_type="l1"):
     total = 0.0
@@ -43,6 +46,7 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.aggregator = None
         self.sampler = None
         self.steps_per_epoch = None
         self.total_steps = None
@@ -306,7 +310,7 @@ class EveNetEngine(L.LightningModule):
             if name not in active_components['current'] and active_components['current']:
                 loss_raw[name] = loss_raw[name] * 0.0
 
-        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw
+        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, outputs['full_input_point_cloud']
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -347,7 +351,7 @@ class EveNetEngine(L.LightningModule):
                 )
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw, full_input_point_cloud = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
             loss_head_dict=loss_head,
@@ -365,7 +369,61 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        self.safe_manual_backward(final_loss.mean())
+        # self.safe_manual_backward(final_loss.mean())
+
+        def filter_trainable(params):
+            return [p for p in params if p.requires_grad]
+
+        shared_params = filter_trainable(gradient_heads["PET"].parameters())
+        task_params_base = filter_trainable(gradient_heads["GlobalEmbedding"].parameters())
+
+        task_param_sets = []
+        task_losses = {
+            k: v for k, v in loss_head.items() if k in self.config.options.Training.FAMO.detailed_loss_list
+        }
+        for loss_name in task_losses:
+            if loss_name == "classification":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
+                        filter_trainable(gradient_heads["classification"].parameters())
+                )
+            elif loss_name == "regression":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
+                        filter_trainable(gradient_heads["regression"].parameters())
+                )
+            elif loss_name in ["assignment", "detection"]:
+                task_params = (
+                        task_params_base +
+                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
+                        filter_trainable(gradient_heads["Assignment"].parameters())
+                )
+            elif loss_name == "generation-global":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(gradient_heads["generation-global"].parameters())
+                )
+            elif loss_name in ["generation-event", "generation-invisible"]:
+                task_params = (
+                        task_params_base +
+                        filter_trainable(gradient_heads["generation-event"].parameters())
+                )
+            else:
+                raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
+
+            task_param_sets.append(task_params)
+
+        # Call TorchJD safely
+        mtl_backward(
+            list(task_losses.values()),
+            features=full_input_point_cloud,
+            aggregator=self.aggregator,
+            tasks_params=task_param_sets,
+            shared_params=shared_params,
+            retain_graph=True,
+        )
 
         clip_grad_norm_(self.model.parameters(), 1.0)
 
@@ -382,7 +440,7 @@ class EveNetEngine(L.LightningModule):
         # -------------------------------------
         if self.include_famo:
             with torch.no_grad():
-                loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
+                loss, loss_head, loss_dict, _, loss_raw, _ = self.shared_step(
                     batch=batch, batch_idx=batch_idx,
                     active_components=active_components,
                     loss_head_dict=loss_head,
@@ -432,7 +490,7 @@ class EveNetEngine(L.LightningModule):
                 )
 
         _, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw, _ = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
             loss_head_dict=loss_head,
@@ -893,6 +951,9 @@ class EveNetEngine(L.LightningModule):
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)
 
+        ### Initialize Jacobian Descent ###
+        self.aggregator = UPGrad()
+
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
         new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
@@ -901,6 +962,10 @@ class EveNetEngine(L.LightningModule):
     def prepare_heads_loss(self):
         gradient_heads = {}
         loss_heads = {}
+
+        gradient_heads["PET"] = self.model.PET
+        gradient_heads["GlobalEmbedding"] = self.model.GlobalEmbedding
+        gradient_heads["ObjectEncoder"] = self.model.ObjectEncoder
 
         if self.classification_cfg.include:
             gradient_heads["classification"] = self.model.Classification
@@ -920,6 +985,7 @@ class EveNetEngine(L.LightningModule):
             loss_heads["generation-invisible"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.assignment_cfg.include:
+            gradient_heads["Assignment"] = self.model.Assignment
             assignment_heads = self.model.Assignment.multiprocess_assign_head
             gradient_heads.update({
                 f'assignment_{name}': assignment_heads[name]
