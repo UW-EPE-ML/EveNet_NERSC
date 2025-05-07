@@ -12,7 +12,7 @@ wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "Full", "135M", "Diffusion"]
+  tags: [ "Pretrain", "NERSC", "Multi-Node", "Full", "135M", "Diffusion", "FAMO" ]
 
 options:
   default: options/options.yaml
@@ -21,7 +21,7 @@ options:
     total_epochs: 10
     epochs: 2
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/best_pretrain_135M.1.ckpt"
+    #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/best_pretrain_135M.1.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 1 # how often to run diffusion
@@ -76,14 +76,19 @@ options:
           - classification
           - generation
 
+    FAMO:
+      turn_on: true
+      detailed_loss: true
+      lr: 0.025
+
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
-    val_split: [0.7, 1.0]
+    val_split: [ 0.7, 1.0 ]
 
   Metrics:
     Generation-Binning:
-      "global-HT": [50, 2, 8]
+      "global-HT": [ 50, 2, 8 ]
 
 network:
   default: network/pretrain.yaml
