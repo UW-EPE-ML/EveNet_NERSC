@@ -45,8 +45,8 @@ def compute_buffer_sizes(ds: Dataset, first_pct: float, second_pct: float) -> tu
 
 def save_batches(ds: Dataset, buffer_size: int, output_dir: Path) -> int:
     count = 0
-    for batch in ds.iter_batches(local_shuffle_buffer_size=32 * buffer_size, batch_size=buffer_size, batch_format="pandas"):
-        ray.data.from_pandas(batch).write_parquet(str(output_dir),ray_remote_args={"num_cpus": 0.5})
+    for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size, batch_format="pandas"):
+        ray.data.from_pandas(batch).write_parquet(str(output_dir))
         count += 1
     return count
 
