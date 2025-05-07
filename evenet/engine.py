@@ -415,7 +415,6 @@ class EveNetEngine(L.LightningModule):
 
             task_param_sets.append(task_params)
 
-        # Call TorchJD safely
         mtl_backward(
             list(task_losses.values()),
             features=full_input_point_cloud,
@@ -426,16 +425,22 @@ class EveNetEngine(L.LightningModule):
             parallel_chunk_size=1,
         )
 
-        clip_grad_norm_(self.model.parameters(), 1.0)
+        # 🔁 Manually sync gradients (if DDP is used)
+        if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
+            world_size = torch.distributed.get_world_size()
+            for param in self.model.parameters():
+                if param.grad is not None:
+                    torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM)
+                    param.grad /= world_size
 
-        # self.check_gradient(gradient_heads)
+        # ✅ Now you can safely apply gradients
+        clip_grad_norm_(self.model.parameters(), 1.0)
 
         for opt in optimizers:
             opt.step()
 
         for sch in schedulers:
             sch.step()
-
         # -------------------------------------
         # logging
         # -------------------------------------
@@ -464,6 +469,35 @@ class EveNetEngine(L.LightningModule):
                 self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         # self.current_step += 1
+
+        def check_ddp_param_sync(model):
+            for name, param in model.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if param.data.is_floating_point():
+                    tensor = param.data.clone()
+                    torch.distributed.broadcast(tensor, src=0)  # Broadcast from rank 0
+                    if not torch.allclose(param.data, tensor, rtol=1e-4, atol=1e-6):
+                        print(f"[RANK {torch.distributed.get_rank()}] Parameter {name} not in sync!")
+                        return False
+            return True
+
+        def check_ddp_grad_sync(model):
+            for name, param in model.named_parameters():
+                if param.grad is None:
+                    continue
+                tensor = param.grad.detach().clone()
+                torch.distributed.broadcast(tensor, src=0)
+                if not torch.allclose(param.grad, tensor, rtol=1e-4, atol=1e-6):
+                    print(f"[RANK {torch.distributed.get_rank()}] Gradient {name} not in sync!")
+                    return False
+            return True
+
+        if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
+            print("Checking param sync...")
+            check_ddp_param_sync(self.model)
+            print("Checking grad sync...")
+            check_ddp_grad_sync(self.model)
 
         return final_loss.mean()
 
