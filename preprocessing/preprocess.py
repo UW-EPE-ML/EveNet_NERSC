@@ -116,6 +116,7 @@ def unflatten_dict(
 
     return reconstructed
 
+
 def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
     # First build the DataFrame with basic stats
     summary_data = []
@@ -147,6 +148,7 @@ def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
 
     return analyzed_str
 
+
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
 
@@ -163,7 +165,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     cutflows = {}
     for process in global_config.process_info:
-    # for process in ["TT2L"]:
+        # for process in ["TT2L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -389,7 +391,7 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        run_parallel(cfg, cfg.preprocess_config, num_workers=cpu_count() - 1)
+        run_parallel(cfg, cfg.preprocess_config, num_workers=min(cpu_count() - 1, 60))
 
     else:
         in_tag = Path(cfg.in_dir).name
