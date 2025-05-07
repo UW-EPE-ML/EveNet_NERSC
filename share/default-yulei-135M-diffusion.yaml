@@ -77,7 +77,7 @@ options:
           - generation
 
     FAMO:
-      turn_on: false
+      turn_on: true
       detailed_loss: true
       lr: 0.025
 
