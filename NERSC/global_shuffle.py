@@ -43,10 +43,10 @@ def compute_buffer_sizes(ds: Dataset, first_pct: float, second_pct: float) -> tu
     return total_rows, first_buf, second_buf
 
 
-def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, prefix: str = "part") -> int:
+def save_batches(ds: Dataset, buffer_size: int, output_dir: Path) -> int:
     count = 0
-    for batch in ds.iter_batches(local_shuffle_buffer_size=100 * buffer_size, batch_size=buffer_size):
-        ray.data.from_pandas(batch).write_parquet(output_dir / f"{prefix}_{count:05d}")
+    for batch in ds.iter_batches(local_shuffle_buffer_size=32 * buffer_size, batch_size=buffer_size, batch_format="pandas"):
+        ray.data.from_pandas(batch).write_parquet(str(output_dir))
         count += 1
     return count
 
@@ -73,13 +73,13 @@ def main():
     )
 
     logging.info("Stage 1: Partial shuffle and write to temp...")
-    stage1_parts = save_batches(ds, first_buffer, temp_dir, prefix="temp")
+    stage1_parts = save_batches(ds, first_buffer, temp_dir)
     logging.info(f"Stage 1 complete: wrote {stage1_parts} temp batches.")
 
     logging.info("Stage 2: Re-shuffle from temp and write final output...")
     temp_files = list(temp_dir.rglob("*.parquet"))
     ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files")
-    stage2_parts = save_batches(ds2, second_buffer, output_dir, prefix="part")
+    stage2_parts = save_batches(ds2, second_buffer, output_dir)
     logging.info(f"Stage 2 complete: wrote {stage2_parts} final batches.")
 
     logging.info(f"✅ Final shuffled dataset saved to {output_dir}")
