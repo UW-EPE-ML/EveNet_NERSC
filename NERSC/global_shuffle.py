@@ -19,7 +19,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Two-pass partial shuffle for large Parquet datasets.")
     parser.add_argument("n_cpus", type=int, help="Number of CPUs to use")
     parser.add_argument("input_folder", type=Path, help="Input folder containing Parquet files")
-    parser.add_argument("n_parts", type=int, help="Number of parts to save final output")
     parser.add_argument("--first_shuffle_percent", type=float, default=1.0,
                         help="First pass shuffle buffer size (percent of rows)")
     parser.add_argument("--second_shuffle_percent", type=float, default=5.0,
@@ -46,7 +45,7 @@ def compute_buffer_sizes(ds: Dataset, first_pct: float, second_pct: float) -> tu
 
 def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, prefix: str = "part") -> int:
     count = 0
-    for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size):
+    for batch in ds.iter_batches(local_shuffle_buffer_size=100 * buffer_size, batch_size=buffer_size):
         ray.data.from_pandas(batch).write_parquet(output_dir / f"{prefix}_{count:05d}")
         count += 1
     return count
@@ -79,7 +78,7 @@ def main():
 
     logging.info("Stage 2: Re-shuffle from temp and write final output...")
     temp_files = list(temp_dir.rglob("*.parquet"))
-    ds2 = ray.data.read_parquet([str(f) for f in temp_files],shuffle="files")
+    ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files")
     stage2_parts = save_batches(ds2, second_buffer, output_dir, prefix="part")
     logging.info(f"Stage 2 complete: wrote {stage2_parts} final batches.")
 
