@@ -314,9 +314,9 @@ class EveNetEngine(L.LightningModule):
                 loss_raw[name] = loss_raw[name] * 0.0
 
         if self.training:
-            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="for-training")
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train")
         else:
-            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="for-validation")
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val")
 
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
                                                                                   outputs["full_global_conditions"]]
@@ -392,14 +392,14 @@ class EveNetEngine(L.LightningModule):
 
         task_losses, shared_params, task_param_sets = self.prepare_MTL_parameters(loss_head)
 
-        check_param_overlap(
-            task_param_sets=task_param_sets,
-            task_names=list(task_losses.keys()),
-            model=self.model,
-            current_step=self.current_step,
-            check_every=1000,
-            verbose=False,
-        )
+        # check_param_overlap(
+        #     task_param_sets=task_param_sets,
+        #     task_names=list(task_losses.keys()),
+        #     model=self.model,
+        #     current_step=self.current_step,
+        #     check_every=1000,
+        #     verbose=False,
+        # )
 
         mtl_backward(
             list(task_losses.values()),
@@ -481,7 +481,7 @@ class EveNetEngine(L.LightningModule):
             update_metric=True,
         )
 
-        self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
+        # self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
         return loss.mean()
 
