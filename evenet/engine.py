@@ -311,7 +311,8 @@ class EveNetEngine(L.LightningModule):
             if name not in active_components['current'] and active_components['current']:
                 loss_raw[name] = loss_raw[name] * 0.0
 
-        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, outputs['full_input_point_cloud']
+        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
+                                                                                  outputs["full_global_conditions"]]
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -352,7 +353,7 @@ class EveNetEngine(L.LightningModule):
                 )
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _, loss_raw, full_input_point_cloud = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             active_components=active_components,
             loss_head_dict=loss_head,
@@ -385,7 +386,7 @@ class EveNetEngine(L.LightningModule):
 
         mtl_backward(
             list(task_losses.values()),
-            features=full_input_point_cloud,
+            features=shared_output,
             aggregator=self.aggregator,
             tasks_params=task_param_sets,
             shared_params=shared_params,
@@ -998,14 +999,15 @@ class EveNetEngine(L.LightningModule):
         def filter_trainable(params):
             return [p for p in params if p.requires_grad]
 
-        shared_params = filter_trainable(self.model.PET.parameters())
-        task_params_base = filter_trainable(self.model.GlobalEmbedding.parameters())
+        shared_params = filter_trainable(
+            list(self.model.PET.parameters()) +
+            list(self.model.GlobalEmbedding.parameters())
+        )
 
         task_param_sets = []
         for loss_name in task_losses:
             if loss_name == "classification":
                 task_params = (
-                        task_params_base +
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Classification.parameters()) +
                         filter_trainable(
@@ -1015,25 +1017,21 @@ class EveNetEngine(L.LightningModule):
                 )
             elif loss_name == "regression":
                 task_params = (
-                        task_params_base +
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Regression.parameters())
                 )
             elif loss_name == "assignment":
                 task_params = (
-                        task_params_base +
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Assignment.parameters())
                 )
             elif loss_name == "generation-global":
                 task_params = (
-                        task_params_base +
-                        filter_trainable(self.model.GlobalGeneration.parameters())
+                    filter_trainable(self.model.GlobalGeneration.parameters())
                 )
             elif loss_name == "generation-particle":
                 task_params = (
-                        task_params_base +
-                        filter_trainable(self.model.EventGeneration.parameters())
+                    filter_trainable(self.model.EventGeneration.parameters())
                 )
             else:
                 raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")

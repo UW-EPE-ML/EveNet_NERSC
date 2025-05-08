@@ -559,6 +559,7 @@ class EveNetModel(nn.Module):
             "regression-noised": outputs.get("generation", {}).get("regression", None),
             "generations": generations,
             "full_input_point_cloud": full_input_point_cloud,
+            "full_global_conditions": full_global_conditions,
         }
 
     def predict_diffusion_vector(
