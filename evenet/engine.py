@@ -288,7 +288,8 @@ class EveNetEngine(L.LightningModule):
             ),
             start=torch.zeros(1, device=self.device, requires_grad=True)
         )
-        self.log('progressive/loss-current', loss_current, prog_bar=False, sync_dist=True)
+        if self.training:
+            self.log('progressive/loss-current', loss_current, prog_bar=False, sync_dist=True)
 
         if not active_components['previous']:
             loss = loss_current
@@ -305,14 +306,30 @@ class EveNetEngine(L.LightningModule):
             self.log('progressive/loss-previous', loss_previous, prog_bar=False, sync_dist=True)
             self.log('progressive/loss-transition', transition_factor, prog_bar=False, sync_dist=True)
 
-        self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
+        if self.training:
+            self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
 
         for name in loss_raw:
             if name not in active_components['current'] and active_components['current']:
                 loss_raw[name] = loss_raw[name] * 0.0
 
+        if self.training:
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="for-training")
+        else:
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="for-validation")
+
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
                                                                                   outputs["full_global_conditions"]]
+
+    def log_loss(self, loss, loss_head, loss_dict, prefix: str):
+        for name, val in loss_head.items():
+            self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
+
+        for name, val in loss_dict.items():
+            for n, v in val.items():
+                self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
+        self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
+
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -429,14 +446,6 @@ class EveNetEngine(L.LightningModule):
                 self.log(f"famo/{k}", v, prog_bar=False, sync_dist=True)
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
-        self.log("train/loss", loss.mean(), prog_bar=True, sync_dist=True)
-        for name, val in loss_head.items():
-            self.log(f"train/{name}", val.mean(), prog_bar=False, sync_dist=True)
-
-        for name, val in loss_dict.items():
-            for n, v in val.items():
-                self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
-
         # self.current_step += 1
         return final_loss.mean()
 
@@ -473,13 +482,6 @@ class EveNetEngine(L.LightningModule):
         )
 
         self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
-
-        for name, val in loss_head.items():
-            self.log(f"val/{name}", val.mean(), prog_bar=False, sync_dist=True)
-
-        for name, val in loss_dict.items():
-            for n, v in val.items():
-                self.log(f"{n}/val/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         return loss.mean()
 
@@ -1009,12 +1011,14 @@ class EveNetEngine(L.LightningModule):
             if loss_name == "classification":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
-                        filter_trainable(self.model.Classification.parameters()) +
-                        filter_trainable(
-                            chain.from_iterable(
-                                v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values())
-                        )
+                        filter_trainable(self.model.Classification.parameters())
                 )
+                if hasattr(self.model, "Assignment") and hasattr(self.model.Assignment, "multiprocess_assign_head"):
+                    task_params += filter_trainable(
+                        chain.from_iterable(
+                            v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values()
+                        )
+                    )
             elif loss_name == "regression":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
