@@ -1,5 +1,6 @@
 import math
 from functools import partial
+from itertools import chain
 from typing import Any, Dict, Union
 
 import wandb
@@ -26,7 +27,7 @@ from evenet.network.metrics.generation import shared_step as gen_step, shared_ep
 from evenet.network.loss.famo import FAMO
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
-from evenet.utilities.tool import get_transition
+from evenet.utilities.tool import get_transition, check_param_overlap
 
 from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
@@ -371,49 +372,16 @@ class EveNetEngine(L.LightningModule):
 
         # self.safe_manual_backward(final_loss.mean())
 
-        def filter_trainable(params):
-            return [p for p in params if p.requires_grad]
+        task_losses, shared_params, task_param_sets = self.prepare_MTL_parameters(loss_head)
 
-        shared_params = filter_trainable(gradient_heads["PET"].parameters())
-        task_params_base = filter_trainable(gradient_heads["GlobalEmbedding"].parameters())
-
-        task_param_sets = []
-        task_losses = {
-            k: v for k, v in loss_head.items() if k in self.config.options.Training.FAMO.detailed_loss_list
-        }
-        for loss_name in task_losses:
-            if loss_name == "classification":
-                task_params = (
-                        task_params_base +
-                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
-                        filter_trainable(gradient_heads["classification"].parameters())
-                )
-            elif loss_name == "regression":
-                task_params = (
-                        task_params_base +
-                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
-                        filter_trainable(gradient_heads["regression"].parameters())
-                )
-            elif loss_name in ["assignment", "detection"]:
-                task_params = (
-                        task_params_base +
-                        filter_trainable(gradient_heads["ObjectEncoder"].parameters()) +
-                        filter_trainable(gradient_heads["Assignment"].parameters())
-                )
-            elif loss_name == "generation-global":
-                task_params = (
-                        task_params_base +
-                        filter_trainable(gradient_heads["generation-global"].parameters())
-                )
-            elif loss_name in ["generation-event", "generation-invisible"]:
-                task_params = (
-                        task_params_base +
-                        filter_trainable(gradient_heads["generation-event"].parameters())
-                )
-            else:
-                raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
-
-            task_param_sets.append(task_params)
+        check_param_overlap(
+            task_param_sets=task_param_sets,
+            task_names=list(task_losses.keys()),
+            model=self.model,
+            current_step=self.current_step,
+            check_every=1000,
+            verbose=False,
+        )
 
         mtl_backward(
             list(task_losses.values()),
@@ -469,38 +437,6 @@ class EveNetEngine(L.LightningModule):
                 self.log(f"{n}/train/{name}", v.mean(), prog_bar=False, sync_dist=True)
 
         # self.current_step += 1
-
-        def check_ddp_param_sync(model):
-            for name, param in model.named_parameters():
-                if not param.requires_grad:
-                    continue
-                if param.data.is_floating_point():
-                    tensor = param.data.clone()
-                    torch.distributed.broadcast(tensor, src=0)  # Broadcast from rank 0
-                    if not torch.allclose(param.data, tensor, rtol=1e-4, atol=1e-6):
-                        print(f"[RANK {torch.distributed.get_rank()}] Parameter {name} not in sync!")
-                        return False
-            return True
-
-        def check_ddp_grad_sync(model):
-            for name, param in model.named_parameters():
-                if param.grad is None:
-                    continue
-                tensor = param.grad.detach().clone()
-                torch.distributed.broadcast(tensor, src=0)
-                if not torch.allclose(param.grad, tensor, rtol=1e-4, atol=1e-6):
-                    print(f"[RANK {torch.distributed.get_rank()}] Gradient {name} not in sync!")
-                    return False
-            return True
-
-        if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
-            if self.current_step % 500 == 0:
-                print(f"[RANK {torch.distributed.get_rank()}] Checking DDP sync...")
-                print("Checking param sync...")
-                check_ddp_param_sync(self.model)
-                print("Checking grad sync...")
-                check_ddp_grad_sync(self.model)
-
         return final_loss.mean()
 
     # @time_decorator
@@ -1034,3 +970,74 @@ class EveNetEngine(L.LightningModule):
             })
 
         return gradient_heads, loss_heads
+
+    # For Torch JD
+    def prepare_MTL_parameters(self, loss_head: dict[str, torch.Tensor]):
+
+        task_losses = {}
+
+        if "classification" in loss_head:
+            task_losses["classification"] = loss_head["classification"]
+
+        if "regression" in loss_head:
+            task_losses["regression"] = loss_head["regression"]
+
+        if "assignment" in loss_head or "detection" in loss_head:
+            task_losses["assignment"] = (
+                    loss_head.get("assignment", 0.0) + loss_head.get("detection", 0.0)
+            )
+
+        if "generation-global" in loss_head:
+            task_losses["generation-global"] = loss_head["generation-global"]
+
+        if "generation-event" in loss_head or "generation-invisible" in loss_head:
+            task_losses["generation-particle"] = (
+                    loss_head.get("generation-event", 0.0) + loss_head.get("generation-invisible", 0.0)
+            )
+
+        def filter_trainable(params):
+            return [p for p in params if p.requires_grad]
+
+        shared_params = filter_trainable(self.model.PET.parameters())
+        task_params_base = filter_trainable(self.model.GlobalEmbedding.parameters())
+
+        task_param_sets = []
+        for loss_name in task_losses:
+            if loss_name == "classification":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(self.model.ObjectEncoder.parameters()) +
+                        filter_trainable(self.model.Classification.parameters()) +
+                        filter_trainable(
+                            chain.from_iterable(
+                                v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values())
+                        )
+                )
+            elif loss_name == "regression":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(self.model.ObjectEncoder.parameters()) +
+                        filter_trainable(self.model.Regression.parameters())
+                )
+            elif loss_name == "assignment":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(self.model.ObjectEncoder.parameters()) +
+                        filter_trainable(self.model.Assignment.parameters())
+                )
+            elif loss_name == "generation-global":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(self.model.GlobalGeneration.parameters())
+                )
+            elif loss_name == "generation-particle":
+                task_params = (
+                        task_params_base +
+                        filter_trainable(self.model.EventGeneration.parameters())
+                )
+            else:
+                raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
+
+            task_param_sets.append(task_params)
+
+        return task_losses, shared_params, task_param_sets
