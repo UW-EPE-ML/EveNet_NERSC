@@ -420,6 +420,8 @@ class EveNetEngine(L.LightningModule):
             parallel_chunk_size=1,
         )
 
+        for opt in optimizers:
+            self.scaler.unscale_(opt)
         # 🔁 Manually sync gradients (if DDP is used)
         if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
             world_size = torch.distributed.get_world_size()
