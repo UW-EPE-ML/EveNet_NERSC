@@ -1037,12 +1037,12 @@ class EveNetEngine(L.LightningModule):
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Classification.parameters())
                 )
-                if hasattr(self.model, "Assignment") and hasattr(self.model.Assignment, "multiprocess_assign_head"):
-                    task_params += filter_trainable(
-                        chain.from_iterable(
-                            v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values()
-                        )
-                    )
+                # if hasattr(self.model, "Assignment") and hasattr(self.model.Assignment, "multiprocess_assign_head"):
+                #     task_params += filter_trainable(
+                #         chain.from_iterable(
+                #             v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values()
+                #         )
+                #     )
             elif loss_name == "regression":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
