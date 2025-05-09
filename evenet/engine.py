@@ -829,6 +829,12 @@ class EveNetEngine(L.LightningModule):
         if self.model is not None:
             return
 
+        if torch.cuda.is_available():
+            name = torch.cuda.get_device_name(torch.cuda.current_device())
+            if "A100" in name:
+                torch.set_float32_matmul_precision("medium")
+                print("[Model] --> A100 detected, using medium precision for matmul")
+
         self.model = EveNetModel(
             config=self.config,
             device=self.device,
