@@ -746,7 +746,7 @@ class EveNetEngine(L.LightningModule):
         print("batch_size: ", batch_size)
         print("warm_up_factor: ", warm_up_factor)
 
-        betas = (0.9, 0.99)
+        betas = (0.95, 0.99)
 
         def create_optim_schedule(
                 p, base_lr, base_wd,
