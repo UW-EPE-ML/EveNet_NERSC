@@ -17,9 +17,23 @@ def make_process_fn(base_dir: Path):
     """Creates a partial function for batch preprocessing."""
     shape_metadata = json.load(open(base_dir / "shape_metadata.json"))
 
-    drop_column_prefix = "EXTRA/"
+    drop_column_prefix = ["EXTRA/"]
     if 'extra_save' in global_config.options.get('prediction', {}):
         drop_column_prefix = None
+
+    component_map = {
+        "Classification": "classification",
+        "Regression": "regression-",
+        "Assignment": "assignment-",
+        "EventGeneration": "event_generation-",
+    }
+
+    for name, prefix in component_map.items():
+        component = getattr(global_config.options.Training.Components, name)
+        if not getattr(component, "include", False):
+            drop_column_prefix.append(prefix)
+        elif name == "EventGeneration" and not getattr(component, "generate_neutrino", False):
+            drop_column_prefix.append(prefix)
 
     return partial(
         process_event_batch,

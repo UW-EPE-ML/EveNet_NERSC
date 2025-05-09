@@ -89,7 +89,7 @@ def flatten_dict(data: dict, delimiter: str = ":"):
 def unflatten_dict(
         table: dict[str, np.ndarray],
         shape_metadata: dict,
-        drop_column_prefix: str = None,
+        drop_column_prefix: list[str] = None,
         delimiter: str = ":",
 ):
     reconstructed = {}
@@ -99,7 +99,7 @@ def unflatten_dict(
         grouped.setdefault(base, []).append(col)
     for base, columns in grouped.items():
         if drop_column_prefix is not None:
-            if base.startswith(drop_column_prefix):
+            if any(base.startswith(prefix) for prefix in drop_column_prefix):
                 continue
 
         if base not in shape_metadata:
