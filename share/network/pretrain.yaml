@@ -8,29 +8,29 @@ Body:
     linear_block_type: GRU
     transformer_dim_scale: 2.0
     initial_embedding_dim: 16
-    hidden_dim: 256
+    hidden_dim: 512
     normalization: LayerNorm
     linear_activation: GELU
-    num_embedding_layers: 4
+    num_embedding_layers: 5
     dropout: 0.1
     skip_connection: true
 
   PET:
     num_feature_keep: 0
     feature_drop: 0.0
-    hidden_dim: 256
+    hidden_dim: 512
     enable_local_embedding: true
-    local_Krank: 3
+    local_Krank: 5
     local_point_index:
       - 2
       - 3
-    num_local_layer: 10
-    num_layers: 16
+    num_local_layer: 12
+    num_layers: 20
     drop_probability: 0.0
     talking_head: false
     layer_scale: true
     layer_scale_init: 1.0e-05
-    num_heads: 8
+    num_heads: 16
     mode: "train"
     dropout: 0.1
 
@@ -91,7 +91,7 @@ GlobalGeneration:
   dropout: 0.0
 
 EventGeneration:
-  hidden_dim: 64
+  hidden_dim: 128
   num_layers: 3
   num_heads: 4
   dropout: 0.1
