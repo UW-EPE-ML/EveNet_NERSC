@@ -5,7 +5,7 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 512
+  batch_size: 1024
   prefetch_batches: 5
 
   mixed_precision: true
