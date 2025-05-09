@@ -432,13 +432,11 @@ class EveNetEngine(L.LightningModule):
         # ✅ Now you can safely apply gradients
         clip_grad_norm_(self.model.parameters(), 1.0)
 
-        for opt in optimizers:
+        for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
+            sch.step()
 
         self.scaler.update()
-        
-        for sch in schedulers:
-            sch.step()
 
         # -------------------------------------
         # logging
