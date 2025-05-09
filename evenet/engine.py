@@ -334,7 +334,6 @@ class EveNetEngine(L.LightningModule):
                 self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
-
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
 
@@ -436,10 +435,11 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             self.scaler.step(opt)
 
+        self.scaler.update()
+        
         for sch in schedulers:
             sch.step()
 
-        self.scaler.update()
         # -------------------------------------
         # logging
         # -------------------------------------

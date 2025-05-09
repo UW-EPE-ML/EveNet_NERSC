@@ -7,11 +7,11 @@ Body:
   GlobalEmbedding:
     linear_block_type: GRU
     transformer_dim_scale: 2.0
-    initial_embedding_dim: 16
+    initial_embedding_dim: 32
     hidden_dim: 512
     normalization: LayerNorm
     linear_activation: GELU
-    num_embedding_layers: 5
+    num_embedding_layers: 4
     dropout: 0.1
     skip_connection: true
 
@@ -24,8 +24,8 @@ Body:
     local_point_index:
       - 2
       - 3
-    num_local_layer: 12
-    num_layers: 20
+    num_local_layer: 10
+    num_layers: 18
     drop_probability: 0.0
     talking_head: false
     layer_scale: true
