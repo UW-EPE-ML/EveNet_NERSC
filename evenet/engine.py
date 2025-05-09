@@ -1,12 +1,14 @@
 import math
 from functools import partial
 from itertools import chain
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 import wandb
 import lightning as L
 import torch
 from torch.nn.utils import clip_grad_norm_
+from torch.amp import GradScaler
+
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 from lightning.pytorch.utilities.model_summary import summarize
 from lion_pytorch import Lion
@@ -47,6 +49,8 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+        self.scaler: Union[torch.amp.GradScaler, None] = None
+        self.mixed_precision: bool = global_config.platform.get("mixed_precision", False)
         self.aggregator = None
         self.sampler = None
         self.steps_per_epoch = None
@@ -370,14 +374,18 @@ class EveNetEngine(L.LightningModule):
                 )
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
-            batch=batch, batch_idx=batch_idx,
-            active_components=active_components,
-            loss_head_dict=loss_head,
-            transition_factor=t,
-            update_metric=True,
-        )
-
+        with torch.autocast(
+                device_type="cuda" if torch.cuda.is_available() else "cpu",
+                dtype=torch.float16,
+                enabled=self.mixed_precision,
+        ):
+            loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
+                batch=batch, batch_idx=batch_idx,
+                active_components=active_components,
+                loss_head_dict=loss_head,
+                transition_factor=t,
+                update_metric=True,
+            )
         final_loss = loss
         famo_logs = None
         if self.include_famo:
@@ -401,8 +409,9 @@ class EveNetEngine(L.LightningModule):
         #     verbose=False,
         # )
 
+        task_losses = self.scaler.scale(list(task_losses.values()))
         mtl_backward(
-            list(task_losses.values()),
+            task_losses,
             features=shared_output,
             aggregator=self.aggregator,
             tasks_params=task_param_sets,
@@ -423,10 +432,12 @@ class EveNetEngine(L.LightningModule):
         clip_grad_norm_(self.model.parameters(), 1.0)
 
         for opt in optimizers:
-            opt.step()
+            self.scaler.step(opt)
 
         for sch in schedulers:
             sch.step()
+
+        self.scaler.update()
         # -------------------------------------
         # logging
         # -------------------------------------
@@ -929,6 +940,13 @@ class EveNetEngine(L.LightningModule):
 
         ### Initialize Jacobian Descent ###
         self.aggregator = UPGrad()
+
+        ### Mixed Precision ###
+        self.scaler = GradScaler(
+            device="cuda" if torch.cuda.is_available() else "cpu",
+            enabled=self.mixed_precision
+        )
+        print("[MixedPrecision] --> ", self.mixed_precision)
 
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
