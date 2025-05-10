@@ -437,8 +437,8 @@ def shared_step(
     generation_loss = dict()
 
     global_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
-    event_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
-    invisible_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    recon_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
+    truth_gen_loss = torch.tensor(0.0, device=device, requires_grad=True)
     for generation_target, generation_result in outputs.items():
         feature_dim = generation_result["vector"].shape[-1]
         if generation_target == "point_cloud":
@@ -469,9 +469,9 @@ def shared_step(
         if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
         elif generation_target == "neutrino":
-            invisible_gen_loss = invisible_gen_loss + generation_loss[generation_target]
+            truth_gen_loss = truth_gen_loss + generation_loss[generation_target]
         elif generation_target == "point_cloud":
-            event_gen_loss = event_gen_loss + generation_loss[generation_target]
+            recon_gen_loss = recon_gen_loss + generation_loss[generation_target]
 
         if diffusion_on and update_metric:
             gen_metrics.update(
@@ -483,11 +483,11 @@ def shared_step(
             )
 
     loss_head_dict["generation-global"] = global_gen_loss
-    loss_head_dict["generation-event"] = event_gen_loss
-    loss_head_dict["generation-invisible"] = invisible_gen_loss
+    loss_head_dict["generation-recon"] = recon_gen_loss
+    loss_head_dict["generation-truth"] = truth_gen_loss
 
     loss = (
-                   global_gen_loss * global_loss_scale + event_gen_loss * event_loss_scale + invisible_gen_loss * invisible_loss_scale) / len(
+                   global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(
         outputs)
     return loss, generation_loss
 

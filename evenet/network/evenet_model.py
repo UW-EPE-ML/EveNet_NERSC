@@ -78,11 +78,11 @@ class EveNetModel(nn.Module):
             }
         )
 
-        self.global_input_dim = global_normalizer_info["norm_mask"].size()[-1]
-        self.sequential_input_dim = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
+        self.global_input_dim: int = global_normalizer_info["norm_mask"].size()[-1]
+        self.sequential_input_dim: int = input_normalizers_setting["SEQUENTIAL"]["norm_mask"].size()[-1]
         self.local_feature_indices = self.network_cfg.Body.PET.local_point_index
-        self.invisible_input_dim = len(normalization_dict["invisible_mean"]["Source"])
-        self.invisible_padding = self.sequential_input_dim - self.invisible_input_dim
+        self.invisible_input_dim: int = len(normalization_dict["invisible_mean"]["Source"])
+        self.invisible_padding: int = self.sequential_input_dim - self.invisible_input_dim
         assert self.invisible_padding >= 0, f"Invisible Padding size {self.invisible_padding} is negative. "
 
         self.sequential_normalizer = Normalizer(
@@ -127,20 +127,6 @@ class EveNetModel(nn.Module):
             dropout=global_embedding_cfg.dropout
         )
 
-        # tihsu: debugging
-        # self.global_embedding_debug = nn.Sequential(
-        #     nn.Linear(self.network_cfg.hidden_dim, self.network_cfg.hidden_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(self.network_cfg.hidden_dim, self.network_cfg.hidden_dim),
-        #     nn.ReLU()
-        #     )
-        # self.point_cloud_transformer_debug = PointCloudTransformer(
-        #     point_dim=self.network_cfg.hidden_dim,
-        #     embed_dim=self.network_cfg.hidden_dim,
-        #     ff_dim=self.network_cfg.hidden_dim
-        # )
-
-        # self.debug_classifier = nn.Linear(self.network_cfg.hidden_dim, self.event_info.num_classes["signal"])
         # [1] Body
         pet_config = self.network_cfg.Body.PET
         self.PET = PETBody(
@@ -259,11 +245,11 @@ class EveNetModel(nn.Module):
                 dropout=self.network_cfg.GlobalGeneration.dropout
             )
 
-        # [6-2] Event Generation Head (for neutrino generation OR point cloud)
-        if self.include_point_cloud_generation or self.include_neutrino_generation:
+        # [6-2] Event Generation Head (Recon-Level)
+        if self.include_point_cloud_generation:
             self.generation_pc_condition_indices = self.event_info.generation_pc_condition_indices
             self.generation_pc_indices = self.event_info.generation_pc_indices
-            self.EventGeneration = EventGenerationHead(
+            self.ReconGeneration = EventGenerationHead(
                 input_dim=pet_config.hidden_dim,
                 projection_dim=self.network_cfg.EventGeneration.hidden_dim,
                 num_global_cond=global_embedding_cfg.hidden_dim,
@@ -276,16 +262,32 @@ class EveNetModel(nn.Module):
                 layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
                 drop_probability=self.network_cfg.EventGeneration.drop_probability,
                 feature_drop=self.network_cfg.EventGeneration.feature_drop,
+            )
+
+        # [6-3] Event Generation Head (Truth-Level)
+        if self.include_neutrino_generation:
+            self.TruthGeneration = EventGenerationHead(
+                input_dim=pet_config.hidden_dim,
+                projection_dim=self.network_cfg.EventGeneration.hidden_dim,
+                num_global_cond=global_embedding_cfg.hidden_dim,
+                num_classes=self.event_info.num_classes_total,
+                output_dim=self.invisible_input_dim + self.invisible_padding,
+                num_layers=self.network_cfg.EventGeneration.num_layers,
+                num_heads=self.network_cfg.EventGeneration.num_heads,
+                dropout=self.network_cfg.EventGeneration.dropout,
+                layer_scale=self.network_cfg.EventGeneration.layer_scale,
+                layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
+                drop_probability=self.network_cfg.EventGeneration.drop_probability,
+                feature_drop=self.network_cfg.EventGeneration.feature_drop,
                 position_encode=self.network_cfg.EventGeneration.neutrino_position_encode,
                 max_position_length=self.network_cfg.EventGeneration.max_position_length
             )
             self.neutrino_position_encode = self.network_cfg.EventGeneration.neutrino_position_encode
 
-            # [6-3] Positional embedding
         self.schedule_flags = [
-            (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
             (self.include_point_cloud_generation, "generation"),
             (self.include_neutrino_generation, "neutrino_generation"),
+            (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
         ]
 
     def forward(self, x: Dict[str, Tensor], time: Tensor) -> dict[str, dict[Any, Any] | Any]:
@@ -406,7 +408,7 @@ class EveNetModel(nn.Module):
 
             generations["global"] = {
                 "vector": predict_target_global_vector,
-                "truth": truth_target_global_vector
+                "truth": truth_target_global_vector.detach(),
             }
 
         outputs = dict()
@@ -450,7 +452,6 @@ class EveNetModel(nn.Module):
                 ).float()
                 global_feature_mask = torch.ones_like(global_conditions).float()
 
-
             #############################
             ## Central embedding (PET) ##
             #############################
@@ -471,11 +472,9 @@ class EveNetModel(nn.Module):
             )
 
             if schedule_name == "deterministic" or schedule_name == "generation":
-
                 ######################################
                 ## Embedding for deterministic task ##
                 ######################################
-
                 embeddings, embedded_global_conditions, event_token = self.ObjectEncoder(
                     encoded_vectors=full_input_point_cloud,
                     mask=full_input_point_cloud_mask,
@@ -505,7 +504,6 @@ class EveNetModel(nn.Module):
                 classifications = None
                 if self.include_classification:
                     classifications = self.Classification(event_token)
-                    # classifications = {"signal": self.debug_classifier(event_token_debug)}
 
                 # Regression head
                 regressions = None
@@ -519,36 +517,43 @@ class EveNetModel(nn.Module):
                     "detections": detections
                 }
 
-            if schedule_name == "neutrino_generation" or schedule_name == "generation":
+            #######################################
+            ##  Output Head For Diffusion Model  ##
+            #######################################
+            if self.include_point_cloud_generation and schedule_name == "generation":
+                pred_point_cloud_vector = self.ReconGeneration(
+                    x=full_input_point_cloud,
+                    x_mask=full_input_point_cloud_mask,
+                    global_cond=full_global_conditions,
+                    global_cond_mask=global_conditions_mask,
+                    num_x=num_point_cloud,
+                    time=full_time,
+                    label=class_label,
+                    attn_mask=full_attn_mask,
+                    time_masking=time_masking,
+                )
+                generations["point_cloud"] = {
+                    "vector": pred_point_cloud_vector[..., self.generation_pc_indices],
+                    "truth": truth_input_point_cloud_vector[..., self.generation_pc_indices].detach()
+                }
 
-                #######################################
-                ##  Output Head For Diffusion Model  ##
-                #######################################
-
-                if self.include_point_cloud_generation or self.include_neutrino_generation:
-                    pred_point_cloud_vector = self.EventGeneration(
-                        x=full_input_point_cloud,
-                        x_mask=full_input_point_cloud_mask,
-                        global_cond=full_global_conditions,
-                        global_cond_mask=global_conditions_mask,
-                        num_x=num_point_cloud,
-                        time=full_time,
-                        label=class_label,
-                        attn_mask=full_attn_mask,
-                        time_masking=time_masking,
-                        position_encode=(self.neutrino_position_encode and schedule_name == "neutrino_generation")
-                    )
-
-                    if schedule_name == "neutrino_generation":
-                        generations["neutrino"] = {
-                            "vector": pred_point_cloud_vector[:, is_invisible_query, :],
-                            "truth": truth_invisible_point_cloud_vector
-                        }
-                    else:
-                        generations["point_cloud"] = {
-                            "vector": pred_point_cloud_vector[..., self.generation_pc_indices],
-                            "truth": truth_input_point_cloud_vector[..., self.generation_pc_indices]
-                        }
+            if self.include_neutrino_generation and schedule_name == "neutrino_generation":
+                pred_point_cloud_vector = self.TruthGeneration(
+                    x=full_input_point_cloud,
+                    x_mask=full_input_point_cloud_mask,
+                    global_cond=full_global_conditions,
+                    global_cond_mask=global_conditions_mask,
+                    num_x=num_point_cloud,
+                    time=full_time,
+                    label=class_label,
+                    attn_mask=full_attn_mask,
+                    time_masking=time_masking,
+                    position_encode=(self.neutrino_position_encode and schedule_name == "neutrino_generation")
+                )
+                generations["neutrino"] = {
+                    "vector": pred_point_cloud_vector[:, is_invisible_query, :],
+                    "truth": truth_invisible_point_cloud_vector.detach(),
+                }
 
         return {
             "classification": outputs.get("deterministic", {}).get("classification", None),
@@ -570,8 +575,6 @@ class EveNetModel(nn.Module):
         """
         Predict the number of point clouds in the batch.
         """
-
-        batch_size = noise_x.shape[0]
 
         if mode == "global":
             """
@@ -615,7 +618,6 @@ class EveNetModel(nn.Module):
                 mask=global_conditions_mask
             )
 
-
             noise_x_mask = torch.zeros_like(noise_x)
             noise_x_mask[..., self.generation_pc_indices] = 1.0
             noise_x = noise_x * noise_x_mask
@@ -627,7 +629,7 @@ class EveNetModel(nn.Module):
                 mask=noise_mask,
                 time=time
             )
-            pred_point_cloud_vector = self.EventGeneration(
+            pred_point_cloud_vector = self.ReconGeneration(
                 x=input_point_cloud,
                 x_mask=noise_mask,
                 global_cond=global_conditions,
@@ -702,7 +704,7 @@ class EveNetModel(nn.Module):
                 time_masking=time_masking
             )
 
-            pred_point_cloud_vector = self.EventGeneration(
+            pred_point_cloud_vector = self.TruthGeneration(
                 x=full_input_point_cloud,
                 x_mask=full_input_point_cloud_mask,
                 global_cond=full_global_conditions,

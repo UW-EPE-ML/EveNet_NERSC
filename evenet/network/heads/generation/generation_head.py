@@ -12,22 +12,25 @@ from evenet.network.layers.utils import StochasticDepth
 from evenet.network.layers.transformer import GeneratorTransformerBlockModule
 from evenet.network.layers.activation import create_residual_connection
 
+
 class EventGenerationHead(nn.Module):
-    def __init__(self,
-                 input_dim: int,
-                 projection_dim: int,
-                 num_global_cond: int,
-                 num_classes: int,
-                 output_dim: int,
-                 num_layers: int,
-                 num_heads: int,
-                 dropout: float,
-                 layer_scale: bool,
-                 layer_scale_init: float,
-                 drop_probability: float,
-                 feature_drop: float,
-                 position_encode: bool = False,
-                 max_position_length: int = 20):
+    def __init__(
+            self,
+            input_dim: int,
+            projection_dim: int,
+            num_global_cond: int,
+            num_classes: int,
+            output_dim: int,
+            num_layers: int,
+            num_heads: int,
+            dropout: float,
+            layer_scale: bool,
+            layer_scale_init: float,
+            drop_probability: float,
+            feature_drop: float,
+            position_encode: bool = False,
+            max_position_length: int = 20
+    ):
         super().__init__()
         self.input_dim = input_dim
         self.projection_dim = projection_dim
@@ -45,8 +48,8 @@ class EventGenerationHead(nn.Module):
         self.position_encode = position_encode
         if self.position_encode:
             self.position_encoder = PointCloudPositionalEmbedding(
-                num_points = max_position_length,
-                embed_dim = projection_dim
+                num_points=max_position_length,
+                embed_dim=projection_dim
             )
 
         self.bridge_global_cond = create_residual_connection(
@@ -61,7 +64,7 @@ class EventGenerationHead(nn.Module):
             nn.Linear(2 * projection_dim, projection_dim),
             nn.GELU(approximate='none')
         )
-        #self.label_embedding = nn.Embedding(num_classes, projection_dim)
+        # self.label_embedding = nn.Embedding(num_classes, projection_dim)
         self.label_dense = nn.Linear(num_classes, projection_dim, bias=False)
         self.feature_drop = feature_drop
         self.stochastic_depth = StochasticDepth(feature_drop)
@@ -98,20 +101,23 @@ class EventGenerationHead(nn.Module):
         label: [B, 1] <- Conditional Label, one-hot in function,
         time_masking: [B, T, 1] <- Mask for time embedding
         """
-        time_emb = self.time_embedding(time).unsqueeze(1).expand(-1, x.shape[1], -1) # [B, 1, proj_dim]
+        time_emb = self.time_embedding(time).unsqueeze(1).expand(-1, x.shape[1], -1)  # [B, 1, proj_dim]
         if time_masking is not None:
             time_emb = time_emb * time_masking
 
         cond_token = self.cond_token(
-            torch.cat([time_emb, (self.bridge_global_cond(global_cond) * global_cond_mask).expand(-1, x.shape[1],-1)], dim=-1),
+            torch.cat(
+                [time_emb, (self.bridge_global_cond(global_cond) * global_cond_mask).expand(-1, x.shape[1], -1)],
+                dim=-1
+            ),
         )  # After MLP, cond_token shape: torch.Size([B, 1, proj_dim])
         x = self.bridge_point_cloud(x) * x_mask
 
         if position_encode:
             x = self.position_encoder(
-                x = x,
-                x_mask = x_mask,
-                time_mask = time_masking
+                x=x,
+                x_mask=x_mask,
+                time_mask=time_masking
             )
 
         if num_x is not None:
@@ -136,21 +142,24 @@ class EventGenerationHead(nn.Module):
 
         return x * x_mask
 
+
 class GlobalCondGenerationHead(nn.Module):
 
-    def __init__(self,
-                 num_layer: int,
-                 num_resnet_layer: int,
-                 input_dim: int,
-                 hidden_dim: int,
-                 output_dim: int,
-                 input_cond_indices: List[int],
-                 num_classes: int,
-                 resnet_dim: int,
-                 layer_scale_init: float,
-                 feature_drop_for_stochastic_depth: float,
-                 activation: str,
-                 dropout: float):
+    def __init__(
+            self,
+            num_layer: int,
+            num_resnet_layer: int,
+            input_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            input_cond_indices: List[int],
+            num_classes: int,
+            resnet_dim: int,
+            layer_scale_init: float,
+            feature_drop_for_stochastic_depth: float,
+            activation: str,
+            dropout: float
+    ):
         super(GlobalCondGenerationHead, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -196,13 +205,13 @@ class GlobalCondGenerationHead(nn.Module):
             nn.Sequential(
                 nn.LayerNorm(self.hidden_dim if i == 0 else self.mlp_dim, eps=1e-6),
                 ResNetDense(
-                    input_dim = self.hidden_dim if i == 0 else self.mlp_dim,
-                    hidden_dim = self.mlp_dim,
-                    output_dim = self.mlp_dim,
-                    num_layers = self.resnet_num_layer,
-                    activation = self.activation,
-                    dropout = self.dropout,
-                    layer_scale_init = self.layer_scale_init
+                    input_dim=self.hidden_dim if i == 0 else self.mlp_dim,
+                    hidden_dim=self.mlp_dim,
+                    output_dim=self.mlp_dim,
+                    num_layers=self.resnet_num_layer,
+                    activation=self.activation,
+                    dropout=self.dropout,
+                    layer_scale_init=self.layer_scale_init
                 )
             )
             for i in range(self.num_layer - 1)
@@ -218,7 +227,7 @@ class GlobalCondGenerationHead(nn.Module):
                 x_mask: Optional[Tensor] = None,
                 global_cond: Optional[Tensor] = None,
                 label: Optional[Tensor] = None
-        ) -> Tensor:
+                ) -> Tensor:
         # ----------------
         # x: [B, 1,] <- Noised Global Input
         # x_mask: [B, 1, 1] <- Mask
@@ -228,7 +237,7 @@ class GlobalCondGenerationHead(nn.Module):
         # ----------------
 
         batch_size = x.shape[0]
-        time = time.unsqueeze(-1) # [B, 1]
+        time = time.unsqueeze(-1)  # [B, 1]
         if x_mask is None:
             x_mask = torch.ones((batch_size, 1), device=x.device)
 
@@ -244,13 +253,13 @@ class GlobalCondGenerationHead(nn.Module):
         cond_token = self.cond_token_embedding(global_token)  # [B, 1, 2D]
 
         if label is not None:
-            label = F.one_hot(label, num_classes = self.num_classes).float() # [B, 1, C]
-            cond_label = self.label_embedding(label) # [B, 1, 2D]
+            label = F.one_hot(label, num_classes=self.num_classes).float()  # [B, 1, C]
+            cond_label = self.label_embedding(label)  # [B, 1, 2D]
             cond_token = cond_token + cond_label
 
         scale, shift = torch.chunk(cond_token, 2, dim=-1)
-        scale = scale.squeeze(1) # [B, D]
-        shift = shift.squeeze(1) # [B, D]
+        scale = scale.squeeze(1)  # [B, D]
+        shift = shift.squeeze(1)  # [B, D]
 
         embed_x = self.dense_layer(x)
         embed_x = (embed_x * (1.0 + scale) + shift) * x_mask
@@ -260,7 +269,4 @@ class GlobalCondGenerationHead(nn.Module):
         embed_x = self.out_layer_norm(embed_x) * x_mask
         outputs = self.out(embed_x) * x_mask
 
-        return outputs # [B, output_dim]
-
-
-
+        return outputs  # [B, output_dim]

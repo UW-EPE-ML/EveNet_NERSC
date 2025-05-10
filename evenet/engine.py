@@ -389,7 +389,7 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_MTL_parameters(loss_head)
+        task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_mtl_parameters(loss_head)
 
         # check_param_overlap(
         #     task_param_sets=task_param_sets,
@@ -1045,9 +1045,10 @@ class EveNetEngine(L.LightningModule):
             loss_heads["generation-global"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.event_generation_cfg.include:
-            gradient_heads["generation-event"] = self.model.EventGeneration
-            loss_heads["generation-event"] = torch.zeros(1, device=self.device, requires_grad=True)
-            loss_heads["generation-invisible"] = torch.zeros(1, device=self.device, requires_grad=True)
+            gradient_heads["generation-recon"] = self.model.ReconGeneration
+            gradient_heads["generation-truth"] = self.model.TruthGeneration
+            loss_heads["generation-recon"] = torch.zeros(1, device=self.device, requires_grad=True)
+            loss_heads["generation-truth"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.assignment_cfg.include:
             gradient_heads["Assignment"] = self.model.Assignment
@@ -1064,7 +1065,7 @@ class EveNetEngine(L.LightningModule):
         return gradient_heads, loss_heads
 
     # For Torch JD
-    def prepare_MTL_parameters(self, loss_head: dict[str, torch.Tensor]):
+    def prepare_mtl_parameters(self, loss_head: dict[str, torch.Tensor]):
 
         task_losses = {}
         task_loss_global = None
@@ -1086,10 +1087,11 @@ class EveNetEngine(L.LightningModule):
         if "regression" in loss_head:
             task_losses["regression"] = loss_head["regression"]
 
-        if "generation-event" in loss_head or "generation-invisible" in loss_head:
-            task_losses["generation-particle"] = (
-                    loss_head.get("generation-event", 0.0) + loss_head.get("generation-invisible", 0.0)
-            )
+        if "generation-truth" in loss_head:
+            task_losses["generation-truth"] = loss_head["generation-truth"]
+
+        if "generation-recon" in loss_head:
+            task_losses["generation-recon"] = loss_head["generation-recon"]
 
         ### Individual Loss
         if "generation-global" in loss_head:
@@ -1132,9 +1134,13 @@ class EveNetEngine(L.LightningModule):
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Regression.parameters())
                 )
-            elif loss_name == "generation-particle":
+            elif loss_name == "generation-truth":
                 task_params = (
-                    filter_trainable(self.model.EventGeneration.parameters())
+                    filter_trainable(self.model.TruthGeneration.parameters())
+                )
+            elif loss_name == "generation-recon":
+                task_params = (
+                    filter_trainable(self.model.ReconGeneration.parameters())
                 )
             # No need, will use automatic backward
             # elif loss_name == "generation-global":
