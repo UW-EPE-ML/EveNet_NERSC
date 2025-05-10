@@ -30,7 +30,7 @@ from evenet.network.metrics.generation import shared_step as gen_step, shared_ep
 from evenet.network.loss.famo import FAMO
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
-from evenet.utilities.tool import get_transition, check_param_overlap
+from evenet.utilities.tool import get_transition, check_param_overlap, print_params_used_by_loss
 
 from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
@@ -389,9 +389,7 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        # self.safe_manual_backward(final_loss.mean())
-
-        task_losses, shared_params, task_param_sets = self.prepare_MTL_parameters(loss_head)
+        task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_MTL_parameters(loss_head)
 
         # check_param_overlap(
         #     task_param_sets=task_param_sets,
@@ -401,7 +399,12 @@ class EveNetEngine(L.LightningModule):
         #     check_every=1000,
         #     verbose=False,
         # )
-        task_list = list(task_losses.keys())
+        for task, loss in task_losses.items():
+            print(f"[Task {task}] Loss: {loss.item()}")
+            # print_params_used_by_loss(loss, self.model)
+        self.log_task_gradient(task_losses, shared_params)
+
+        # === Backward for EveNet Main Part (multitask) ===
         task_losses = list(task_losses.values())
         mtl_backward(
             task_losses,
@@ -412,16 +415,20 @@ class EveNetEngine(L.LightningModule):
             retain_graph=True,
             parallel_chunk_size=1,
         )
+        # === Sync gradients (excluding GlobalGeneration) ===
+        self.sync_gradients_ddp(
+            self.model,
+            exclude_modules=(getattr(self.model, "GlobalGeneration", None),) if gen_global_loss else ()
+        )
+        # === Backward for EveNet Global Part (GlobalGeneration) ===
+        if gen_global_loss:
+            gen_global_loss.mean().backward()
 
-        self.sync_gradients_ddp(self.model)
-
-        # ✅ Now you can safely apply gradients
+        # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
-
         self.check_gradient(gradient_heads)
 
-        # self.log_task_gradient({task_list[i]: task_param_sets[i] for i in range(len(task_list))}, shared_params)
-
+        # === Step optimizers ===
         for opt in optimizers:
             opt.step()
 
@@ -562,28 +569,70 @@ class EveNetEngine(L.LightningModule):
             grad_avg = grad_mag / num_params if num_params > 0 else 0.0
             self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
 
-    def log_task_gradient(self, task_param_sets, shared_params):
-        def flatten_grads(params):
-            """Flatten gradients into a single 1D tensor."""
-            grads = [p.grad.view(-1) for p in params if p.grad is not None]
-            return torch.cat(grads) if grads else torch.tensor([], device=params[0].device)
+    def log_task_gradient(self, task_loss_dict, shared_params):
+        """
+        Computes and logs pairwise cosine similarity between task gradients
+        on shared parameters using torch.autograd.grad (non-intrusive and efficient).
 
-        flat_task_grads = {}
-        for name, params in task_param_sets.items():
-            flat = flatten_grads(params)
-            norm = flat.norm().item() if flat.numel() > 0 else 0.0
-            flat_task_grads[name] = flat
-            self.log(f"grad_norm/{name}", norm, on_step=True, prog_bar=False, logger=True, sync_dist=True)
+        Args:
+            task_loss_dict (dict): Mapping from task name to loss tensor.
+            shared_params (iterable): Parameters shared across tasks (e.g., backbone).
+        """
+        total_dim = sum(p.numel() for p in shared_params)
+        grad_vectors = {}
 
-    def sync_gradients_ddp(self, model, average=True):
+        for task_name, loss in task_loss_dict.items():
+            grads = torch.autograd.grad(
+                loss,
+                shared_params,
+                retain_graph=True,
+                allow_unused=False,
+                create_graph=False
+            )
+            flat = [g.view(-1) for g in grads if g is not None]
+            if flat:
+                grad_vec = torch.cat(flat)
+            else:
+                grad_vec = torch.zeros(total_dim, device=loss.device)
+            grad_vectors[task_name] = grad_vec
+
+        # Stack into [T, D]
+        task_names = list(grad_vectors.keys())
+        all_grads = torch.stack([grad_vectors[name] for name in task_names], dim=0)  # [T, D]
+
+        # Normalize manually, avoid NaNs for zero vectors
+        norms = all_grads.norm(p=2, dim=1, keepdim=True)  # [T, 1]
+        nonzero = norms > 0
+        safe_norms = torch.where(nonzero, norms, torch.ones_like(norms))  # avoid div-by-zero
+        normalized_grads = all_grads / safe_norms  # [T, D]
+
+        # Compute cosine sim matrix [T, T]
+        sim_matrix = normalized_grads @ normalized_grads.T
+        for i, name_i in enumerate(task_names):
+            for j in range(i, len(task_names)):
+                if i == j:
+                    continue
+                self.log(
+                    f"cos_grad_sim/{name_i}_vs_{task_names[j]}",
+                    sim_matrix[i, j],
+                    on_step=True,
+                    logger=True,
+                    sync_dist=True
+                )
+
+    def sync_gradients_ddp(self, model, average=True, exclude_modules=()):
         if not torch.distributed.is_initialized():
             return
 
         buckets = defaultdict(list)
 
+        excluded = set()
+        for module in exclude_modules:
+            excluded.update(p for p in module.parameters())
+
         # Group gradients by (device, dtype)
         for param in model.parameters():
-            if param.grad is not None:
+            if param.grad is not None and param not in excluded:
                 key = (param.grad.device, param.grad.dtype)
                 buckets[key].append(param.grad)
 
@@ -1016,6 +1065,7 @@ class EveNetEngine(L.LightningModule):
     def prepare_MTL_parameters(self, loss_head: dict[str, torch.Tensor]):
 
         task_losses = {}
+        task_loss_global = None
 
         # if "classification" in loss_head:
         #     task_losses["classification"] = loss_head["classification"]
@@ -1034,13 +1084,14 @@ class EveNetEngine(L.LightningModule):
         if "regression" in loss_head:
             task_losses["regression"] = loss_head["regression"]
 
-        if "generation-global" in loss_head:
-            task_losses["generation-global"] = loss_head["generation-global"]
-
         if "generation-event" in loss_head or "generation-invisible" in loss_head:
             task_losses["generation-particle"] = (
                     loss_head.get("generation-event", 0.0) + loss_head.get("generation-invisible", 0.0)
             )
+
+        ### Individual Loss
+        if "generation-global" in loss_head:
+            task_loss_global = loss_head["generation-global"]
 
         def filter_trainable(params):
             return [p for p in params if p.requires_grad]
@@ -1063,34 +1114,34 @@ class EveNetEngine(L.LightningModule):
             #             v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values()
             #         )
             #     )
+            # elif loss_name == "assignment":
+            #     task_params = (
+            #             filter_trainable(self.model.ObjectEncoder.parameters()) +
+            #             filter_trainable(self.model.Assignment.parameters())
+            #     )
             if loss_name == "deterministic":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Classification.parameters()) +
                         filter_trainable(self.model.Assignment.parameters())
                 )
-
             elif loss_name == "regression":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Regression.parameters())
                 )
-            # elif loss_name == "assignment":
-            #     task_params = (
-            #             filter_trainable(self.model.ObjectEncoder.parameters()) +
-            #             filter_trainable(self.model.Assignment.parameters())
-            #     )
-            elif loss_name == "generation-global":
-                task_params = (
-                    filter_trainable(self.model.GlobalGeneration.parameters())
-                )
             elif loss_name == "generation-particle":
                 task_params = (
                     filter_trainable(self.model.EventGeneration.parameters())
                 )
+            # No need, will use automatic backward
+            # elif loss_name == "generation-global":
+            #     task_params = (
+            #         filter_trainable(self.model.GlobalGeneration.parameters())
+            #     )
             else:
                 raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
 
             task_param_sets.append(task_params)
 
-        return task_losses, shared_params, task_param_sets
+        return task_losses, shared_params, task_param_sets, task_loss_global

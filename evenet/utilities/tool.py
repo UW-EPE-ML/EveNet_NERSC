@@ -62,3 +62,41 @@ def check_param_overlap(task_param_sets, task_names, model, current_step=None, c
                 print(f"    ↳ {pname}")
 
     return overlaps
+
+
+def print_params_used_by_loss(loss, model, include_shapes=True, verbose=True):
+    """
+    Print parameter names from the model that are used in computing the given loss.
+
+    Args:
+        loss (torch.Tensor): Scalar loss tensor.
+        model (torch.nn.Module): The model whose parameters will be checked.
+        include_shapes (bool): Whether to print parameter shapes.
+        verbose (bool): Whether to print output (vs return lists).
+
+    Returns:
+        used_names (List[str]): List of used parameter names.
+    """
+    named_params = [(name, p) for name, p in model.named_parameters() if p.requires_grad]
+    names, params = zip(*named_params)
+
+    # Get gradients w.r.t. all parameters
+    grads = torch.autograd.grad(
+        loss,
+        params,
+        retain_graph=True,
+        allow_unused=True,
+        create_graph=False
+    )
+
+    used_names = []
+    for name, param, grad in zip(names, params, grads):
+        if grad is not None:
+            used_names.append(name)
+            if verbose:
+                msg = f"✅ USED: {name}"
+                if include_shapes:
+                    msg += f" — shape: {tuple(param.shape)}"
+                print(msg)
+
+    return used_names
