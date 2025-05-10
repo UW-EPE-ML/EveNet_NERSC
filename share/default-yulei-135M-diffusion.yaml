@@ -27,7 +27,7 @@ options:
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 1 # how often to run diffusion
-    diffusion_every_n_steps: 100 # how often to run diffusion inside the valid epoch
+    diffusion_every_n_steps: 1000 # how often to run diffusion inside the valid epoch
 
     learning_rate: &lr 0.000015
     weight_decay: &wd 0.0015

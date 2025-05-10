@@ -432,6 +432,8 @@ class EveNetEngine(L.LightningModule):
         # ✅ Now you can safely apply gradients
         clip_grad_norm_(self.model.parameters(), 1.0)
 
+        self.check_gradient(gradient_heads)
+
         for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
             sch.step()
@@ -1003,16 +1005,22 @@ class EveNetEngine(L.LightningModule):
 
         task_losses = {}
 
-        if "classification" in loss_head:
-            task_losses["classification"] = loss_head["classification"]
+        # if "classification" in loss_head:
+        #     task_losses["classification"] = loss_head["classification"]
+        #
+        # if "assignment" in loss_head or "detection" in loss_head:
+        #     task_losses["assignment"] = (
+        #             loss_head.get("assignment", 0.0) + loss_head.get("detection", 0.0)
+        #     )
+
+        if "classification" in loss_head or "assignment" in loss_head or "detection" in loss_head:
+            task_losses["deterministic"] = (
+                    loss_head.get("classification", 0.0) + loss_head.get("assignment", 0.0) +
+                    loss_head.get("detection", 0.0)
+            )
 
         if "regression" in loss_head:
             task_losses["regression"] = loss_head["regression"]
-
-        if "assignment" in loss_head or "detection" in loss_head:
-            task_losses["assignment"] = (
-                    loss_head.get("assignment", 0.0) + loss_head.get("detection", 0.0)
-            )
 
         if "generation-global" in loss_head:
             task_losses["generation-global"] = loss_head["generation-global"]
@@ -1032,27 +1040,34 @@ class EveNetEngine(L.LightningModule):
 
         task_param_sets = []
         for loss_name in task_losses:
-            if loss_name == "classification":
-                task_params = (
-                        filter_trainable(self.model.ObjectEncoder.parameters()) +
-                        filter_trainable(self.model.Classification.parameters())
-                )
+            # if loss_name == "classification":
+            #     task_params = (
+            #             filter_trainable(self.model.ObjectEncoder.parameters()) +
+            #             filter_trainable(self.model.Classification.parameters())
+            #     )
                 # if hasattr(self.model, "Assignment") and hasattr(self.model.Assignment, "multiprocess_assign_head"):
                 #     task_params += filter_trainable(
                 #         chain.from_iterable(
                 #             v.parameters() for v in self.model.Assignment.multiprocess_assign_head.values()
                 #         )
                 #     )
+            if loss_name == "deterministic":
+                task_params = (
+                        filter_trainable(self.model.ObjectEncoder.parameters()) +
+                        filter_trainable(self.model.Classification.parameters()) +
+                        filter_trainable(self.model.Assignment.parameters())
+                )
+
             elif loss_name == "regression":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +
                         filter_trainable(self.model.Regression.parameters())
                 )
-            elif loss_name == "assignment":
-                task_params = (
-                        filter_trainable(self.model.ObjectEncoder.parameters()) +
-                        filter_trainable(self.model.Assignment.parameters())
-                )
+            # elif loss_name == "assignment":
+            #     task_params = (
+            #             filter_trainable(self.model.ObjectEncoder.parameters()) +
+            #             filter_trainable(self.model.Assignment.parameters())
+            #     )
             elif loss_name == "generation-global":
                 task_params = (
                     filter_trainable(self.model.GlobalGeneration.parameters())
