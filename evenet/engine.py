@@ -439,56 +439,6 @@ class EveNetEngine(L.LightningModule):
 
         # self.log_task_gradient({task_list[i]: task_param_sets[i] for i in range(len(task_list))}, shared_params)
 
-        def compare_tensor_stats(local_tensor, ref_tensor, name, rtol=1e-4, atol=1e-6):
-            same = torch.isclose(local_tensor, ref_tensor, rtol=rtol, atol=atol)
-            total = same.numel()
-            num_same = same.sum().item()
-            num_diff = total - num_same
-            if num_diff > 0:
-                rank = torch.distributed.get_rank()
-                max_diff = (local_tensor - ref_tensor).abs().max().item()
-                print(f"[RANK {rank}] {name}: {num_diff}/{total} values differ "
-                      f"(max diff: {max_diff:.3e}, match rate: {num_same / total:.2%})")
-            return num_same, num_diff
-
-        def check_ddp_param_sync(model):
-            all_same = True
-            total_same, total_diff = 0, 0
-            for name, param in model.named_parameters():
-                if not param.requires_grad or not param.data.is_floating_point():
-                    continue
-                ref = param.data.clone()
-                torch.distributed.broadcast(ref, src=0)
-                num_same, num_diff = compare_tensor_stats(param.data, ref, f"Param {name}", rtol=1e-4, atol=1e-6)
-                total_same += num_same
-                total_diff += num_diff
-                if num_diff > 0:
-                    all_same = False
-            print(f"[RANK {torch.distributed.get_rank()}] Param sync: {total_same} same, {total_diff} different")
-            return all_same
-
-        def check_ddp_grad_sync(model):
-            all_same = True
-            total_same, total_diff = 0, 0
-            for name, param in model.named_parameters():
-                if param.grad is None:
-                    continue
-                ref = param.grad.detach().clone()
-                torch.distributed.broadcast(ref, src=0)
-                num_same, num_diff = compare_tensor_stats(param.grad, ref, f"Grad {name}")
-                total_same += num_same
-                total_diff += num_diff
-                if num_diff > 0:
-                    all_same = False
-            print(f"[RANK {torch.distributed.get_rank()}] Grad sync: {total_same} same, {total_diff} different")
-            return all_same
-
-        if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
-            print("Checking param sync...")
-            check_ddp_param_sync(self.model)
-            print("Checking grad sync...")
-            check_ddp_grad_sync(self.model)
-
         for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
             sch.step()
