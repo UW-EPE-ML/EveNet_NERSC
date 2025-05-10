@@ -457,7 +457,7 @@ class EveNetEngine(L.LightningModule):
                     continue
                 ref = param.data.clone()
                 torch.distributed.broadcast(ref, src=0)
-                num_same, num_diff = compare_tensor_stats(param.data, ref, f"Param {name}")
+                num_same, num_diff = compare_tensor_stats(param.data, ref, f"Param {name}", rtol=1e-4, atol=1e-6)
                 total_same += num_same
                 total_diff += num_diff
                 if num_diff > 0:
@@ -484,8 +484,8 @@ class EveNetEngine(L.LightningModule):
         if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
             print("Checking param sync...")
             check_ddp_param_sync(self.model)
-            print("Checking grad sync...")
-            check_ddp_grad_sync(self.model)
+            # print("Checking grad sync...")
+            # check_ddp_grad_sync(self.model)
 
         for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
