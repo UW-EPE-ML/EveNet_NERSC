@@ -7,6 +7,7 @@ import wandb
 import lightning as L
 import torch
 from torch.nn.utils import clip_grad_norm_
+import torch.nn.functional as F
 from torch.amp import GradScaler
 
 from lightning.pytorch.utilities.types import STEP_OUTPUT
@@ -407,7 +408,7 @@ class EveNetEngine(L.LightningModule):
         #     check_every=1000,
         #     verbose=False,
         # )
-
+        task_list = list(task_losses.keys())
         task_losses = self.scaler.scale(list(task_losses.values()))
         mtl_backward(
             task_losses,
@@ -433,6 +434,8 @@ class EveNetEngine(L.LightningModule):
         clip_grad_norm_(self.model.parameters(), 1.0)
 
         self.check_gradient(gradient_heads)
+
+        # self.log_task_gradient({task_list[i]: task_param_sets[i] for i in range(len(task_list))}, shared_params)
 
         for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
@@ -573,6 +576,19 @@ class EveNetEngine(L.LightningModule):
             num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
             grad_avg = grad_mag / num_params if num_params > 0 else 0.0
             self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
+
+    def log_task_gradient(self, task_param_sets, shared_params):
+        def flatten_grads(params):
+            """Flatten gradients into a single 1D tensor."""
+            grads = [p.grad.view(-1) for p in params if p.grad is not None]
+            return torch.cat(grads) if grads else torch.tensor([], device=params[0].device)
+
+        flat_task_grads = {}
+        for name, params in task_param_sets.items():
+            flat = flatten_grads(params)
+            norm = flat.norm().item() if flat.numel() > 0 else 0.0
+            flat_task_grads[name] = flat
+            self.log(f"grad_norm/{name}", norm, on_step=True, prog_bar=False, logger=True, sync_dist=True)
 
     # @time_decorator
     def on_fit_start(self) -> None:

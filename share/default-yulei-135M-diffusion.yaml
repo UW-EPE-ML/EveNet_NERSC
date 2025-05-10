@@ -1,14 +1,14 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M"
-  number_of_workers: 32
+  number_of_workers: 2
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 512
+  batch_size: 256
   prefetch_batches: 2
 
-  mixed_precision: true
+  mixed_precision: false
 
 wandb:
   project: "Pretrain"
