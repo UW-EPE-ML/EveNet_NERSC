@@ -399,10 +399,12 @@ class EveNetEngine(L.LightningModule):
         #     check_every=1000,
         #     verbose=False,
         # )
-        for task, loss in task_losses.items():
-            print(f"[Task {task}] Loss: {loss.item()}")
-            # print_params_used_by_loss(loss, self.model)
-        self.log_task_gradient(task_losses, shared_params)
+        # for task, loss in task_losses.items():
+        #     print(f"[Task {task}] Loss: {loss.item()}")
+        #     print_params_used_by_loss(loss, self.model)
+
+        if self.current_step % 500 == 0:
+            self.log_task_gradient(task_losses, shared_params)
 
         # === Backward for EveNet Main Part (multitask) ===
         task_losses = list(task_losses.values())
