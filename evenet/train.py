@@ -16,6 +16,7 @@ from ray.train import RunConfig, ScalingConfig
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, RichModelSummary
+from lightning.pytorch.profilers import PyTorchProfiler
 
 from evenet.control.global_config import global_config
 from shared import make_process_fn, prepare_datasets
@@ -97,6 +98,10 @@ def train_func(cfg):
         # val_check_interval=10,
         num_sanity_val_steps=0,
         log_every_n_steps=1,
+        profiler=PyTorchProfiler(
+            dirpath=global_config.options.Training.model_checkpoint_save_path,
+            filename=f"profiler_{world_rank}",
+        ),
         **accelerator_config,
     )
 
