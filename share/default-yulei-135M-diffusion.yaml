@@ -5,10 +5,8 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 256
+  batch_size: 512
   prefetch_batches: 2
-
-  mixed_precision: true
 
 wandb:
   project: "Pretrain"
