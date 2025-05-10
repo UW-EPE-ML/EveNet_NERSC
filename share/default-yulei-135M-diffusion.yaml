@@ -8,7 +8,7 @@ platform:
   batch_size: 256
   prefetch_batches: 2
 
-  mixed_precision: false
+  mixed_precision: true
 
 wandb:
   project: "Pretrain"
