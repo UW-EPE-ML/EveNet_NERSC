@@ -1,4 +1,5 @@
 import math
+from collections import defaultdict
 from functools import partial
 from itertools import chain
 from typing import Any, Union
@@ -429,6 +430,7 @@ class EveNetEngine(L.LightningModule):
         #         if param.grad is not None:
         #             torch.distributed.all_reduce(param.grad, op=torch.distributed.ReduceOp.SUM)
         #             param.grad /= world_size
+        self.sync_gradients_ddp(self.model)
 
         # ✅ Now you can safely apply gradients
         clip_grad_norm_(self.model.parameters(), 1.0)
@@ -484,8 +486,8 @@ class EveNetEngine(L.LightningModule):
         if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
             print("Checking param sync...")
             check_ddp_param_sync(self.model)
-            # print("Checking grad sync...")
-            # check_ddp_grad_sync(self.model)
+            print("Checking grad sync...")
+            check_ddp_grad_sync(self.model)
 
         for opt, sch in zip(optimizers, schedulers):
             self.scaler.step(opt)
@@ -639,6 +641,24 @@ class EveNetEngine(L.LightningModule):
             norm = flat.norm().item() if flat.numel() > 0 else 0.0
             flat_task_grads[name] = flat
             self.log(f"grad_norm/{name}", norm, on_step=True, prog_bar=False, logger=True, sync_dist=True)
+
+    def sync_gradients_ddp(self, model, average=True):
+        if not torch.distributed.is_initialized():
+            return
+
+        buckets = defaultdict(list)
+
+        # Group gradients by (device, dtype)
+        for param in model.parameters():
+            if param.grad is not None:
+                key = (param.grad.device, param.grad.dtype)
+                buckets[key].append(param.grad)
+
+        for (_, _), grads in buckets.items():
+            for grad in grads:
+                torch.distributed.all_reduce(grad, op=torch.distributed.ReduceOp.SUM)
+                if average:
+                    grad /= torch.distributed.get_world_size()
 
     # @time_decorator
     def on_fit_start(self) -> None:
