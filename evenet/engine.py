@@ -428,7 +428,7 @@ class EveNetEngine(L.LightningModule):
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
-        self.check_gradient(gradient_heads)
+        # self.check_gradient(gradient_heads)
 
         # === Step optimizers ===
         for opt in optimizers:
