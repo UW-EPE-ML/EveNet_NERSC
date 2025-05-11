@@ -25,14 +25,13 @@ def make_process_fn(base_dir: Path):
         "Classification": "classification",
         "Regression": "regression-",
         "Assignment": "assignment-",
-        "EventGeneration": "event_generation-",
+        # "TruthGeneration": "event_generation-",
+        "ReconGeneration": "event_generation-",
     }
 
     for name, prefix in component_map.items():
         component = getattr(global_config.options.Training.Components, name)
         if not getattr(component, "include", False):
-            drop_column_prefix.append(prefix)
-        elif name == "EventGeneration" and not getattr(component, "generate_neutrino", False):
             drop_column_prefix.append(prefix)
 
     return partial(

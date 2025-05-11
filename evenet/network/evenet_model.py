@@ -251,38 +251,38 @@ class EveNetModel(nn.Module):
             self.generation_pc_indices = self.event_info.generation_pc_indices
             self.ReconGeneration = EventGenerationHead(
                 input_dim=pet_config.hidden_dim,
-                projection_dim=self.network_cfg.EventGeneration.hidden_dim,
+                projection_dim=self.network_cfg.ReconGeneration.hidden_dim,
                 num_global_cond=global_embedding_cfg.hidden_dim,
                 num_classes=self.event_info.num_classes_total,
                 output_dim=self.sequential_input_dim,
-                num_layers=self.network_cfg.EventGeneration.num_layers,
-                num_heads=self.network_cfg.EventGeneration.num_heads,
-                dropout=self.network_cfg.EventGeneration.dropout,
-                layer_scale=self.network_cfg.EventGeneration.layer_scale,
-                layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
-                drop_probability=self.network_cfg.EventGeneration.drop_probability,
-                feature_drop=self.network_cfg.EventGeneration.feature_drop,
+                num_layers=self.network_cfg.ReconGeneration.num_layers,
+                num_heads=self.network_cfg.ReconGeneration.num_heads,
+                dropout=self.network_cfg.ReconGeneration.dropout,
+                layer_scale=self.network_cfg.ReconGeneration.layer_scale,
+                layer_scale_init=self.network_cfg.ReconGeneration.layer_scale_init,
+                drop_probability=self.network_cfg.ReconGeneration.drop_probability,
+                feature_drop=self.network_cfg.ReconGeneration.feature_drop,
             )
 
         # [6-3] Event Generation Head (Truth-Level)
         if self.include_neutrino_generation:
             self.TruthGeneration = EventGenerationHead(
                 input_dim=pet_config.hidden_dim,
-                projection_dim=self.network_cfg.EventGeneration.hidden_dim,
+                projection_dim=self.network_cfg.TruthGeneration.hidden_dim,
                 num_global_cond=global_embedding_cfg.hidden_dim,
                 num_classes=self.event_info.num_classes_total,
                 output_dim=self.invisible_input_dim + self.invisible_padding,
-                num_layers=self.network_cfg.EventGeneration.num_layers,
-                num_heads=self.network_cfg.EventGeneration.num_heads,
-                dropout=self.network_cfg.EventGeneration.dropout,
-                layer_scale=self.network_cfg.EventGeneration.layer_scale,
-                layer_scale_init=self.network_cfg.EventGeneration.layer_scale_init,
-                drop_probability=self.network_cfg.EventGeneration.drop_probability,
-                feature_drop=self.network_cfg.EventGeneration.feature_drop,
-                position_encode=self.network_cfg.EventGeneration.neutrino_position_encode,
-                max_position_length=self.network_cfg.EventGeneration.max_position_length
+                num_layers=self.network_cfg.TruthGeneration.num_layers,
+                num_heads=self.network_cfg.TruthGeneration.num_heads,
+                dropout=self.network_cfg.TruthGeneration.dropout,
+                layer_scale=self.network_cfg.TruthGeneration.layer_scale,
+                layer_scale_init=self.network_cfg.TruthGeneration.layer_scale_init,
+                drop_probability=self.network_cfg.TruthGeneration.drop_probability,
+                feature_drop=self.network_cfg.TruthGeneration.feature_drop,
+                position_encode=self.network_cfg.TruthGeneration.neutrino_position_encode,
+                max_position_length=self.network_cfg.TruthGeneration.max_position_length
             )
-            self.neutrino_position_encode = self.network_cfg.EventGeneration.neutrino_position_encode
+            self.neutrino_position_encode = self.network_cfg.TruthGeneration.neutrino_position_encode
 
         self.schedule_flags = [
             (self.include_point_cloud_generation, "generation"),

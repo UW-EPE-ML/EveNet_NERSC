@@ -75,8 +75,8 @@ Assignment:
   combinatorial_scale: 0.0
   encode_event_token: true
   activation: GELU
-  num_encoder_layers: 4 # At least 1 layer, otherwise detection will not work
-  num_linear_layers: 2
+  num_encoder_layers: 5 # At least 1 layer, otherwise detection will not work
+  num_linear_layers: 3
   skip_connection: true
   encoder_skip_connection: true
 
@@ -90,7 +90,18 @@ GlobalGeneration:
   activation: SILU
   dropout: 0.0
 
-EventGeneration:
+ReconGeneration:
+  hidden_dim: 128
+  num_layers: 3
+  num_heads: 4
+  dropout: 0.1
+  layer_scale: true
+  layer_scale_init: 1.0e-05
+  drop_probability: 0.0
+  feature_drop: 0.0
+  extend_batch: true
+
+TruthGeneration:
   hidden_dim: 128
   num_layers: 3
   num_heads: 4
@@ -102,4 +113,3 @@ EventGeneration:
   extend_batch: true
   neutrino_position_encode: true
   max_position_length: 36 # Must be larger than max object number
-

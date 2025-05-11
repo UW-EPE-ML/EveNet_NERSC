@@ -115,24 +115,36 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
-    EventGeneration:
+    ReconGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
       optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
       loss_scale: 1.0 # loss coefficient
-      invisible_loss_scale: 1.0 # loss coefficient for invisible particles
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       diffusion_steps: 100
-      generate_point_cloud: true
-      generate_neutrino: true
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
       use_generation_result: false # whether to use the generation result as input for the next step
+
+    TruthGeneration:
+      learning_rate: *lr
+      optimizer_group: "generation"
+      optimizer_type: "lion"
+      warm_up: true
+      include: false # whether to build in network
+      loss_scale: 1.0 # loss coefficient
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      diffusion_steps: 100
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
 
 
   ProgressiveTraining:
@@ -189,25 +201,25 @@ Dataset:
   dataset_limit: 1.0
   normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
   balance_file: null
-  val_split: [0.7, 1.0]
+  val_split: [ 0.7, 1.0 ]
 
 Metrics:
   # plotting bins: [bin_num, bin_min, bin_max]
   Generation-Binning:
-    num_vectors: [21, -1, 20]
+    num_vectors: [ 21, -1, 20 ]
 
-    "point cloud-log_mass": [50, -1, 10]
-    "point cloud-log_pt": [50, -1, 10]
-    "point cloud-eta": [50, -4, 4]
-    "point cloud-phi": [50, -4, 4]
-    "point cloud-btag": [2, 0, 1]
-    "point cloud-isLepton": [2, 0, 1]
-    "point cloud-charge": [3, -1, 1]
+    "point cloud-log_mass": [ 50, -1, 10 ]
+    "point cloud-log_pt": [ 50, -1, 10 ]
+    "point cloud-eta": [ 50, -4, 4 ]
+    "point cloud-phi": [ 50, -4, 4 ]
+    "point cloud-btag": [ 2, 0, 1 ]
+    "point cloud-isLepton": [ 2, 0, 1 ]
+    "point cloud-charge": [ 3, -1, 1 ]
 
-    "neutrino-log_mass": [10, -1, 1]
-    "neutrino-log_pt": [50, 0, 7]
-    "neutrino-eta": [50, -4, 4]
-    "neutrino-phi": [50, -4, 4]
-    "neutrino-btag": [2, 0, 1]
-    "neutrino-isLepton": [2, 0, 1]
-    "neutrino-charge": [3, -1, 1]
+    "neutrino-log_mass": [ 10, -1, 1 ]
+    "neutrino-log_pt": [ 50, 0, 7 ]
+    "neutrino-eta": [ 50, -4, 4 ]
+    "neutrino-phi": [ 50, -4, 4 ]
+    "neutrino-btag": [ 2, 0, 1 ]
+    "neutrino-isLepton": [ 2, 0, 1 ]
+    "neutrino-charge": [ 3, -1, 1 ]

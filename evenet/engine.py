@@ -85,8 +85,9 @@ class EveNetEngine(L.LightningModule):
         self.regression_cfg = self.component_cfg.Regression
         self.assignment_cfg = self.component_cfg.Assignment
         self.global_generation_cfg = self.component_cfg.GlobalGeneration
-        self.event_generation_cfg = self.component_cfg.EventGeneration
-        self.generation_include = self.global_generation_cfg.include or self.event_generation_cfg.include
+        self.recon_generation_cfg = self.component_cfg.ReconGeneration
+        self.truth_generation_cfg = self.component_cfg.TruthGeneration
+        self.generation_include = self.global_generation_cfg.include or self.recon_generation_cfg.include or self.truth_generation_cfg.include
 
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
@@ -113,9 +114,9 @@ class EveNetEngine(L.LightningModule):
         self.diffusion_every_n_epochs = global_config.options.Training.diffusion_every_n_epochs
         self.diffusion_every_n_steps = global_config.options.Training.diffusion_every_n_steps
 
-        self.global_diffusion_steps = self.component_cfg.GlobalGeneration.diffusion_steps
-        self.point_cloud_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
-        self.neutrino_diffusion_steps = self.component_cfg.EventGeneration.diffusion_steps
+        self.global_diffusion_steps = self.global_generation_cfg.diffusion_steps
+        self.point_cloud_diffusion_steps = self.recon_generation_cfg.diffusion_steps
+        self.neutrino_diffusion_steps = self.truth_generation_cfg.diffusion_steps
 
         ###### Initialize Loss ######
         self.include_famo: bool = self.config.options.Training.get("FAMO", {}).get("turn_on", False)
@@ -165,6 +166,7 @@ class EveNetEngine(L.LightningModule):
 
         ###### For general log ######
         self.general_log = GenericMetrics()
+        self.log_gradient_step = global_config.options.Training.get("log_gradient_step", 100)
 
         ###### Progressive Training ######
         self.progressive_training: list = global_config.options.Training.get("ProgressiveTraining", [])
@@ -264,8 +266,8 @@ class EveNetEngine(L.LightningModule):
                 gen_metrics=self.generation_metrics_train if self.training else self.generation_metrics_valid,
                 model=self.model,
                 global_loss_scale=self.global_generation_cfg.loss_scale,
-                event_loss_scale=self.event_generation_cfg.loss_scale,
-                invisible_loss_scale=self.event_generation_cfg.invisible_loss_scale,
+                event_loss_scale=self.recon_generation_cfg.loss_scale,
+                invisible_loss_scale=self.truth_generation_cfg.loss_scale,
                 device=device,
                 num_steps_global=self.global_diffusion_steps,
                 num_steps_point_cloud=self.point_cloud_diffusion_steps,
@@ -428,7 +430,8 @@ class EveNetEngine(L.LightningModule):
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
-        # self.check_gradient(gradient_heads)
+        if self.current_step % 100 == 0:
+            self.check_gradient(gradient_heads)
 
         # === Step optimizers ===
         for opt in optimizers:
@@ -532,7 +535,7 @@ class EveNetEngine(L.LightningModule):
                     event_permutations=self.ass_args['step']['event_permutations'][process],
                 )
 
-        if self.event_generation_cfg.generate_neutrino:
+        if self.truth_generation_cfg.include:
             outputs["neutrinos"] = {
                 "predict": {},
                 "target": {}
@@ -679,12 +682,12 @@ class EveNetEngine(L.LightningModule):
                 "sequential_feature_names": self.config.event_info.sequential_feature_names,
                 "invisible_feature_names": self.config.event_info.invisible_feature_names,
                 "device": self.device,
-                "point_cloud_generation": self.event_generation_cfg.generate_point_cloud,
-                "neutrino_generation": self.event_generation_cfg.generate_neutrino,
+                "point_cloud_generation": self.recon_generation_cfg.include,
+                "neutrino_generation": self.truth_generation_cfg.include,
                 "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),
                 "target_global_index": self.config.event_info.generation_target_indices,
                 "target_global_names": self.config.event_info.generation_target_names,
-                "use_generation_result": self.event_generation_cfg.get("use_generation_result", False),
+                "use_generation_result": self.recon_generation_cfg.get("use_generation_result", False),
                 "target_event_index": self.config.event_info.generation_pc_indices,
             }
 
@@ -912,8 +915,8 @@ class EveNetEngine(L.LightningModule):
             device=self.device,
             classification=self.classification_cfg.include,
             regression=self.regression_cfg.include,
-            point_cloud_generation=self.global_generation_cfg.include,
-            neutrino_generation=self.event_generation_cfg.generate_neutrino,
+            point_cloud_generation=self.global_generation_cfg.include and self.recon_generation_cfg.include,
+            neutrino_generation=self.truth_generation_cfg.include,
             assignment=self.assignment_cfg.include,
             normalization_dict=self.normalization_dict,
         )
@@ -1044,10 +1047,12 @@ class EveNetEngine(L.LightningModule):
             gradient_heads["generation-global"] = self.model.GlobalGeneration
             loss_heads["generation-global"] = torch.zeros(1, device=self.device, requires_grad=True)
 
-        if self.event_generation_cfg.include:
+        if self.recon_generation_cfg.include:
             gradient_heads["generation-recon"] = self.model.ReconGeneration
-            gradient_heads["generation-truth"] = self.model.TruthGeneration
             loss_heads["generation-recon"] = torch.zeros(1, device=self.device, requires_grad=True)
+
+        if self.truth_generation_cfg.include:
+            gradient_heads["generation-truth"] = self.model.TruthGeneration
             loss_heads["generation-truth"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         if self.assignment_cfg.include:
