@@ -1,7 +1,6 @@
 import math
 from collections import defaultdict
 from functools import partial
-from itertools import chain
 from typing import Any, Union
 
 import wandb
@@ -391,42 +390,44 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_mtl_parameters(loss_head)
+        self.safe_manual_backward(loss.mean())
 
-        # check_param_overlap(
-        #     task_param_sets=task_param_sets,
-        #     task_names=list(task_losses.keys()),
-        #     model=self.model,
-        #     current_step=self.current_step,
-        #     check_every=1000,
-        #     verbose=False,
+        # task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_mtl_parameters(loss_head)
+        #
+        # # check_param_overlap(
+        # #     task_param_sets=task_param_sets,
+        # #     task_names=list(task_losses.keys()),
+        # #     model=self.model,
+        # #     current_step=self.current_step,
+        # #     check_every=1000,
+        # #     verbose=False,
+        # # )
+        # # for task, loss in task_losses.items():
+        # #     print(f"[Task {task}] Loss: {loss.item()}")
+        # #     print_params_used_by_loss(loss, self.model)
+        #
+        # if self.current_step % 100 == 0:
+        #     self.log_task_gradient(task_losses, shared_params)
+        #
+        # # === Backward for EveNet Main Part (multitask) ===
+        # task_losses = list(task_losses.values())
+        # mtl_backward(
+        #     task_losses,
+        #     features=shared_output,
+        #     aggregator=self.aggregator,
+        #     tasks_params=task_param_sets,
+        #     shared_params=shared_params,
+        #     retain_graph=True,
+        #     parallel_chunk_size=1,
         # )
-        # for task, loss in task_losses.items():
-        #     print(f"[Task {task}] Loss: {loss.item()}")
-        #     print_params_used_by_loss(loss, self.model)
-
-        if self.current_step % 100 == 0:
-            self.log_task_gradient(task_losses, shared_params)
-
-        # === Backward for EveNet Main Part (multitask) ===
-        task_losses = list(task_losses.values())
-        mtl_backward(
-            task_losses,
-            features=shared_output,
-            aggregator=self.aggregator,
-            tasks_params=task_param_sets,
-            shared_params=shared_params,
-            retain_graph=True,
-            parallel_chunk_size=1,
-        )
-        # === Sync gradients (excluding GlobalGeneration) ===
-        self.sync_gradients_ddp(
-            self.model,
-            exclude_modules=(getattr(self.model, "GlobalGeneration", None),) if gen_global_loss else ()
-        )
-        # === Backward for EveNet Global Part (GlobalGeneration) ===
-        if gen_global_loss:
-            gen_global_loss.mean().backward()
+        # # === Sync gradients (excluding GlobalGeneration) ===
+        # self.sync_gradients_ddp(
+        #     self.model,
+        #     exclude_modules=(getattr(self.model, "GlobalGeneration", None),) if gen_global_loss else ()
+        # )
+        # # === Backward for EveNet Global Part (GlobalGeneration) ===
+        # if gen_global_loss:
+        #     gen_global_loss.mean().backward()
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
