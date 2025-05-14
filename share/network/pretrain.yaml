@@ -31,7 +31,7 @@ Body:
     layer_scale: true
     layer_scale_init: 1.0e-05
     num_heads: 16
-    mode: "train"
+    mode: "all"
     dropout: 0.1
 
   ObjectEncoder:
