@@ -390,9 +390,7 @@ class EveNetEngine(L.LightningModule):
         for opt in optimizers:
             opt.zero_grad()
 
-        self.safe_manual_backward(loss.mean())
-
-        # task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_mtl_parameters(loss_head)
+        task_losses, shared_params, task_param_sets, gen_global_loss = self.prepare_mtl_parameters(loss_head)
         #
         # # check_param_overlap(
         # #     task_param_sets=task_param_sets,
@@ -406,9 +404,9 @@ class EveNetEngine(L.LightningModule):
         # #     print(f"[Task {task}] Loss: {loss.item()}")
         # #     print_params_used_by_loss(loss, self.model)
         #
-        # if self.current_step % 100 == 0:
-        #     self.log_task_gradient(task_losses, shared_params)
-        #
+        if self.current_step % self.log_gradient_step == 0:
+            self.log_task_gradient(task_losses, shared_params)
+
         # # === Backward for EveNet Main Part (multitask) ===
         # task_losses = list(task_losses.values())
         # mtl_backward(
@@ -429,9 +427,12 @@ class EveNetEngine(L.LightningModule):
         # if gen_global_loss:
         #     gen_global_loss.mean().backward()
 
+
+        self.safe_manual_backward(loss.mean())
+
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
-        if self.current_step % 100 == 0:
+        if self.current_step % self.log_gradient_step == 0:
             self.check_gradient(gradient_heads)
 
         # === Step optimizers ===
