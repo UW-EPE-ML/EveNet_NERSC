@@ -8,7 +8,7 @@ Body:
     linear_block_type: GRU
     transformer_dim_scale: 2.0
     initial_embedding_dim: 16
-    hidden_dim: 512
+    hidden_dim: 256
     normalization: LayerNorm
     linear_activation: GELU
     num_embedding_layers: 8
@@ -18,16 +18,16 @@ Body:
   PET:
     num_feature_keep: 0
     feature_drop: 0.1
-    hidden_dim: 512
+    hidden_dim: 256
     enable_local_embedding: true
     local_Krank: 4
     local_point_index:
       - 2
       - 3
     num_local_layer: 10
-    num_layers: 18
+    num_layers: 16
     drop_probability: 0.1
-    talking_head: false
+    talking_head: true
     layer_scale: true
     layer_scale_init: 1.0e-05
     num_heads: 16
@@ -35,7 +35,7 @@ Body:
     dropout: 0.1
 
   ObjectEncoder:
-    hidden_dim: 512
+    hidden_dim: 256
     position_embedding_dim: 32
     num_attention_heads: 8
     transformer_dim_scale: 2.0
