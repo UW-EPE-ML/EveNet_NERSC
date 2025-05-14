@@ -63,14 +63,16 @@ class TalkingHeadAttention(nn.Module):
         q, k, v = qkv[0] * self.scale, qkv[1], qkv[2]
 
         attn = (q @ k.transpose(-2, -1))
-        if int_matrix is not None:
-            attn += int_matrix
 
         attn = self.proj_l(attn.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
+        if int_matrix is not None:
+            attn = attn + int_matrix
+
+
         if mask is not None:
-            mask = mask.squeeze(2).unsqueeze(1).repeat(1, self.num_heads, 1, 1)
-            attn += (1.0 - mask) * -1e9
+            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+            attn = attn + ((1.0 - mask.float()) * -1e9)
 
         attn = F.softmax(attn, dim=-1)
         attn = self.proj_w(attn.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)

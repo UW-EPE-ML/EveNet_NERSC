@@ -52,7 +52,7 @@ class TransformerBlockModule(nn.Module):
                 int_matrix[attn_mask] = float('-inf')  # or -1e9 if you prefer finite
 
                 # Step 2: Broadcast to (B, num_heads, N, N)
-                int_matrix = int_matrix.unsqueeze(0).unsqueeze(0).expand(x.shpae[0], self.num_heads, attn_mask.shape[0], attn_mask.shape[1])
+                int_matrix = int_matrix.unsqueeze(0).unsqueeze(0).expand(x.shape[0], self.num_heads, attn_mask.shape[0], attn_mask.shape[1])
             updates, _ = self.attn(self.norm1(x), int_matrix=int_matrix, mask=mask) # TODO: check if attn_mask is correct
         else:
             updates, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x),
