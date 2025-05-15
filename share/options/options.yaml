@@ -146,32 +146,25 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
-
   ProgressiveTraining:
-    - name: "vanilla"
-      epoch_ratio: 1.0
-      # the length of the transition epoch (can be float number)
-      # --> ramp up the loss from previous training schedule to the current one
-      # --> a cosine function is used to ramp up the loss
-      #     --> transition factor: t = 0.5 * (1 - np.cos(np.pi * np.clip(steps / total_steps, 0, 1)))
-      #     ==> loss = t * new_loss + (1 - t) * old_loss
-      # Will not triggered if it's the first training schedule
-      transition_epoch: 0.0
-      components:
-        - body
-        - object_encoder
-        - classification
-        - regression
-        - assignment
-        - generation
-    - name: "no use, just for example"
-      epoch_ratio: 0.0
-      transition_epoch: 0.5
-      components:
-        - body
-        - object_encoder
-        - classification
-        - assignment
+    stages:
+      - name: "full_training"
+        epoch_ratio: 1.0
+        transition_ratio: 0.0
+        loss_weights:
+          generation: [ 1.0, 1.0 ]
+          classification: [ 1.0, 1.0 ]
+          regression: [ 1.0, 1.0 ]
+          assignment: [ 1.0, 1.0 ]
+
+      - name: "gen_pretrain"
+        epoch_ratio: 0.2
+        transition_ratio: 0.2  # ramp over 20% of this stage
+        loss_weights:
+          generation: [1.0, 1.0]
+          classification: [0.0, 0.0]
+          regression: [0.0, 0.0]
+          assignment: [0.0, 0.0]
 
   EarlyStopping:
     patience: 20
