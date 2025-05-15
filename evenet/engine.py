@@ -521,6 +521,11 @@ class EveNetEngine(L.LightningModule):
         grad_vectors = {}
 
         for task_name, loss in task_loss_dict.items():
+            if loss.requires_grad is False or loss.detach().item() == 0.0:
+                grad_vec = torch.zeros(total_dim, device=loss.device)
+                grad_vectors[task_name] = grad_vec
+                continue
+
             grads = torch.autograd.grad(
                 loss,
                 shared_params,
@@ -529,10 +534,7 @@ class EveNetEngine(L.LightningModule):
                 create_graph=False
             )
             flat = [g.view(-1) for g in grads if g is not None]
-            if flat:
-                grad_vec = torch.cat(flat)
-            else:
-                grad_vec = torch.zeros(total_dim, device=loss.device)
+            grad_vec = torch.cat(flat) if flat else torch.zeros(total_dim, device=loss.device)
             grad_vectors[task_name] = grad_vec
 
         for task_name, grad_vec in grad_vectors.items():
@@ -1009,6 +1011,10 @@ class EveNetEngine(L.LightningModule):
                     loss_head.get("detection", 0.0)
             )
 
+        for loss_name in loss_head.keys():
+            if loss_name.startswith("assignment_"):
+                task_losses[loss_name] = loss_head[loss_name]
+
         if "regression" in loss_head:
             task_losses["regression"] = loss_head["regression"]
 
@@ -1073,7 +1079,10 @@ class EveNetEngine(L.LightningModule):
             #         filter_trainable(self.model.GlobalGeneration.parameters())
             #     )
             else:
-                raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
+                # print(f"[TorchJD] Unhandled loss name: {loss_name}")
+                # raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
+                task_params=[]
+                pass
 
             task_param_sets.append(task_params)
 
