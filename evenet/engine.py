@@ -1048,6 +1048,9 @@ class EveNetEngine(L.LightningModule):
                     loss_head.get("detection", 0.0)
             )
 
+        if "classification-noised" in loss_head:
+            task_losses["cross_term"] = loss_head["classification-noised"]
+
         for loss_name in loss_head.keys():
             if loss_name.startswith("assignment_"):
                 task_losses[loss_name] = loss_head[loss_name]
