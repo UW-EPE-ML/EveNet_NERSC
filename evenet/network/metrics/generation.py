@@ -76,9 +76,12 @@ class GenerationMetrics:
     ):
         model.eval()
 
+        print('key', input_set.keys())
+
         predict_distribution = dict()
         truth_distribution = dict()
-        process_id = input_set['classification']
+        process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
+            input_set['conditions_mask']).long()  # (batch_size, 1)
         masking = dict()
         if self.point_cloud_generation:
             ####################################
@@ -125,8 +128,10 @@ class GenerationMetrics:
             ##  Step 2: Generate point cloud  ##
             ####################################
 
+
             data_shape = input_set['x'].shape
-            process_id = input_set['classification']
+            process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
+            input_set['conditions_mask']).long()  # (batch_size, 1)
 
             predict_for_point_cloud = partial(
                 model.predict_diffusion_vector,
@@ -159,7 +164,8 @@ class GenerationMetrics:
             #####################################
 
             data_shape = input_set['x_invisible'].shape
-            process_id = input_set['classification']
+            process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
+            input_set['conditions_mask']).long()  # (batch_size, 1)
 
             predict_for_neutrino = partial(
                 model.predict_diffusion_vector,
@@ -333,7 +339,7 @@ class GenerationMetrics:
             if (np.sum(counts) > 0) and (np.sum(truth_counts) > 0):
                 p = truth_counts / np.sum(truth_counts)
                 q = counts / np.sum(counts)
-                jsd[cls_name] = (jensenshannon(p, q)) ** 2
+                jsd[cls_name] = (jensenshannon(p, q))
 
         ax.set_xlabel('Value')
         ax.set_ylabel('Frequency')
@@ -468,10 +474,14 @@ def shared_step(
         # total_gen_losses += generation_loss[generation_target]
         if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
+            loss_head_dict["generation-global"] = global_gen_loss
         elif generation_target == "neutrino":
             truth_gen_loss = truth_gen_loss + generation_loss[generation_target]
+            loss_head_dict["generation-truth"] = truth_gen_loss
+
         elif generation_target == "point_cloud":
             recon_gen_loss = recon_gen_loss + generation_loss[generation_target]
+            loss_head_dict["generation-recon"] = recon_gen_loss
 
         if diffusion_on and update_metric:
             gen_metrics.update(
@@ -481,10 +491,6 @@ def shared_step(
                 num_steps_point_cloud=num_steps_point_cloud,
                 num_steps_neutrino=num_steps_neutrino,
             )
-
-    loss_head_dict["generation-global"] = global_gen_loss
-    loss_head_dict["generation-recon"] = recon_gen_loss
-    loss_head_dict["generation-truth"] = truth_gen_loss
 
     loss = (
                    global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(

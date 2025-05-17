@@ -2,11 +2,12 @@
 NOT MY CODE -- minimally adapted from https://debuggercafe.com/using-learning-rate-scheduler-and-early-stopping-with-pytorch/
 """
 
-import torch, os, json
 from preprocessing.preprocess import unflatten_dict, flatten_dict
 import pyarrow.parquet as pq
 import numpy as np
 import awkward as ak
+import torch, os, json
+
 
 class LRScheduler():
     """
