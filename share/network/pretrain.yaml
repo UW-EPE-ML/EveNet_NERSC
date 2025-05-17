@@ -27,7 +27,7 @@ Body:
     num_local_layer: 10
     num_layers: 16
     drop_probability: 0.1
-    talking_head: true
+    talking_head: false
     layer_scale: true
     layer_scale_init: 1.0e-05
     num_heads: 16
