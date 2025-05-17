@@ -165,6 +165,10 @@ def mix(args):
     perm = np.random.permutation(len(next(iter(df_hybrid.values()))))
     df_hybrid = {k: v[perm] for k, v in df_hybrid.items()}
 
+    df_x_mask = np.zeros_like(df_hybrid["x"])
+    df_x_mask[..., global_config.event_info.generation_pc_indices] = 1.0
+    df_hybrid["x"] = df_hybrid["x"] * df_x_mask
+
     outputdir = clean_and_append(config["output"]["storedir"], "_hybrid")
     outputdir = clean_and_append(outputdir, postfix)
 

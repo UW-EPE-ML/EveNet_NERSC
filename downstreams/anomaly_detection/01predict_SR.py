@@ -86,6 +86,8 @@ def predict(rank, world_size, gen_num_events, args):
 
     new_state_dict = dict()
     for k, v in checkpoint["state_dict"].items():
+        if "famo" in k:
+            continue
         new_state_dict[k.replace("model.", "")] = v
     model.load_state_dict(new_state_dict)
     model.eval()
