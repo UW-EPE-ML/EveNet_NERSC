@@ -234,15 +234,21 @@ def shared_step(
         metrics: ClassificationMetrics,
         device: torch.device,
         update_metric: bool = True,
+        event_weight: torch.Tensor = None,
+        loss_name: str = "classification"
 ):
     cls_loss = cls_loss_fn(
         cls_output,
         target_classification,
         class_weight=class_weight.to(device=device),
-        reduction="mean",
+        reduction="none",
     )
+    if event_weight is not None:
+        cls_loss  = cls_loss * event_weight
+    cls_loss = cls_loss.mean()
+
     loss = cls_loss * loss_scale
-    loss_dict["classification"] = cls_loss
+    loss_dict[loss_name] = cls_loss
 
     if update_metric:
         metrics.update(
@@ -259,8 +265,8 @@ def shared_epoch_end(
         metrics_valid: ClassificationMetrics,
         metrics_train: ClassificationMetrics,
         num_classes: list[str],
-
         logger,
+        prefix: str = "",
 ):
     metrics_valid.reduce_across_gpus()
     if metrics_train:
@@ -275,14 +281,14 @@ def shared_epoch_end(
         fig_cm = metrics_valid.plot_cm(class_names=num_classes)
         logger.log({
             # "classification/CM": wandb.Image(fig_cm)
-            "classification/CM": fig_cm
+            f"{prefix}classification/CM": fig_cm
         })
         plt.close(fig_cm)
 
         fig_logits = metrics_valid.plot_logits(class_names=num_classes)
         for i, class_name in enumerate(num_classes):
             logger.log({
-                f"classification/logits_{class_name}": wandb.Image(fig_logits[i])
+                f"{prefix}classification/logits_{class_name}": wandb.Image(fig_logits[i])
                 # f"classification/logits_{class_name}": fig_logits[i]
             })
             plt.close(fig_logits[i])

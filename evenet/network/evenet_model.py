@@ -10,6 +10,7 @@ from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
 from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead, EventGenerationHead
+from evenet.utilities.diffusion_sampler import get_logsnr_alpha_sigma
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
 import torch.nn.functional as F
@@ -325,6 +326,8 @@ class EveNetModel(nn.Module):
         ##  Input  ##
         #############
 
+        _, alpha, _ = get_logsnr_alpha_sigma(time)
+
         input_point_cloud = x['x']
         input_point_cloud_mask = x['x_mask'].unsqueeze(-1)
         global_conditions = x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
@@ -430,7 +433,7 @@ class EveNetModel(nn.Module):
             elif schedule_name == "generation":
                 input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
                 input_point_cloud_noised_tmp_mask = torch.zeros_like(input_point_cloud_noised)
-                input_point_cloud_noised_tmp_mask[..., self.local_feature_indices] = 1.0
+                input_point_cloud_noised_tmp_mask[..., self.generation_pc_indices] = 1.0
                 input_point_cloud_noised = input_point_cloud_noised * input_point_cloud_noised_tmp_mask
                 full_input_point_cloud = input_point_cloud_noised
                 full_input_point_cloud_mask = input_point_cloud_mask
@@ -565,6 +568,7 @@ class EveNetModel(nn.Module):
             "generations": generations,
             "full_input_point_cloud": full_input_point_cloud,
             "full_global_conditions": full_global_conditions,
+            "alpha": alpha
         }
 
     def predict_diffusion_vector(
@@ -583,7 +587,8 @@ class EveNetModel(nn.Module):
             """
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
-            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
+            cond_x['conditions_mask']).long()  # (batch_size, 1)
             global_conditions = self.global_normalizer(
                 x=global_conditions,
                 mask=global_conditions_mask
@@ -599,7 +604,8 @@ class EveNetModel(nn.Module):
         elif mode == "event":
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
-            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
+            cond_x['conditions_mask']).long()  # (batch_size, 1)
             num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
             global_feature_mask = torch.zeros_like(global_conditions).float()
@@ -643,7 +649,8 @@ class EveNetModel(nn.Module):
         elif mode == "neutrino":
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
-            class_label = cond_x['classification'].unsqueeze(-1)  # (batch_size, 1)
+            class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
+            cond_x['conditions_mask']).long()  # (batch_size, 1)
             num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
             input_point_cloud = cond_x['x']
             input_point_cloud_mask = cond_x['x_mask'].unsqueeze(-1)

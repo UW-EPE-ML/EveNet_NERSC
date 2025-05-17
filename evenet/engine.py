@@ -58,6 +58,8 @@ class EveNetEngine(L.LightningModule):
         self.current_step = None  # hack global_step due to incorrect behavior in lightning for multiple optimizers
         self.classification_metrics_train = None
         self.classification_metrics_valid = None
+        self.classification_metrics_train_cross_term = None
+        self.classification_metrics_valid_cross_term = None
         self.assignment_metrics_train = None
         self.assignment_metrics_valid = None
         self.generation_metrics_train = None
@@ -219,6 +221,23 @@ class EveNetEngine(L.LightningModule):
             )
 
             loss_raw["classification"] = scaled_cls_loss
+
+        if self.classification_cfg.include_cross_term and outputs["classification-noised"]:
+            scaled_cls_loss_cross_term = cls_step(
+                target_classification=batch[self.target_classification_key].to(device=device),
+                cls_output=next(iter(outputs["classification-noised"].values())),
+                cls_loss_fn=self.cls_loss,
+                class_weight=self.class_weight.to(device=device),
+                event_weight=outputs["alpha"]*outputs["alpha"],
+                loss_dict=loss_head_dict,
+                loss_scale=self.classification_cfg.loss_scale_cross_term,
+                metrics=self.classification_metrics_train_cross_term if self.training else self.classification_metrics_valid_cross_term,
+                device=device,
+                update_metric=update_metric,
+                loss_name="classification-noised"
+            )
+
+            loss_raw["classification-noised"] = scaled_cls_loss_cross_term # TODO: check if this is correct for famo
 
         if self.regression_cfg.include and outputs["regression"]:
             target_regression = batch[self.target_regression_key].to(device=device)
@@ -605,6 +624,14 @@ class EveNetEngine(L.LightningModule):
                 num_classes=len(self.num_classes), normalize=True, device=self.device
             )
 
+        if self.classification_cfg.include_cross_term:
+            self.classification_metrics_train_cross_term = ClassificationMetrics(
+                num_classes=len(self.num_classes), normalize=True, device=self.device
+            )
+            self.classification_metrics_valid_cross_term = ClassificationMetrics(
+                num_classes=len(self.num_classes), normalize=True, device=self.device
+            )
+
         if self.assignment_cfg.include:
             def make_assignment_metrics():
                 return {
@@ -696,6 +723,16 @@ class EveNetEngine(L.LightningModule):
                 metrics_train=self.classification_metrics_train,
                 num_classes=self.num_classes,
                 logger=self.logger.experiment,
+            )
+
+        if self.classification_cfg.include_cross_term:
+            cls_end(
+                global_rank=self.global_rank,
+                metrics_valid=self.classification_metrics_valid_cross_term,
+                metrics_train=self.classification_metrics_train_cross_term,
+                num_classes=self.num_classes,
+                logger=self.logger.experiment,
+                prefix="cross-term-"
             )
 
         if self.assignment_cfg.include:
@@ -1055,11 +1092,12 @@ class EveNetEngine(L.LightningModule):
             #             filter_trainable(self.model.Assignment.parameters())
             #     )
             if loss_name == "deterministic":
-                task_params = (
-                        filter_trainable(self.model.ObjectEncoder.parameters()) +
-                        filter_trainable(self.model.Classification.parameters()) +
-                        filter_trainable(self.model.Assignment.parameters())
-                )
+                task_params = filter_trainable(self.model.ObjectEncoder.parameters())
+                if hasattr(self.model, "Classification"):
+                    task_params += filter_trainable(self.model.Classification.parameters())
+                if hasattr(self.model, "Assignment"):
+                    task_params += filter_trainable(self.model.Assignment.parameters())
+
             elif loss_name == "regression":
                 task_params = (
                         filter_trainable(self.model.ObjectEncoder.parameters()) +

@@ -1,8 +1,8 @@
 Training:
   # Total plan epochs for optimizer decay
-  total_epochs: 100
+  total_epochs: 300
   # Trainer will stop at this epoch number
-  epochs: 100
+  epochs: 300
 
   model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
@@ -16,14 +16,16 @@ Training:
   decoupled_weight_decay: &decouple_wd true
 
   diffusion_every_n_epochs: 20 # how often to run diffusion
-  diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
+  diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
+
+  patience: 10 # early stopping patience
 
 
   Components:
     GlobalEmbedding:
       learning_rate: *lr
       optimizer_group: "body" # learning rate based on the first component
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -35,7 +37,7 @@ Training:
     PET:
       learning_rate: *lr
       optimizer_group: "body"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -47,7 +49,7 @@ Training:
     ObjectEncoder:
       learning_rate: *lr
       optimizer_group: "object_encoder"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
@@ -59,12 +61,10 @@ Training:
     Classification:
       learning_rate: *lr
       optimizer_group: "classification"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
-      include: true # whether to build in network
-      include_cross_term: true # whether to calculate cross term loss
-      loss_scale_cross_term: 1.0 # loss coefficient
+      include: false # whether to build in network
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       freeze:
@@ -75,10 +75,10 @@ Training:
     Regression:
       learning_rate: *lr
       optimizer_group: "regression"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       loss_scale: 1.0 # loss coefficient
-      include: true # whether to build in network
+      include: false # whether to build in network
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       freeze:
@@ -89,7 +89,7 @@ Training:
     Assignment:
       learning_rate: *lr
       optimizer_group: "assignment"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
@@ -105,7 +105,7 @@ Training:
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
-      optimizer_type: "lion"
+      optimizer_type: "adamw"
       warm_up: true
       include: false # whether to build in network
       loss_scale: 1.0 # loss coefficient
@@ -148,6 +148,7 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
+
   ProgressiveTraining:
     stages:
       - name: "full_training"
@@ -156,19 +157,9 @@ Training:
         loss_weights:
           generation: [ 1.0, 1.0 ]
           classification: [ 1.0, 1.0 ]
-          classification-noised: [ 1.0, 1.0 ]
           regression: [ 1.0, 1.0 ]
           assignment: [ 1.0, 1.0 ]
 
-      - name: "gen_pretrain"
-        epoch_ratio: 0.2
-        transition_ratio: 0.2  # ramp over 20% of this stage
-        loss_weights:
-          generation: [1.0, 1.0]
-          classification: [0.0, 0.0]
-          classification-noised: [ 1.0, 1.0 ]
-          regression: [0.0, 0.0]
-          assignment: [0.0, 0.0]
 
   EarlyStopping:
     patience: 20
@@ -182,14 +173,8 @@ Training:
     detailed_loss: false
     detailed_loss_list:
       - classification
-      - generation-global
-      - generation-event
-      - generation-invisible
-      - assignment
-      - detection
     logits_bound: 1.0
     lr: 0.025
-
 #  GradientNorm:
 #    alpha: 0.12
 #    learning_rate: 0.0001
@@ -197,26 +182,12 @@ Training:
 Dataset:
   dataset_limit: 1.0
   normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/normalization_files/PreTrain_norm.pkl"
-  balance_file: null
-  val_split: [ 0.7, 1.0 ]
+  val_split: [0.0, 0.2]
 
 Metrics:
-  # plotting bins: [bin_num, bin_min, bin_max]
   Generation-Binning:
-    num_vectors: [ 21, -1, 20 ]
-
-    "point cloud-log_mass": [ 50, -1, 10 ]
-    "point cloud-log_pt": [ 50, -1, 10 ]
-    "point cloud-eta": [ 50, -4, 4 ]
-    "point cloud-phi": [ 50, -4, 4 ]
-    "point cloud-btag": [ 2, 0, 1 ]
-    "point cloud-isLepton": [ 2, 0, 1 ]
-    "point cloud-charge": [ 3, -1, 1 ]
-
-    "neutrino-log_mass": [ 10, -1, 1 ]
-    "neutrino-log_pt": [ 50, 0, 7 ]
-    "neutrino-eta": [ 50, -4, 4 ]
-    "neutrino-phi": [ 50, -4, 4 ]
-    "neutrino-btag": [ 2, 0, 1 ]
-    "neutrino-isLepton": [ 2, 0, 1 ]
-    "neutrino-charge": [ 3, -1, 1 ]
+    num_vectors: [21, -1, 20]
+    global-HT: [30, 0, 300]
+    point cloud-eta: [20, -3, 3]
+    point cloud-phi: [40, -4, 4]
+    point cloud-ip3d: [60, -1, 2]

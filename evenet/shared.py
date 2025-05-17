@@ -22,7 +22,7 @@ def make_process_fn(base_dir: Path):
         drop_column_prefix = None
 
     component_map = {
-        "Classification": "classification",
+#        "Classification": "classification",
         "Regression": "regression-",
         "Assignment": "assignment-",
         # "TruthGeneration": "event_generation-",
