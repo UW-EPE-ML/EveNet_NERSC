@@ -29,8 +29,19 @@ INPUTS:
   # ---------------------------------------------------------------------
   GLOBAL:
     Conditions:
+#      met: log_normalize
+#      met_phi: normalize
+
       met: log_normalize
       met_phi: normalize
+      nLepton: none
+      nbJet: none
+      nJet: none
+      HT: log_normalize
+      HT_lep: log_normalize
+      M_all: log_normalize
+      M_leps: log_normalize
+      M_bjets: log_normalize
 
 
 # ----------------------------------------------------------------------

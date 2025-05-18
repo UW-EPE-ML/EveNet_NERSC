@@ -13,6 +13,44 @@ def compute_mass(pt, eta, energy):
     return mass
 
 
+def get_masses(point_clouds):
+    # point_clouds: [batch, n_particles, n_features]
+    pt = point_clouds[:, :, 1]  # pt
+    eta = point_clouds[:, :, 2]  # eta
+    phi = point_clouds[:, :, 3]  # phi
+    E   = point_clouds[:, :, 7]  # energy
+
+    btag     = point_clouds[:, :, 4]
+    isLepton = point_clouds[:, :, 5]
+
+    vec_all = vector.arr({
+        "pt": pt,
+        "eta": eta,
+        "phi": phi,
+        "E": E,
+    })
+
+    vec_leps = vector.arr({
+        "pt": np.where(isLepton > 0.5, pt, 0.0),
+        "eta": np.where(isLepton > 0.5, eta, 0.0),
+        "phi": np.where(isLepton > 0.5, phi, 0.0),
+        "E": np.where(isLepton > 0.5, E, 0.0),
+    })
+
+    vec_bjets = vector.arr({
+        "pt": np.where(btag > 0.5, pt, 0.0),
+        "eta": np.where(btag > 0.5, eta, 0.0),
+        "phi": np.where(btag > 0.5, phi, 0.0),
+        "E": np.where(btag > 0.5, E, 0.0)
+    })
+
+    return {
+        "INPUTS/Conditions/M_all": vec_all.sum(axis=1).mass,
+        "INPUTS/Conditions/M_leps": vec_leps.sum(axis=1).mass,
+        "INPUTS/Conditions/M_bjets": vec_bjets.sum(axis=1).mass,
+    }
+
+
 def extract_and_split_4vec(pc, indices, base_key):
     """
     Extracts and splits 4-momentum into separate fields (pt, eta, phi, energy).
@@ -190,7 +228,7 @@ def convert_nu2flow(data: dict[str, ndarray]):
         'INFO/VetoDoubleAssign': good_events,
 
         'INPUTS/Source/MASK': point_clouds_mask,
-        'INPUTS/Source/mass': point_clouds[:, :, 0],
+        'INPUTS/Source/energy': point_clouds[:, :, 7],
         'INPUTS/Source/pt': point_clouds[:, :, 1],
         'INPUTS/Source/eta': point_clouds[:, :, 2],
         'INPUTS/Source/phi': point_clouds[:, :, 3],
@@ -201,15 +239,18 @@ def convert_nu2flow(data: dict[str, ndarray]):
         'INPUTS/Conditions/MASK': np.ones((n_event, 1), dtype=np.float32),
         'INPUTS/Conditions/met': data['delphes/MET']['MET'],
         'INPUTS/Conditions/met_phi': data['delphes/MET']['phi'],
+        'INPUTS/Conditions/nLepton': np.ones((n_event,), dtype=np.float32) * lep_num,
+        'INPUTS/Conditions/nJet': data['delphes/njets'],
+        'INPUTS/Conditions/nbJet': data['delphes/nbjets'],
+        'INPUTS/Conditions/HT': point_clouds[:, :, 1].sum(axis=1),
+        'INPUTS/Conditions/HT_lep': point_clouds[:, :lep_num, 1].sum(axis=1),
+        # 'INPUTS/Conditions/M_all':
+        **get_masses(point_clouds),
 
         'INPUTS/Invisible/MASK': np.ones((n_event, 2), dtype=np.float32),
-        'INPUTS/Invisible/mass': np.zeros((n_event, 2), dtype=np.float32),
         'INPUTS/Invisible/pt': data['delphes/neutrinos']['pt'],
         'INPUTS/Invisible/eta': data['delphes/neutrinos']['eta'],
         'INPUTS/Invisible/phi': data['delphes/neutrinos']['phi'],
-        'INPUTS/Invisible/btag': np.zeros((n_event, 2), dtype=np.float32),
-        'INPUTS/Invisible/isLepton': np.zeros((n_event, 2), dtype=np.float32),
-        'INPUTS/Invisible/charge': np.zeros((n_event, 2), dtype=np.float32),
 
         **assignments,
         **extra,
