@@ -660,6 +660,7 @@ class EveNetEngine(L.LightningModule):
                 "sequential_feature_names": self.config.event_info.sequential_feature_names,
                 "invisible_feature_names": self.config.event_info.invisible_feature_names,
                 "device": self.device,
+                "global_generation": self.global_generation_cfg.include,
                 "point_cloud_generation": self.recon_generation_cfg.include,
                 "neutrino_generation": self.truth_generation_cfg.include,
                 "special_bin_configs": self.config.options.Metrics.get("Generation-Binning", {}),

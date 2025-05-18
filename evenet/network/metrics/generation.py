@@ -21,6 +21,7 @@ class GenerationMetrics:
             invisible_feature_names,
             target_global_names, target_global_index, target_event_index,
             hist_xmin=-15, hist_xmax=15, num_bins=60,
+            global_generation=False,
             point_cloud_generation=False,
             neutrino_generation=False,
             use_generation_result=False,
@@ -30,6 +31,7 @@ class GenerationMetrics:
         self.sampler = DDIMSampler(device)
         self.device = device
 
+        self.global_generation = global_generation
         self.point_cloud_generation = point_cloud_generation
         self.neutrino_generation = neutrino_generation
         self.use_generation_result = use_generation_result
@@ -81,7 +83,7 @@ class GenerationMetrics:
         process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
             input_set['conditions_mask']).long()  # (batch_size, 1)
         masking = dict()
-        if self.point_cloud_generation:
+        if self.global_generation:
             ####################################
             ##  Step 1: Generate num vectors  ##
             ####################################
@@ -122,14 +124,14 @@ class GenerationMetrics:
                     input_set = copy.deepcopy(input_set)
                     input_set['conditions'][..., self.target_global_index] = generated_global
 
+        if self.point_cloud_generation:
             ####################################
             ##  Step 2: Generate point cloud  ##
             ####################################
 
-
             data_shape = input_set['x'].shape
             process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
-            input_set['conditions_mask']).long()  # (batch_size, 1)
+                input_set['conditions_mask']).long()  # (batch_size, 1)
 
             predict_for_point_cloud = partial(
                 model.predict_diffusion_vector,
@@ -163,7 +165,7 @@ class GenerationMetrics:
 
             data_shape = input_set['x_invisible'].shape
             process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
-            input_set['conditions_mask']).long()  # (batch_size, 1)
+                input_set['conditions_mask']).long()  # (batch_size, 1)
 
             predict_for_neutrino = partial(
                 model.predict_diffusion_vector,
