@@ -88,6 +88,13 @@ network:
   #  default: configs/model_large.yaml
   default: configs/pretrain.yaml
 
+  Body:
+    PET:
+      feature_drop: 0.0
+  ReconGeneration:
+    feature_drop: 0.0
+  TruthGeneration:
+    feature_drop: 0.0
   # overwrites
   # ...
 
