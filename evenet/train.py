@@ -11,7 +11,7 @@ from ray.train.lightning import (
     RayTrainReportCallback,
 )
 from ray.train.torch import TorchTrainer
-from ray.train import RunConfig, ScalingConfig
+from ray.train import RunConfig, ScalingConfig, CheckpointConfig
 
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
@@ -19,7 +19,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from lightning.pytorch.profilers import PyTorchProfiler
 
 from evenet.control.global_config import global_config
-from shared import make_process_fn, prepare_datasets
+from shared import make_process_fn, prepare_datasets, EveNetTrainCallback
 from evenet.engine import EveNetEngine
 
 
@@ -87,7 +87,7 @@ def train_func(cfg):
         strategy=RayDDPStrategy(find_unused_parameters=True),
         plugins=[RayLightningEnvironment()],
         callbacks=[
-            RayTrainReportCallback(),
+            EveNetTrainCallback(),
             checkpoint_callback,
             early_stop_callback,
             LearningRateMonitor(),
@@ -154,7 +154,7 @@ def main(args):
 
     run_config = RunConfig(
         name="EveNet-Training",
-        storage_path=args.ray_dir
+        storage_path=args.ray_dir,
     )
 
     # Schedule four workers for DDP training (1 GPU/worker by default)
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     parser.add_argument("config", help="Path to config file")
     # argument for loading all dataset files into RAM
     parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
-    parser.add_argument("--ray_dir", type=str, default = "~/ray_results")
+    parser.add_argument("--ray_dir", type=str, default="~/ray_results")
 
     args, _ = parser.parse_known_args()
 

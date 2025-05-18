@@ -8,6 +8,15 @@ from ray.data.dataset import MaterializedDataset
 from rich.table import Table
 import rich
 
+import os
+from tempfile import TemporaryDirectory
+
+from lightning.pytorch.callbacks import Callback
+
+import ray
+import ray.train
+from ray.train import Checkpoint
+
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
 from preprocessing.preprocess import unflatten_dict
@@ -176,3 +185,17 @@ def prepare_datasets(
         )
 
         return train_ds, val_ds, train_ds.count(), val_ds.count()
+
+
+
+class EveNetTrainCallback(Callback):
+    def on_train_epoch_end(self, trainer, pl_module):
+        # Fetch metrics from `self.log(..)` in the LightningModule
+        metrics = trainer.callback_metrics
+        metrics = {k: v.item() for k, v in metrics.items()}
+
+        # Add customized metrics
+        metrics["epoch"] = trainer.current_epoch
+
+        # Report to train session
+        ray.train.report(metrics=metrics, checkpoint=None)
