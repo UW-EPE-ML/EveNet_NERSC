@@ -23,14 +23,14 @@ options:
     epochs: 500
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
     #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=49-v1.ckpt"
-    pretrain_model_load_path: null
-    #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
+#    pretrain_model_load_path: null
+    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/vanilla.1.ckpt"
 
     diffusion_every_n_epochs: 50 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.0005
-    learning_rate_body: &lr_body 0.0005
+    learning_rate: &lr 0.00005
+    learning_rate_body: &lr_body 0.000005
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
