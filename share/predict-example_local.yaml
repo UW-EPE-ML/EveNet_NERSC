@@ -23,8 +23,8 @@ options:
       - num_sequential_vectors
 
   Training:
-    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_c8de6_00000_0_2025-04-26_16-21-46/checkpoint_000002/checkpoint.ckpt"
-    #    pretrain_model_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_8685a_00000_0_2025-04-10_22-15-19/checkpoint_000000/checkpoint.ckpt"
+#    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_a103a_00000_0_2025-05-17_21-53-40/checkpoint_000009/checkpoint.ckpt"
+    pretrain_model_load_path:  "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_a103a_00000_0_2025-05-17_21-53-40/checkpoint_000009/checkpoint.ckpt"
 
     # Should follow the same components as your finetune model
     Components:
@@ -32,13 +32,13 @@ options:
         include: true
 
       Regression:
-        include: true
+        include: false
 
       Assignment:
         include: true
 
   Dataset:
-    dataset_limit: 0.005
+    dataset_limit: 0.0001
     normalization_file: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt"
 
 network:

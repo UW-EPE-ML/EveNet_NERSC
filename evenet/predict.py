@@ -32,8 +32,7 @@ def predict_func(cfg):
         ckpt_path = global_config.options.Training.model_checkpoint_load_path
         print(f"Loading checkpoint from model_checkpoint_load_path: {ckpt_path}")
     elif global_config.options.Training.pretrain_model_load_path:
-        ckpt_path = global_config.options.Training.pretrain_model_load_path
-        print(f"Loading checkpoint from pretrain_model_load_path: {ckpt_path}")
+        ckpt_path = None
     else:
         raise ValueError(
             "Checkpoint path required for prediction, "

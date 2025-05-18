@@ -31,7 +31,7 @@ def make_process_fn(base_dir: Path):
 
     for name, prefix in component_map.items():
         component = getattr(global_config.options.Training.Components, name)
-        if not getattr(component, "include", False):
+        if drop_column_prefix and not getattr(component, "include", False):
             drop_column_prefix.append(prefix)
 
     return partial(

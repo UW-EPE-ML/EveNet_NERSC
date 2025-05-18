@@ -465,6 +465,11 @@ class EveNetEngine(L.LightningModule):
         )
         # No loss calculation here, drop the output
         outputs["generations"] = None
+        outputs["classification-noised"] = None
+        outputs['regression-noised'] = None
+        outputs.pop('full_input_point_cloud')
+        outputs.pop('full_global_conditions')
+        outputs.pop('alpha')
 
         extra_save = self.config.options.prediction.get('extra_save', {})
         for key in extra_save:
