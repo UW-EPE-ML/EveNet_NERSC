@@ -13,6 +13,9 @@ def plot_uncertainty_with_ratio(
         ratio_baseline_name,
         p_dir: Path,
         save_name=None,
+        ratio_baseline_min: float = -1.0,
+        ratio_baseline_max: float = 1.0,
+        ratio_y_label: str = "Ratio to baseline",
 ):
     def pad_step_data(data):
         data = np.array(data)
@@ -63,26 +66,32 @@ def plot_uncertainty_with_ratio(
     )
 
     # --- Bottom panel: Ratio ---
-    max_ratio = 1.0
+    max_ratio = -np.inf
+    min_ratio = np.inf
     for method in methods:
         if method["name"] == ratio_baseline_name:
             continue
-        ratio = method["data"] / baseline_method["data"]
+        ratio = - (method["data"] - baseline_method["data"]) / (baseline_method["data"] + 1e-6)
 
         r_x_pad, r_y_pad = pad_step_data(ratio)
         ax_bot.step(r_x_pad, r_y_pad, where='mid', color=method["color"], linewidth=2)
 
         for j, val in enumerate(ratio):
-            if val < 1.0:
-                ax_bot.plot(x[j], 1.05, marker='v', color=method["color"], markersize=8)
+            if val < ratio_baseline_min:
+                ax_bot.plot(x[j], ratio_baseline_min, marker='v', color=method["color"], markersize=8)
+            elif val > ratio_baseline_max:
+                ax_bot.plot(x[j], ratio_baseline_max, marker='^', color=method["color"], markersize=8)
 
         max_ratio = max(max_ratio, ratio.max())
+        min_ratio = min(min_ratio, ratio.min())
 
-    ax_bot.axhline(1.0, color='black', lw=1)
-    ax_bot.set_ylabel(f"Ratio to {ratio_baseline_name}")
+
+    ax_bot.axhline(0.0, color='black', lw=1)
+    ax_bot.set_ylabel(ratio_y_label)
     ax_bot.set_xticks(x)
     ax_bot.set_xticklabels(x_labels, rotation=45, ha='right')
-    ax_bot.set_ylim(1.0, max(2.0, max_ratio * 1.05))
+    ax_bot.set_ylim(max(ratio_baseline_min, min_ratio * 1.05), min(ratio_baseline_max, max_ratio * 1.15))
+    print("min_ratio, max_ratio", min_ratio, max_ratio)
 
     for i in range(bins_per_block, total_bins, bins_per_block):
         ax_bot.axvline(i - 0.5, color='black', linestyle='--', lw=1)
