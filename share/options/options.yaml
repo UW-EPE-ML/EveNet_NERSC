@@ -93,7 +93,7 @@ Training:
       warm_up: true
       assignment_loss_scale: 1.0
       detection_loss_scale: 1.0
-      focal_gamma: 0.0
+      focal_gamma: 1.0
       include: false # whether to build in network
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
