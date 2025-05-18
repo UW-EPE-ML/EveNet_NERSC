@@ -45,9 +45,9 @@ def get_masses(point_clouds):
     })
 
     return {
-        "INPUTS/Conditions/M_all": vec_all.sum(axis=1).mass,
-        "INPUTS/Conditions/M_leps": vec_leps.sum(axis=1).mass,
-        "INPUTS/Conditions/M_bjets": vec_bjets.sum(axis=1).mass,
+        "INPUTS/Conditions/M_all": np.clip(vec_all.sum(axis=1).mass, 0, None),
+        "INPUTS/Conditions/M_leps": np.clip(vec_leps.sum(axis=1).mass, 0, None),
+        "INPUTS/Conditions/M_bjets": np.clip(vec_bjets.sum(axis=1).mass, 0, None),
     }
 
 

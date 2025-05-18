@@ -19,7 +19,7 @@ OUT_BASE="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/nu2flow"
 
 for dataset in mg5_test mg5_train pythia_test pythia_train; do
 #for dataset in train; do
-    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
+    python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
         --in_dir "$IN_BASE/$dataset" \
         --store_dir "$OUT_BASE/$dataset"
 done
