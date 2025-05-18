@@ -29,8 +29,8 @@ options:
     diffusion_every_n_epochs: 50 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.00005
-    learning_rate_body: &lr_body 0.000005
+    learning_rate: &lr 0.005
+    learning_rate_body: &lr_body 0.0005
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
@@ -47,6 +47,7 @@ options:
         optimizer_type: "AdamW"
       Classification:
         include: false
+        include_cross_term: false
       Regression:
         include: false
       Assignment:
@@ -76,8 +77,8 @@ options:
 
   Dataset:
     dataset_limit: 1.0
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
-#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
+#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
     #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     val_split: [ 0.75, 1.0 ]
 
