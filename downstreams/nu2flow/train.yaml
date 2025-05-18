@@ -47,16 +47,8 @@ options:
         optimizer_type: "AdamW"
       Classification:
         include: false
-        warm_up: true
-        learning_rate: *lr
-        weight_decay: *wd
-        optimizer_type: "AdamW"
       Regression:
         include: false
-        warm_up: true
-        learning_rate: *lr
-        weight_decay: *wd
-        optimizer_type: "AdamW"
       Assignment:
         include: false
         warm_up: true
@@ -65,25 +57,20 @@ options:
         optimizer_type: "AdamW"
       GlobalGeneration:
         include: false
-        warm_up: true
-        learning_rate: *lr
-        weight_decay: *wd
-        loss_scale: 0.0
-      EventGeneration:
+      ReconGeneration:
+        include: false
+      TruthGeneration:
         include: true
         warm_up: true
-        generate_point_cloud: false
-        generate_neutrino: true
-        diffusion_steps: 200
-        loss_scale: 0.0 # loss coefficient
-        invisible_loss_scale: 1.0 # loss coefficient for invisible particles
         learning_rate: *lr
         weight_decay: *wd
+        optimizer_type: "AdamW"
+        diffusion_steps: 200
 
     EarlyStopping:
       patience: 100
       min_delta: 0.0
-      monitor: "val/generation-invisible"
+      monitor: "val/generation-truth"
       mode: "min"
       verbose: true
 
@@ -96,9 +83,9 @@ options:
 
 
 network:
-  default: configs/model.yaml
+#  default: configs/model.yaml
   #  default: configs/model_large.yaml
-  #  default: configs/pretrain.yaml
+  default: configs/pretrain.yaml
 
   # overwrites
   # ...
