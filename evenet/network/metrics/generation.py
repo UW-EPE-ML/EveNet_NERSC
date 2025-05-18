@@ -76,8 +76,6 @@ class GenerationMetrics:
     ):
         model.eval()
 
-        print('key', input_set.keys())
-
         predict_distribution = dict()
         truth_distribution = dict()
         process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
