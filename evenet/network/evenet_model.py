@@ -29,6 +29,7 @@ class EveNetModel(nn.Module):
             device,
             classification: bool = False,
             regression: bool = False,
+            global_generation: bool = False,
             point_cloud_generation: bool = False,
             neutrino_generation: bool = False,
             assignment: bool = False,
@@ -42,6 +43,7 @@ class EveNetModel(nn.Module):
         # # self.save_hyperparameters(self.options)
         self.include_classification = classification
         self.include_regression = regression
+        self.include_global_generation = global_generation
         self.include_point_cloud_generation = point_cloud_generation
         self.include_neutrino_generation = neutrino_generation
         self.include_assignment = assignment
@@ -229,7 +231,7 @@ class EveNetModel(nn.Module):
             )
 
         # [6-1] Global Generation Head (for point cloud generation only)
-        if self.include_point_cloud_generation:
+        if self.include_global_generation:
             self.global_generation_target_indices = self.event_info.generation_target_indices
             self.GlobalGeneration = GlobalCondGenerationHead(
                 num_layer=self.network_cfg.GlobalGeneration.num_layers,
@@ -393,7 +395,7 @@ class EveNetModel(nn.Module):
         ## Global Generator Head ##
         ###########################
         generations = dict()
-        if self.include_point_cloud_generation:
+        if self.include_global_generation:
             # [6-1] Global Generation Head
             if len(self.global_generation_target_indices) > 0:
                 target_global = global_conditions[..., self.global_generation_target_indices].squeeze(1)
