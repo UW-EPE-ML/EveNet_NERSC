@@ -194,7 +194,13 @@ class EveNetEngine(L.LightningModule):
         batch_size = batch["x"].shape[0]
         device = self.device
 
-        task_weights = self.task_scheduler.get_loss_weights(self.current_epoch, self.current_step)
+        current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
+        task_weights = current_parameters["loss_weights"]
+        train_parameters = current_parameters["train_parameters"]
+
+        # logging training parameters
+        for name, val in train_parameters.items():
+            self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=True)
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
@@ -203,6 +209,7 @@ class EveNetEngine(L.LightningModule):
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,
+            train_parameters=train_parameters,
         )
 
         loss_raw: dict[str, torch.Tensor] = {}

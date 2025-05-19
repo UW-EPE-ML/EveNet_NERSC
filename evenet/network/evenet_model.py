@@ -293,9 +293,12 @@ class EveNetModel(nn.Module):
             (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
         ]
 
-    def forward(self, x: Dict[str, Tensor], time: Tensor, progressive_params: dict = {}) -> dict[str, dict[Any, Any] | Any]:
+    def forward(self, x: Dict[str, Tensor], time: Tensor, progressive_params: dict = None) -> dict[
+        str, dict[Any, Any] | Any]:
         """
 
+        :param time:
+        :param progressive_params:
         :param x:
             - x['x']: point cloud, shape (batch_size, num_objects, num_features)
             - x['x_mask']: Mask for point cloud, shape (batch_size, num_objects)
@@ -327,6 +330,8 @@ class EveNetModel(nn.Module):
         #############
         ##  Input  ##
         #############
+        if progressive_params is None:
+            progressive_params = dict()
 
         _, alpha, _ = get_logsnr_alpha_sigma(time)
 
@@ -435,7 +440,10 @@ class EveNetModel(nn.Module):
             elif schedule_name == "generation":
 
                 noise_prob = progressive_params.get("noise_prob", 1.0)
-                noise_mask = (torch.rand(input_point_cloud.size(0), input_point_cloud.size(1), device=input_point_cloud.device) < noise_prob).float().unsqueeze(-1)# (B, L, 1)
+                noise_mask = (torch.rand(
+                    input_point_cloud.size(0), input_point_cloud.size(1),
+                    device=input_point_cloud.device
+                ) < noise_prob).float().unsqueeze(-1)  # (B, L, 1)
 
                 input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
                 input_point_cloud_noised_tmp_mask = torch.zeros_like(input_point_cloud_noised)
@@ -445,8 +453,8 @@ class EveNetModel(nn.Module):
                 full_input_point_cloud = input_point_cloud * (1.0 - noise_mask) + input_point_cloud_noised * noise_mask
                 full_input_point_cloud_mask = input_point_cloud_mask
 
-                is_noise_query = (noise_mask > 0.1).squeeze(-1) #(B,L)
-                full_attn_mask = (~is_noise_query[:, :, None]) & is_noise_query[:, None, :]) # (B, L, L)
+                is_noise_query = (noise_mask > 0.1).squeeze(-1)  # (B,L)
+                full_attn_mask = (~is_noise_query[:, :, None]) & is_noise_query[:, None, :]  # (B, L, L)
 
                 full_time = time
                 time_masking = noise_mask
@@ -569,7 +577,7 @@ class EveNetModel(nn.Module):
                 generations["neutrino"] = {
                     "vector": pred_point_cloud_vector[:, is_invisible_query, :],
                     "truth": truth_invisible_point_cloud_vector.detach(),
-                    "mask": invisible_point_cloud_mask 
+                    "mask": invisible_point_cloud_mask
                 }
 
         return {
@@ -602,7 +610,7 @@ class EveNetModel(nn.Module):
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
             class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
-            cond_x['conditions_mask']).long()  # (batch_size, 1)
+                cond_x['conditions_mask']).long()  # (batch_size, 1)
             global_conditions = self.global_normalizer(
                 x=global_conditions,
                 mask=global_conditions_mask
@@ -619,7 +627,7 @@ class EveNetModel(nn.Module):
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1)
             class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
-            cond_x['conditions_mask']).long()  # (batch_size, 1)
+                cond_x['conditions_mask']).long()  # (batch_size, 1)
             num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
             global_feature_mask = torch.zeros_like(global_conditions).float()
@@ -664,7 +672,7 @@ class EveNetModel(nn.Module):
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
             class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
-            cond_x['conditions_mask']).long()  # (batch_size, 1)
+                cond_x['conditions_mask']).long()  # (batch_size, 1)
             num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
             input_point_cloud = cond_x['x']
             input_point_cloud_mask = cond_x['x_mask'].unsqueeze(-1)
@@ -745,9 +753,9 @@ class EveNetModel(nn.Module):
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
 
-    def shared_step(self, batch: Dict[str, Tensor], batch_size, is_training: bool = True) -> dict:
+    def shared_step(self, batch: Dict[str, Tensor], batch_size, train_parameters: dict) -> dict:
         time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
-        output = self.forward(batch, time)
+        output = self.forward(batch, time, progressive_params=train_parameters)
         return output
 
     def freeze_module(self, logical_name: str, cfg: dict):

@@ -35,6 +35,7 @@ class ProgressiveTaskScheduler:
                 "transition_start": transition_start,
                 "transition_end": transition_end,
                 "loss_weights": stage_cfg.get("loss_weights", {}),
+                "train_parameters": stage_cfg.get("train_parameters", {}),
                 "freeze": stage_cfg.get("freeze", []),
                 "unfreeze": stage_cfg.get("unfreeze", []),
             })
@@ -68,14 +69,20 @@ class ProgressiveTaskScheduler:
         t = (step - stage["transition_start"]) / max(stage["transition_end"] - stage["transition_start"], 1)
         return 0.5 * (1 - np.cos(np.pi * np.clip(t, 0, 1)))
 
-    def get_loss_weights(self, epoch, step):
+    def get_current_parameters(self, epoch, step):
         stage = self.get_current_stage(epoch)
         t = self.get_transition_factor(step, stage)
 
         weights = {}
+        train_parameters = {}
         for task, (start, end) in stage["loss_weights"].items():
             weights[task] = (1 - t) * start + t * end
-        return weights
+        for task, (start, end) in stage["train_parameters"].items():
+            train_parameters[task] = (1 - t) * start + t * end
+        return {
+            'loss_weights': weights,
+            'train_parameters': train_parameters,
+        }
 
     def get_frozen_components(self, epoch):
         return self.get_current_stage(epoch).get("freeze", [])

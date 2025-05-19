@@ -159,6 +159,9 @@ Training:
           classification-noised: [ 1.0, 1.0 ]
           regression: [ 1.0, 1.0 ]
           assignment: [ 1.0, 1.0 ]
+        train_parameters:
+          noise_prob: [0.0, 1.0]
+
 
       - name: "gen_pretrain"
         epoch_ratio: 0.2
@@ -169,6 +172,8 @@ Training:
           classification-noised: [ 1.0, 1.0 ]
           regression: [0.0, 0.0]
           assignment: [0.0, 0.0]
+        train_parameters:
+          noise_prob: [ 0.0, 0.0 ]
 
   EarlyStopping:
     patience: 20
