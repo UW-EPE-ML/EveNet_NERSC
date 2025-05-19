@@ -54,7 +54,7 @@ For every sub-run folder:
             ${pretrain_dir}/Run_2.Dec22 \
             ${pretrain_dir}/Run_2.Pretrain.20250505 \
             ${pretrain_dir}/Run_2.Pretrain.20250507 \
-        --store_dir ${output_dir}/run.20250507.227M | tee ${output_dir}/run.20250507.227M.log
+        --store_dir ${output_dir}/run.20250519.237M | tee ${output_dir}/run.20250519.237M.log
     ```
 
     This command will:
@@ -62,6 +62,11 @@ For every sub-run folder:
   - Generate flattened .parquet files and normalization .pt file
   - Save logs to run.20250403.log
 
+- **Global Shuffle**
+  ```bash
+    python3 NERSC/global_shuffle.py --first_shuffle_percent 2.5 --second_shuffle_percent 5.0 20 \
+    /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250519.237M/
+  ```
 
 
 ## 📤 Output Files
