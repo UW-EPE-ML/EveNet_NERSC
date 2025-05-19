@@ -104,7 +104,7 @@ options:
       GlobalGeneration:
         include: false
       ReconGeneration:
-        include: true
+        include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
