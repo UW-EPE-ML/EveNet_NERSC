@@ -5,7 +5,7 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 1024
+  batch_size: 2048
   prefetch_batches: 2
   use_gpu: true
 
@@ -29,8 +29,8 @@ options:
     diffusion_every_n_epochs: 50 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.00025
-    learning_rate_body: &lr_body 0.000025
+    learning_rate: &lr 0.0005
+    learning_rate_body: &lr_body 0.00005
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
@@ -59,7 +59,7 @@ options:
       GlobalGeneration:
         include: false
       ReconGeneration:
-        include: true
+        include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -74,7 +74,7 @@ options:
         diffusion_steps: 200
 
     EarlyStopping:
-      patience: 100
+      patience: 200
       min_delta: 0.0
       monitor: "val/generation-truth"
       mode: "min"
@@ -82,8 +82,8 @@ options:
 
   Dataset:
     dataset_limit: 1.0
-#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
+#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
     #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     val_split: [ 0.85, 1.0 ]
 
