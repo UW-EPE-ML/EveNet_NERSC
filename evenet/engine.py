@@ -235,7 +235,7 @@ class EveNetEngine(L.LightningModule):
                 cls_output=next(iter(outputs["classification-noised"].values())),
                 cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
-                event_weight=outputs["alpha"]*outputs["alpha"],
+                event_weight=outputs["alpha"] * outputs["alpha"],
                 loss_dict=loss_head_dict,
                 loss_scale=self.classification_cfg.loss_scale_cross_term,
                 metrics=self.classification_metrics_train_cross_term if self.training else self.classification_metrics_valid_cross_term,
@@ -244,7 +244,7 @@ class EveNetEngine(L.LightningModule):
                 loss_name="classification-noised"
             )
 
-            loss_raw["classification-noised"] = scaled_cls_loss_cross_term # TODO: check if this is correct for famo
+            loss_raw["classification-noised"] = scaled_cls_loss_cross_term  # TODO: check if this is correct for famo
 
         if self.regression_cfg.include and outputs["regression"]:
             target_regression = batch[self.target_regression_key].to(device=device)
@@ -469,6 +469,7 @@ class EveNetEngine(L.LightningModule):
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,
+            train_parameters=None,
         )
         # No loss calculation here, drop the output
         outputs["generations"] = None
@@ -1136,7 +1137,7 @@ class EveNetEngine(L.LightningModule):
             else:
                 # print(f"[TorchJD] Unhandled loss name: {loss_name}")
                 # raise NotImplementedError(f"[TorchJD] Unhandled loss name: {loss_name}")
-                task_params=[]
+                task_params = []
                 pass
 
             task_param_sets.append(task_params)

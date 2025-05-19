@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from evenet.utilities.diffusion_sampler import add_noise
 from evenet.utilities.tool import gather_index
 from torch import Tensor, nn
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Union
 import re
 
 
@@ -753,7 +753,7 @@ class EveNetModel(nn.Module):
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
 
-    def shared_step(self, batch: Dict[str, Tensor], batch_size, train_parameters: dict) -> dict:
+    def shared_step(self, batch: Dict[str, Tensor], batch_size, train_parameters: Union[dict, None]) -> dict:
         time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
         output = self.forward(batch, time, progressive_params=train_parameters)
         return output
