@@ -116,7 +116,7 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: "AdamW"
-        diffusion_steps: 200
+        diffusion_steps: 300
 
     EarlyStopping:
       patience: 100
