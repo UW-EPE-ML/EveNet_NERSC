@@ -448,9 +448,9 @@ def shared_step(
     for generation_target, generation_result in outputs.items():
         feature_dim = generation_result["vector"].shape[-1]
         if generation_target == "point_cloud":
-            masking = batch["x_mask"].unsqueeze(-1)
+            masking = generation_result["mask"]
         elif generation_target == "neutrino":
-            masking = batch["x_invisible_mask"].unsqueeze(-1)  # (B, N, 1)
+            masking = generation_result["mask"] # (B, N, 1)
 
             if invisible_padding > 0:
                 B, N, _ = masking.shape

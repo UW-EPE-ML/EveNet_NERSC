@@ -293,7 +293,7 @@ class EveNetModel(nn.Module):
             (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
         ]
 
-    def forward(self, x: Dict[str, Tensor], time: Tensor) -> dict[str, dict[Any, Any] | Any]:
+    def forward(self, x: Dict[str, Tensor], time: Tensor, progressive_params: dict = {}) -> dict[str, dict[Any, Any] | Any]:
         """
 
         :param x:
@@ -433,17 +433,27 @@ class EveNetModel(nn.Module):
                 time_masking = torch.zeros_like(full_input_point_cloud_mask).float()
                 global_feature_mask = torch.ones_like(global_conditions).float()
             elif schedule_name == "generation":
+
+                noise_prob = progressive_params.get("noise_prob", 1.0)
+                noise_mask = (torch.rand(input_point_cloud.size(0), input_point_cloud.size(1), device=input_point_cloud.device) < noise_prob).float().unsqueeze(-1)# (B, L, 1)
+
                 input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
                 input_point_cloud_noised_tmp_mask = torch.zeros_like(input_point_cloud_noised)
                 input_point_cloud_noised_tmp_mask[..., self.generation_pc_indices] = 1.0
                 input_point_cloud_noised = input_point_cloud_noised * input_point_cloud_noised_tmp_mask
-                full_input_point_cloud = input_point_cloud_noised
+
+                full_input_point_cloud = input_point_cloud * (1.0 - noise_mask) + input_point_cloud_noised * noise_mask
                 full_input_point_cloud_mask = input_point_cloud_mask
-                full_attn_mask = None
+
+                is_noise_query = (noise_mask > 0.1).squeeze(-1) #(B,L)
+                full_attn_mask = (~is_noise_query[:, :, None]) & is_noise_query[:, None, :]) # (B, L, L)
+
                 full_time = time
-                time_masking = full_input_point_cloud_mask.float()
+                time_masking = noise_mask
                 global_feature_mask = torch.zeros_like(global_conditions).float()
                 global_feature_mask[..., self.generation_pc_condition_indices] = 1.0
+
+
             else:
                 invisible_point_cloud_noised, truth_invisible_point_cloud_vector = add_noise(
                     invisible_point_cloud, time
@@ -538,8 +548,9 @@ class EveNetModel(nn.Module):
                     time_masking=time_masking,
                 )
                 generations["point_cloud"] = {
-                    "vector": pred_point_cloud_vector[..., self.generation_pc_indices],
-                    "truth": truth_input_point_cloud_vector[..., self.generation_pc_indices].detach()
+                    "vector": pred_point_cloud_vector[..., self.generation_pc_indices] * noise_mask,
+                    "truth": (truth_input_point_cloud_vector[..., self.generation_pc_indices] * noise_mask).detach(),
+                    "mask": noise_mask * full_input_point_cloud_mask
                 }
 
             if self.include_neutrino_generation and schedule_name == "neutrino_generation":
@@ -558,6 +569,7 @@ class EveNetModel(nn.Module):
                 generations["neutrino"] = {
                     "vector": pred_point_cloud_vector[:, is_invisible_query, :],
                     "truth": truth_invisible_point_cloud_vector.detach(),
+                    "mask": invisible_point_cloud_mask 
                 }
 
         return {
