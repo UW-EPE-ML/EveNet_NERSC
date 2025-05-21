@@ -391,7 +391,7 @@ def main(cfg):
     if cfg.pretrain_dirs is not None:
         print(f"[INFO] Directories to run: {cfg.pretrain_dirs}")
 
-        run_parallel(cfg, cfg.preprocess_config, num_workers=min(cpu_count() - 1, 60))
+        run_parallel(cfg, cfg.preprocess_config, num_workers=min(cpu_count() - 1, args.cpu_max))
 
     else:
         in_tag = Path(cfg.in_dir).name
@@ -433,6 +433,7 @@ if __name__ == '__main__':
         '--pretrain_dirs', type=str, nargs='+',
         help='Pretrain directories, accept a list of directories, will force using 2-level directory structure'
     )
+    parser.add_argument('-c,--cpu_max', type=int, default=60, help='Maximum number of CPU cores to use')
     args = parser.parse_args()
 
     main(args)
