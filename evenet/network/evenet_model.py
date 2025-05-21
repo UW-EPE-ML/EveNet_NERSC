@@ -440,10 +440,13 @@ class EveNetModel(nn.Module):
             elif schedule_name == "generation":
 
                 noise_prob = progressive_params.get("noise_prob", 1.0)
+                attn_mask_turn_on = (progressive_params.get("reco_attn_mask", 0.0) > 0.5)
+
                 noise_mask = (torch.rand(
                     input_point_cloud.size(0), input_point_cloud.size(1),
                     device=input_point_cloud.device
                 ) < noise_prob).float().unsqueeze(-1)  # (B, L, 1)
+                noise_mask = noise_mask * input_point_cloud_mask
 
                 input_point_cloud_noised, truth_input_point_cloud_vector = add_noise(input_point_cloud, time)
                 input_point_cloud_noised_tmp_mask = torch.zeros_like(input_point_cloud_noised)
@@ -454,7 +457,7 @@ class EveNetModel(nn.Module):
                 full_input_point_cloud_mask = input_point_cloud_mask
 
                 is_noise_query = (noise_mask > 0.1).squeeze(-1)  # (B,L)
-                full_attn_mask = (~is_noise_query[:, :, None]) & is_noise_query[:, None, :]  # (B, L, L)
+                full_attn_mask = ((~is_noise_query[:, :, None]) & is_noise_query[:, None, :]) if attn_mask_turn_on else None # (B, L, L)
 
                 full_time = time
                 time_masking = noise_mask

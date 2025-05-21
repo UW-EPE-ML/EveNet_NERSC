@@ -55,6 +55,8 @@ class TransformerBlockModule(nn.Module):
                 int_matrix = int_matrix.unsqueeze(0).unsqueeze(0).expand(x.shape[0], self.num_heads, attn_mask.shape[0], attn_mask.shape[1])
             updates, _ = self.attn(self.norm1(x), int_matrix=int_matrix, mask=mask) # TODO: check if attn_mask is correct
         else:
+            if (attn_mask is not None) and (attn_mask.dim() == 3):
+                attn_mask = attn_mask.repeat(self.num_heads, 1, 1)
             updates, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x),
                                    key_padding_mask=padding_mask,
                                    attn_mask=attn_mask)
@@ -303,6 +305,10 @@ class GeneratorTransformerBlockModule(nn.Module):
         """
         x1 = self.norm1(x)
         padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None
+
+        if (attn_mask is not None) and (attn_mask.dim() == 3):
+           attn_mask = attn_mask.repeat(self.num_heads, 1, 1)
+
         updates, _ = self.attn(x1, x1, x1, key_padding_mask=padding_mask, attn_mask=attn_mask)
 
         if self.layer_scale_flag:
