@@ -433,7 +433,7 @@ if __name__ == '__main__':
         '--pretrain_dirs', type=str, nargs='+',
         help='Pretrain directories, accept a list of directories, will force using 2-level directory structure'
     )
-    parser.add_argument('-c,--cpu_max', type=int, default=60, help='Maximum number of CPU cores to use')
+    parser.add_argument('-c', '--cpu_max', type=int, default=60, help='Maximum number of CPU cores to use')
     args = parser.parse_args()
 
     main(args)
