@@ -10,6 +10,9 @@ def loss(
         feature_dim: Optional[int] = None,
 ):
     if mask is not None:
-        return torch.sum(((predict - target) ** 2) * mask.float()) / (torch.sum(mask.float()) * feature_dim)
+        den = torch.sum(mask.float()) * feature_dim
+        if den == 0:
+            return torch.tensor(0.0, device=predict.device, dtype=predict.dtype)
+        return torch.sum(((predict - target) ** 2) * mask.float()) / den
     else:
         return torch.mean((predict - target) ** 2)
