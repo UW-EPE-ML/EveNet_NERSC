@@ -16,14 +16,10 @@ class ProgressiveTaskScheduler:
             epoch_length = int(round(stage_cfg["epoch_ratio"] * total_epochs))
             epoch_end = epoch_start + epoch_length
 
-            if i == 0:
-                transition_start_epoch = epoch_end
-                transition_end_epoch = epoch_end
-            else:
-                transition_ratio = stage_cfg.get("transition_ratio", 0.0)
-                transition_epochs = epoch_length * transition_ratio
-                transition_start_epoch = epoch_start
-                transition_end_epoch = epoch_start + transition_epochs
+            transition_ratio = stage_cfg.get("transition_ratio", 0.0)
+            transition_epochs = epoch_length * transition_ratio
+            transition_start_epoch = epoch_start
+            transition_end_epoch = epoch_start + transition_epochs
 
             transition_start = int(transition_start_epoch * steps_per_epoch)
             transition_end = int(transition_end_epoch * steps_per_epoch)
