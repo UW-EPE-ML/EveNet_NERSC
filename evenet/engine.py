@@ -206,10 +206,30 @@ class EveNetEngine(L.LightningModule):
             key: value.to(device=device) for key, value in batch.items()
         }
 
+        schedules = self.model.schedule_flags
+        if self.training:
+            # Evaluate which tasks are active based on weights
+            task_gate = {
+                "generation": task_weights.get("generation", 0) > 0,
+                "neutrino_generation": task_weights.get("generation", 0) > 0,
+                "deterministic": (
+                                         task_weights.get("classification", 0)
+                                         + task_weights.get("regression", 0)
+                                         + task_weights.get("assignment", 0)
+                                 ) > 0,
+            }
+
+            # Combine schedule flags and weight gating
+            schedules = {
+                key: self.model.schedule_flags[key] and task_gate.get(key, False)
+                for key in self.model.schedule_flags
+            }
+
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,
             train_parameters=train_parameters,
+            schedules=schedules,
         )
 
         loss_raw: dict[str, torch.Tensor] = {}

@@ -287,16 +287,20 @@ class EveNetModel(nn.Module):
             )
             self.neutrino_position_encode = self.network_cfg.TruthGeneration.neutrino_position_encode
 
-        self.schedule_flags = [
-            (self.include_point_cloud_generation, "generation"),
-            (self.include_neutrino_generation, "neutrino_generation"),
-            (self.include_classification or self.include_assignment or self.include_regression, "deterministic"),
-        ]
+        self.schedule_flags = {
+            "generation": self.include_point_cloud_generation,
+            "neutrino_generation": self.include_neutrino_generation,
+            "deterministic": self.include_classification or self.include_assignment or self.include_regression,
+        }
 
-    def forward(self, x: Dict[str, Tensor], time: Tensor, progressive_params: dict = None) -> dict[
-        str, dict[Any, Any] | Any]:
+    def forward(
+            self, x: Dict[str, Tensor], time: Tensor,
+            progressive_params: dict = None,
+            schedules: list[tuple[bool, str]] = None
+    ) -> dict[str, dict[Any, Any] | Any]:
         """
 
+        :param schedules:
         :param time:
         :param progressive_params:
         :param x:
@@ -422,7 +426,9 @@ class EveNetModel(nn.Module):
             }
 
         outputs = dict()
-        for flag, schedule_name in self.schedule_flags:
+        if schedules is None:
+            schedules = self.schedule_flags
+        for schedule_name, flag  in schedules.items():
             if not flag:
                 continue
 
@@ -457,7 +463,8 @@ class EveNetModel(nn.Module):
                 full_input_point_cloud_mask = input_point_cloud_mask
 
                 is_noise_query = (noise_mask > 0.1).squeeze(-1)  # (B,L)
-                full_attn_mask = ((~is_noise_query[:, :, None]) & is_noise_query[:, None, :]) if attn_mask_turn_on else None # (B, L, L)
+                full_attn_mask = ((~is_noise_query[:, :, None]) & is_noise_query[:, None,
+                                                                  :]) if attn_mask_turn_on else None  # (B, L, L)
 
                 full_time = time
                 time_masking = noise_mask
@@ -756,9 +763,13 @@ class EveNetModel(nn.Module):
             return pred_point_cloud_vector[:, is_invisible_query, :]
         return None
 
-    def shared_step(self, batch: Dict[str, Tensor], batch_size, train_parameters: Union[dict, None]) -> dict:
+    def shared_step(
+            self, batch: Dict[str, Tensor], batch_size,
+            train_parameters: Union[dict, None],
+            schedules: Union[list[tuple[bool, str]], None] = None
+    ) -> dict:
         time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
-        output = self.forward(batch, time, progressive_params=train_parameters)
+        output = self.forward(batch, time, progressive_params=train_parameters, schedules=schedules)
         return output
 
     def freeze_module(self, logical_name: str, cfg: dict):
