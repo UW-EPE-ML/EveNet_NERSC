@@ -49,7 +49,7 @@ class EveNetModel(nn.Module):
         self.include_assignment = assignment
         self.device = device
 
-        self.normalization_dict = normalization_dict
+        # self.normalization_dict = normalization_dict
 
         # Initialize the normalization layer
         input_normalizers_setting = dict()
@@ -186,8 +186,8 @@ class EveNetModel(nn.Module):
                 input_dim=obj_encoder_cfg.hidden_dim,
                 regressions_target=self.event_info.regressions,
                 regression_names=self.event_info.regression_names,
-                means=self.normalization_dict["regression_mean"],
-                stds=self.normalization_dict["regression_std"],
+                means=normalization_dict["regression_mean"],
+                stds=normalization_dict["regression_std"],
                 num_layers=reg_cfg.num_regression_layers,
                 hidden_dim=reg_cfg.hidden_dim,
                 dropout=reg_cfg.dropout,
@@ -287,16 +287,16 @@ class EveNetModel(nn.Module):
             )
             self.neutrino_position_encode = self.network_cfg.TruthGeneration.neutrino_position_encode
 
-        self.schedule_flags = {
-            "generation": self.include_point_cloud_generation,
-            "neutrino_generation": self.include_neutrino_generation,
-            "deterministic": self.include_classification or self.include_assignment or self.include_regression,
-        }
+        self.schedule_flags = [
+            ("generation", self.include_point_cloud_generation),
+            ("neutrino_generation", self.include_neutrino_generation),
+            ("deterministic", self.include_classification or self.include_assignment or self.include_regression),
+        ]
 
     def forward(
             self, x: Dict[str, Tensor], time: Tensor,
             progressive_params: dict = None,
-            schedules: list[tuple[bool, str]] = None
+            schedules: list[tuple[str, bool]] = None
     ) -> dict[str, dict[Any, Any] | Any]:
         """
 
@@ -428,7 +428,7 @@ class EveNetModel(nn.Module):
         outputs = dict()
         if schedules is None:
             schedules = self.schedule_flags
-        for schedule_name, flag  in schedules.items():
+        for schedule_name, flag  in schedules:
             if not flag:
                 continue
 
@@ -766,7 +766,7 @@ class EveNetModel(nn.Module):
     def shared_step(
             self, batch: Dict[str, Tensor], batch_size,
             train_parameters: Union[dict, None],
-            schedules: Union[list[tuple[bool, str]], None] = None
+            schedules: Union[list[tuple[str, bool]], None] = None
     ) -> dict:
         time = torch.rand((batch_size,), device=batch['x'].device, dtype=batch['x'].dtype)
         output = self.forward(batch, time, progressive_params=train_parameters, schedules=schedules)
