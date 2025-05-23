@@ -27,10 +27,11 @@ from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
 from evenet.network.loss.famo import FAMO
+from evenet.utilities.ema import EMA
 
 from evenet.utilities.debug_tool import time_decorator, log_function_stats
 from evenet.utilities.task_scheduler import ProgressiveTaskScheduler
-from evenet.utilities.tool import get_transition, check_param_overlap, print_params_used_by_loss
+from evenet.utilities.tool import get_transition, check_param_overlap, print_params_used_by_loss, safe_load_state
 
 from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
@@ -114,6 +115,9 @@ class EveNetEngine(L.LightningModule):
             self.ass_args = get_ass(global_config.event_info)
 
         #######  Initialize Diffusion Settings ##########
+        self.ema_model: Union[EMA, None] = None
+        self.ema_cfg = global_config.options.Training.EMA
+
         self.diffusion_every_n_epochs = global_config.options.Training.diffusion_every_n_epochs
         self.diffusion_every_n_steps = global_config.options.Training.diffusion_every_n_steps
 
@@ -441,6 +445,14 @@ class EveNetEngine(L.LightningModule):
 
         for sch in schedulers:
             sch.step()
+
+        # === Update EMA ===
+        if self.ema_model is not None:
+            update_epoch = self.current_epoch >= self.ema_cfg.get("start_epoch", 0)
+            update_step = self.current_step % self.ema_cfg.get("update_step", 1) == 0
+
+            if update_epoch and update_step:
+                self.ema_model.update(self.model)
 
         # -------------------------------------
         # logging
@@ -934,33 +946,17 @@ class EveNetEngine(L.LightningModule):
             normalization_dict=self.normalization_dict,
         )
 
-        if self.pretrain_ckpt_path is not None:
-            if self.global_rank == 0:
-                print(f"Loading PRETRAIN model from: {self.pretrain_ckpt_path}")
-                # Load checkpoint
-                state_dict = torch.load(self.pretrain_ckpt_path, map_location=self.device)['state_dict']
-                state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+        if self.global_rank == 0:
+            if self.pretrain_ckpt_path is not None:
+                print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
+                ckpt = torch.load(self.pretrain_ckpt_path, map_location=self.device)
+                self.safe_load_state(self.model, ckpt['state_dict'])
 
-                # Get model state dict
-                model_state_dict = self.model.state_dict()
-
-                # Safe filtering
-                filtered_state_dict = {}
-                for k, v in state_dict.items():
-                    if k in model_state_dict:
-                        if v.shape == model_state_dict[k].shape:
-                            filtered_state_dict[k] = v
-                        else:
-                            print(
-                                f"Skipping loading for layer: {k} due to shape mismatch (ckpt {v.shape} vs model {model_state_dict[k].shape})")
-                    else:
-                        print(f"Skipping loading for layer: {k} because it does not exist in the current model.")
-
-                # Load filtered keys
-                missing, unexpected = self.model.load_state_dict(filtered_state_dict, strict=False)
-
-                print("--> Missing keys:", missing)
-                print("--> Unexpected keys:", unexpected)
+            # EMA
+            if self.ema_cfg.get("enable", False):
+                self.ema_model = EMA(
+                    model=self.model, decay=self.ema_cfg.get("decay", 0.999), device=self.device,
+                )
 
         # Define Freezing
         # self.model.freeze_module("Classification", self.classification_cfg.get("freeze", {}))
@@ -1018,8 +1014,21 @@ class EveNetEngine(L.LightningModule):
 
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
+
+        if self.ema is not None and self.ema_cfg.get("replace_model_at_end", False):
+            orig_model.load_state_dict(self.ema.state_dict())
+            print(f"[Model] --> Replacing model with EMA model at end of training")
+
         new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
         checkpoint["state_dict"] = new_sd
+
+    def on_load_checkpoint(self, checkpoint):
+        if self.ema is not None and 'ema_state_dict' in checkpoint:
+            self.ema.load_state_dict(checkpoint['ema_state_dict'])
+            print(f"[Model] --> Loading EMA model")
+            if self.ema_cfg.get("replace_model_after_load", False):
+                self.ema.copy_to(self.model)
+                print(f"[Model] --> Replacing model with EMA model after loading checkpoint")
 
     def prepare_heads_loss(self):
         gradient_heads = {}

@@ -160,18 +160,18 @@ Training:
           regression: [ 1.0, 1.0 ]
           assignment: [ 1.0, 1.0 ]
         train_parameters:
-          noise_prob: [0.0, 1.0]
-          reco_attn_mask: [0.0, 0.0]
+          noise_prob: [ 0.0, 1.0 ]
+          reco_attn_mask: [ 0.0, 0.0 ]
 
       - name: "gen_pretrain"
         epoch_ratio: 0.2
         transition_ratio: 0.2  # ramp over 20% of this stage
         loss_weights:
-          generation: [1.0, 1.0]
-          classification: [0.0, 0.0]
+          generation: [ 1.0, 1.0 ]
+          classification: [ 0.0, 0.0 ]
           classification-noised: [ 1.0, 1.0 ]
-          regression: [0.0, 0.0]
-          assignment: [0.0, 0.0]
+          regression: [ 0.0, 0.0 ]
+          assignment: [ 0.0, 0.0 ]
         train_parameters:
           noise_prob: [ 0.0, 0.0 ]
           reco_attn_mask: [ 0.0, 0.0 ]
@@ -196,9 +196,16 @@ Training:
     logits_bound: 1.0
     lr: 0.025
 
-#  GradientNorm:
-#    alpha: 0.12
-#    learning_rate: 0.0001
+  EMA:
+    enable: true               # Enable or disable EMA
+    decay: 0.999               # EMA decay rate
+    start_epoch: 0             # Start updating EMA after this epoch
+    update_every_n_steps: 1    # Update EMA every N steps
+
+    replace_model_after_load: false    # After loading checkpoint, copy EMA weights into model
+    replace_model_at_end: true         # At training end, copy EMA weights into model (will not save EMA weights)
+    # not implemented yet
+    use_ema_during_training_eval: false # If you evaluate during training, use EMA
 
 Dataset:
   dataset_limit: 1.0

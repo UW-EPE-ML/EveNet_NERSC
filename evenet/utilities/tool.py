@@ -4,6 +4,7 @@ from typing import Dict, Union, List
 import numpy as np
 from torch import Tensor
 import torch
+import torch.nn as nn
 from collections import OrderedDict
 
 
@@ -100,3 +101,25 @@ def print_params_used_by_loss(loss, model, include_shapes=True, verbose=True):
                 print(msg)
 
     return used_names
+
+
+def safe_load_state(model: nn.Module, state_dict: dict, prefix_to_strip: str = "model.", verbose=True) -> None:
+    # Strip prefix (e.g., "model.")
+    clean_sd = {k.replace(prefix_to_strip, ""): v for k, v in state_dict.items()}
+
+    model_sd = model.state_dict()
+    filtered_sd = {}
+    for k, v in clean_sd.items():
+        if k in model_sd:
+            if v.shape == model_sd[k].shape:
+                filtered_sd[k] = v
+            elif verbose:
+                print(f"[safe_load_state] ⚠️ Shape mismatch: {k} (ckpt: {v.shape}, model: {model_sd[k].shape})")
+        elif verbose:
+            print(f"[safe_load_state] ⚠️ Unmatched key (ignored): {k}")
+
+    missing, unexpected = model.load_state_dict(filtered_sd, strict=False)
+    if verbose:
+        print(f"[safe_load_state] ✅ Loaded with {len(filtered_sd)} keys.")
+        print(f"[safe_load_state]   🔸 Missing keys: {missing}")
+        print(f"[safe_load_state]   🔸 Unexpected keys: {unexpected}")
