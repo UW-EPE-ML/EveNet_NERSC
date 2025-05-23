@@ -460,12 +460,12 @@ class EveNetModel(nn.Module):
                 input_point_cloud_noised = input_point_cloud_noised * input_point_cloud_noised_tmp_mask
 
                 full_input_point_cloud = input_point_cloud * (1.0 - noise_mask) + input_point_cloud_noised * noise_mask
-                full_input_point_cloud_mask = input_point_cloud_mask
+                full_input_point_cloud_mask = input_point_cloud_mask.contiguous()
 
                 is_noise_query = (noise_mask > 0.1).squeeze(-1)  # (B,L)
-                full_attn_mask = ((~is_noise_query[:, :, None]) & is_noise_query[:, None,
+                is_noise_padding_query = is_noise_query | ~(full_input_point_cloud_mask.squeeze(-1).bool())  # (B,L)
+                full_attn_mask = (~(is_noise_padding_query[:, :, None]) & is_noise_padding_query[:, None,
                                                                   :]) if attn_mask_turn_on else None  # (B, L, L)
-
                 full_time = time
                 time_masking = noise_mask
                 global_feature_mask = torch.zeros_like(global_conditions).float()

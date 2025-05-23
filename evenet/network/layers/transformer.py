@@ -56,7 +56,11 @@ class TransformerBlockModule(nn.Module):
             updates, _ = self.attn(self.norm1(x), int_matrix=int_matrix, mask=mask) # TODO: check if attn_mask is correct
         else:
             if (attn_mask is not None) and (attn_mask.dim() == 3):
-                attn_mask = attn_mask.repeat(self.num_heads, 1, 1)
+                batch_size, tgt_len, src_len = attn_mask.size()
+                attn_mask = attn_mask.view(batch_size, 1, tgt_len, src_len)
+                attn_mask = attn_mask.expand(batch_size, self.num_heads, tgt_len, src_len)
+                attn_mask = attn_mask.reshape(batch_size * self.num_heads, tgt_len, src_len)
+
             updates, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x),
                                    key_padding_mask=padding_mask,
                                    attn_mask=attn_mask)
@@ -307,7 +311,10 @@ class GeneratorTransformerBlockModule(nn.Module):
         padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None
 
         if (attn_mask is not None) and (attn_mask.dim() == 3):
-           attn_mask = attn_mask.repeat(self.num_heads, 1, 1)
+            batch_size, tgt_len, src_len = attn_mask.size()
+            attn_mask = attn_mask.view(batch_size, 1, tgt_len, src_len)
+            attn_mask = attn_mask.expand(batch_size, self.num_heads, tgt_len, src_len)
+            attn_mask = attn_mask.reshape(batch_size * self.num_heads, tgt_len, src_len)
 
         updates, _ = self.attn(x1, x1, x1, key_padding_mask=padding_mask, attn_mask=attn_mask)
 
