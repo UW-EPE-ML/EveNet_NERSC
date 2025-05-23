@@ -86,7 +86,9 @@ options:
           epoch_ratio: 0.1
           transition_ratio: 1.0
           loss_weights:
-            generation: [ 1.0, 1.0 ]
+#            generation: [ 1.0, 1.0 ]
+            generation-truth: [ 0.0, 0.0]
+            generation-reco: [ 1.0, 1.0 ]
             classification: [ 0.0, 0.0 ]
             classification-noised: [ 0.0, 0.0 ]
             regression: [ 0.0, 0.0 ]
@@ -100,7 +102,9 @@ options:
           epoch_ratio: 0.1
           transition_ratio: 0.5
           loss_weights:
-            generation: [ 1.0, 0.0 ]
+#            generation: [ 1.0, 0.0 ]
+            generation-truth: [ 0.0, 1.0] ]
+            generation-reco: [ 1.0, 0.0 ]
             classification: [ 0.0, 1.0 ]
             classification-noised: [ 1.0, 0.0 ]
             regression: [ 0.0, 1.0 ]
@@ -114,7 +118,9 @@ options:
           epoch_ratio: 0.8
           transition_ratio: 0.1
           loss_weights:
-            generation: [ 0.0, 0.5 ]
+#            generation: [ 0.0, 0.5 ]
+            generation-truth: [ 1.0, 0.25 ]
+            generation-reco: [ 0.0, 0.25 ]
             classification: [ 1.0, 1.0 ]
             classification-noised: [ 0.0, 1.0 ]
             regression: [ 1.0, 1.0 ]

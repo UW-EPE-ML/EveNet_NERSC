@@ -337,6 +337,8 @@ class EveNetEngine(L.LightningModule):
                 update_metric=update_metric,
             )
             loss_raw["generation"] = scaled_gen_loss
+            loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
+            loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
 

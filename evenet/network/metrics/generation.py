@@ -471,7 +471,6 @@ def shared_step(
             mask=masking,
             feature_dim=feature_dim,
         )
-        # total_gen_losses += generation_loss[generation_target]
         if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-global"] = global_gen_loss
