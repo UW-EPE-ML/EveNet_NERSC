@@ -202,7 +202,7 @@ class EveNetEngine(L.LightningModule):
 
         # logging training parameters
         for name, val in train_parameters.items():
-            self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=True)
+            self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=False, rank_zero_only=True)
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
@@ -227,7 +227,9 @@ class EveNetEngine(L.LightningModule):
                 for key in schedules
             }
 
-            print(schedules)
+        # logging schedules
+        for key, value in schedules.items():
+            self.log(f"progressive/schedule-{key}", value, prog_bar=False, sync_dist=False, rank_zero_only=True)
 
         outputs = self.model.shared_step(
             batch=inputs,
