@@ -63,11 +63,13 @@ def train_func(cfg):
     # callbacks
     checkpoint_callback = ModelCheckpoint(
         monitor="val/loss",
-        save_top_k=1,
+        save_top_k=5,
         mode="min",
         verbose=True,
         dirpath=global_config.options.Training.model_checkpoint_save_path,
-        filename="best_{epoch}",
+        save_last="link",
+        auto_insert_metric_name=False,
+        filename="epoch={epoch}_train={train/loss:.4f}_val={val/loss:.4f}",
     )
     early_stop_callback = EarlyStopping(
         **cfg.get("early_stopping", {}),
