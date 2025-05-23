@@ -451,8 +451,10 @@ class EveNetEngine(L.LightningModule):
             update_epoch = self.current_epoch >= self.ema_cfg.get("start_epoch", 0)
             update_step = self.current_step % self.ema_cfg.get("update_step", 1) == 0
 
+            current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
+            train_parameters = current_parameters["train_parameters"]
             if update_epoch and update_step:
-                self.ema_model.update(self.model)
+                self.ema_model.update(self.model, decay_=train_parameters.get("ema_decay", None))
 
         # -------------------------------------
         # logging
@@ -955,7 +957,7 @@ class EveNetEngine(L.LightningModule):
             # EMA
             if self.ema_cfg.get("enable", False):
                 self.ema_model = EMA(
-                    model=self.model, decay=self.ema_cfg.get("decay", 0.999), device=self.device,
+                    model=self.model, decay=self.ema_cfg.get("decay", 0.999)
                 )
 
         # Define Freezing
@@ -1015,19 +1017,25 @@ class EveNetEngine(L.LightningModule):
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
 
-        if self.ema is not None and self.ema_cfg.get("replace_model_at_end", False):
-            orig_model.load_state_dict(self.ema.state_dict())
-            print(f"[Model] --> Replacing model with EMA model at end of training")
+        # Save current model state_dict
+        checkpoint["state_dict"] = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
 
-        new_sd = {f"model.{k}": v for k, v in orig_model.state_dict().items()}
-        checkpoint["state_dict"] = new_sd
+        # Optionally replace what’s saved (but not in memory) with EMA weights
+        if self.ema_model is not None and self.ema_cfg.get("replace_model_at_end", False):
+            ema_sd = {f"model.{k}": v for k, v in self.ema_model.state_dict().items()}
+            checkpoint["state_dict"] = ema_sd
+            print("[Model] --> Saved EMA weights instead of current model weights")
+
+        # Always save EMA weights separately as well
+        if self.ema_model is not None:
+            checkpoint["ema_state_dict"] = self.ema_model.state_dict()
 
     def on_load_checkpoint(self, checkpoint):
-        if self.ema is not None and 'ema_state_dict' in checkpoint:
-            self.ema.load_state_dict(checkpoint['ema_state_dict'])
+        if self.ema_model is not None and 'ema_state_dict' in checkpoint:
+            self.ema_model.load_state_dict(checkpoint['ema_state_dict'])
             print(f"[Model] --> Loading EMA model")
             if self.ema_cfg.get("replace_model_after_load", False):
-                self.ema.copy_to(self.model)
+                self.ema_model.copy_to(self.model)
                 print(f"[Model] --> Replacing model with EMA model after loading checkpoint")
 
     def prepare_heads_loss(self):

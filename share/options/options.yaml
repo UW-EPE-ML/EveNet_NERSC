@@ -162,6 +162,7 @@ Training:
         train_parameters:
           noise_prob: [ 0.0, 1.0 ]
           reco_attn_mask: [ 0.0, 0.0 ]
+          ema_decay: [ 0.999, 0.999 ]
 
       - name: "gen_pretrain"
         epoch_ratio: 0.2
@@ -203,7 +204,7 @@ Training:
     update_every_n_steps: 1    # Update EMA every N steps
 
     replace_model_after_load: false    # After loading checkpoint, copy EMA weights into model
-    replace_model_at_end: true         # At training end, copy EMA weights into model (will not save EMA weights)
+    replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
     # not implemented yet
     use_ema_during_training_eval: false # If you evaluate during training, use EMA
 

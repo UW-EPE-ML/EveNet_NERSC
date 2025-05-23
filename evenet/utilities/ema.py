@@ -4,48 +4,33 @@ import torch.nn as nn
 
 
 class EMA:
-    def __init__(self, model: nn.Module, decay: float = 0.999, device=None):
-        self.ema_model = copy.deepcopy(model)
+    def __init__(self, model: nn.Module, decay: float = 0.999):
         self.decay = decay
-        self.device = device
-        self._has_module = hasattr(self.ema_model, 'module')  # for DDP
+        self.current_epoch = 0
 
-        # Turn off gradients for ema_model
-        for p in self.ema_model.parameters():
-            p.requires_grad_(False)
+        self.shadow = {}
+        self.model = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = param.data.clone()
 
     @torch.no_grad()
-    def update(self, model: nn.Module):
-        ema_params = self._get_params(self.ema_model)
-        model_params = self._get_params(model)
+    def update(self, model: nn.Module, decay_: float = None):
+        model = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+        decay = self.decay if decay_ is None else decay_
 
-        for ema_p, model_p in zip(ema_params, model_params):
-            if self.device is not None:
-                model_p = model_p.to(self.device)
-            ema_p.data.mul_(self.decay).add_(model_p.data, alpha=1.0 - self.decay)
-
-    def _get_params(self, model):
-        return (
-            model.module.parameters() if self._has_module else model.parameters()
-        )
-
-    def state_dict(self):
-        return self.ema_model.state_dict()
-
-    def load_state_dict(self, state_dict):
-        self.ema_model.load_state_dict(state_dict)
-
-    def to(self, device):
-        self.device = device
-        self.ema_model.to(device)
+        for name, param in model.named_parameters():
+            if name in self.shadow:
+                self.shadow[name].mul_(decay).add_(param.data, alpha=1.0 - decay)
 
     def copy_to(self, model: nn.Module):
-        """Copies EMA weights into the given model."""
-        model_params = self._get_params(model)
-        ema_params = self._get_params(self.ema_model)
-        for m, e in zip(model_params, ema_params):
-            m.data.copy_(e.data)
+        model = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+        for name, param in model.named_parameters():
+            if name in self.shadow:
+                param.data.copy_(self.shadow[name])
 
-    def ema_model_eval(self):
-        self.ema_model.eval()
-        return self.ema_model
+    def state_dict(self):
+        return {k: v.clone() for k, v in self.shadow.items()}
+
+    def load_state_dict(self, state_dict):
+        self.shadow = {k: v.clone() for k, v in state_dict.items()}
