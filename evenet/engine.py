@@ -227,6 +227,8 @@ class EveNetEngine(L.LightningModule):
                 for key in schedules
             }
 
+            print(schedules)
+
         outputs = self.model.shared_step(
             batch=inputs,
             batch_size=batch_size,

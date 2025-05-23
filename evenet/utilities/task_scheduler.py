@@ -37,11 +37,8 @@ class ProgressiveTaskScheduler:
             })
 
             print(f"{self.stages[-1]['name']}: {epoch_length:.0f} epochs, total {epoch_end:.0f} epochs")
-            if i == 0:
-                print("  --> No transition (first stage)")
-            else:
-                print(f"  --> Transition (epochs): {transition_start_epoch:.1f} -> {transition_end_epoch:.1f}")
-                print(f"  --> Transition (steps):  {transition_start} -> {transition_end}")
+            print(f"  --> Transition (epochs): {transition_start_epoch:.1f} -> {transition_end_epoch:.1f}")
+            print(f"  --> Transition (steps):  {transition_start} -> {transition_end}")
 
             for component in stage_cfg.get("freeze", []) + stage_cfg.get("unfreeze", []):
                 if self.model_parts.get(component, None):
