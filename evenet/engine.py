@@ -1036,7 +1036,7 @@ class EveNetEngine(L.LightningModule):
 
     def on_load_checkpoint(self, checkpoint):
         if self.ema_model is not None and 'ema_state_dict' in checkpoint:
-            self.ema_model.load_state_dict(checkpoint['ema_state_dict'])
+            self.ema_model.load_state_dict(checkpoint['ema_state_dict'], device=self.device)
             print(f"[Model] --> Loading EMA model")
             if self.ema_cfg.get("replace_model_after_load", False):
                 self.ema_model.copy_to(self.model)

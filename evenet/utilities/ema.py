@@ -32,5 +32,5 @@ class EMA:
     def state_dict(self):
         return {k: v.clone() for k, v in self.shadow.items()}
 
-    def load_state_dict(self, state_dict):
-        self.shadow = {k: v.clone() for k, v in state_dict.items()}
+    def load_state_dict(self, state_dict, device=None):
+        self.shadow = {k: v.clone().to(device) for k, v in state_dict.items()}
