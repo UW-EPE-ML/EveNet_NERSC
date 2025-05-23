@@ -121,7 +121,7 @@ options:
       lr: 0.025
 
   Dataset:
-    dataset_limit: 0.01
+    dataset_limit: 1.0
     normalization_file: "/pscratch/sd/t/tihsu/database/EveNet/v4-full/normalization.pt"
     val_split: [ 0.7, 1.0 ]
 
