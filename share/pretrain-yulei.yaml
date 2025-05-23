@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250521.342M_shuffled"
   number_of_workers: 32
   resources_per_worker: {
     "CPU": 30,
@@ -12,7 +12,7 @@ wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "135M", "Diffusion", "Vanilla" ]
+  tags: [ "Pretrain", "NERSC", "Multi-Node", "342M", "Diffusion", "Vanilla" ]
 
 options:
   default: options/options.yaml
@@ -21,7 +21,7 @@ options:
     total_epochs: 10
     epochs: 5
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/epoch=1_train=3.0692_val=2.7939.ckpt"
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/epoch=1_train=3.0692_val=2.7939.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 2 # how often to run diffusion
@@ -83,7 +83,7 @@ options:
     ProgressiveTraining:
       stages:
         - name: "masking point prediction"
-          epoch_ratio: 0.1
+          epoch_ratio: 0.2
           transition_ratio: 1.0
           loss_weights:
             generation-truth: [ 0.0, 0.0 ]
@@ -111,7 +111,7 @@ options:
             ema_decay: [ 0.9, 0.99 ]
 
         - name: "full_training"
-          epoch_ratio: 0.8
+          epoch_ratio: 0.7
           transition_ratio: 0.2
           loss_weights:
             generation-truth: [ 1.0, 1.0 ]
