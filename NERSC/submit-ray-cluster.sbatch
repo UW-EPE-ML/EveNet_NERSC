@@ -28,6 +28,12 @@ fi
 fi
 port=6379
 
+##############################################################################################
+
+echo srun -n 4 --nodes=4 --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0 shifter ./start-worker.sh $head_node_ip:$port > ~/ray.run
+
+##############################################################################################
+
 echo "STARTING HEAD at $head_node"
 echo "Head node IP: $head_node_ip"
 srun --nodes=1 --ntasks=1 --gpus=0 --gpus-per-task=4 --cpus-per-task=128 -w $head_node shifter ./start-head.sh $head_node_ip &
@@ -36,14 +42,10 @@ sleep 10
 worker_num=$(($SLURM_JOB_NUM_NODES - 1)) #number of nodes other than the head node
 srun -n $worker_num --nodes=$worker_num --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0  --exclude $head_node shifter ./start-worker.sh $head_node_ip:$port &
 sleep 5
-##############################################################################################
-
-echo srun -n 4 --nodes=4 --ntasks-per-node=1 --gpus-per-task=4 --cpus-per-task=128 --gpus=0 shifter ./start-worker.sh $head_node_ip:$port > ~/ray.run
-
-##############################################################################################
 
 # export the parent directory of the script to the PYTHONPATH
-PYTHONPATH=$(dirname "$(dirname "$(realpath "$0")")"):$PYTHONPATH
-echo $PYTHONPATH && export PYTHONPATH
+cd ../ && source setup.sh
 
-#shifter python3 ../evenet/train.py ../share/default-yulei.yaml
+shifter python3 evenet/train.py share/pretrain-yulei.yaml
+
+exit
