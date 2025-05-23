@@ -62,7 +62,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
       GlobalGeneration:
-        include: true
+        include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -106,7 +106,7 @@ options:
             generation-truth: [ 0.0, 1.0] ]
             generation-reco: [ 1.0, 0.0 ]
             classification: [ 0.0, 1.0 ]
-            classification-noised: [ 1.0, 0.0 ]
+            classification-noised: [ 1.0, 0.5 ]
             regression: [ 0.0, 1.0 ]
             assignment: [ 0.0, 1.0 ]
           train_parameters:
@@ -116,13 +116,13 @@ options:
 
         - name: "full_training"
           epoch_ratio: 0.8
-          transition_ratio: 0.1
+          transition_ratio: 0.2
           loss_weights:
 #            generation: [ 0.0, 0.5 ]
             generation-truth: [ 1.0, 0.25 ]
             generation-reco: [ 0.0, 0.25 ]
             classification: [ 1.0, 1.0 ]
-            classification-noised: [ 0.0, 1.0 ]
+            classification-noised: [ 0.5, 1.0 ]
             regression: [ 1.0, 1.0 ]
             assignment: [ 1.0, 1.0 ]
           train_parameters:
