@@ -51,7 +51,6 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
-        self.task_scheduler: Union[ProgressiveTaskScheduler, None] = None
         self.aggregator = None
         self.sampler = None
         self.steps_per_epoch = None
@@ -176,8 +175,7 @@ class EveNetEngine(L.LightningModule):
         self.log_gradient_step = global_config.options.Training.get("log_gradient_step", 100)
 
         ###### Progressive Training ######
-        self.progressive_training: list = global_config.options.Training.get("ProgressiveTraining", [])
-        self.previous_progress: Union[dict, None] = None
+        self.task_scheduler: Union[ProgressiveTaskScheduler, None] = None
         self.progressive_index = 0
 
         ###### Last ######
@@ -214,8 +212,8 @@ class EveNetEngine(L.LightningModule):
         if self.training:
             # Evaluate which tasks are active based on weights
             task_gate = {
-                "generation": task_weights.get("generation", 0) > 0,
-                "neutrino_generation": task_weights.get("generation", 0) > 0,
+                "generation": task_weights.get("generation-recon", 0) > 0,
+                "neutrino_generation": task_weights.get("generation-truth", 0) > 0,
                 "deterministic": (
                                          task_weights.get("classification", 0)
                                          + task_weights.get("regression", 0)
