@@ -229,7 +229,7 @@ class EveNetEngine(L.LightningModule):
 
         # logging schedules
         for key, value in schedules.items():
-            self.log(f"progressive/schedule-{key}", value, prog_bar=False, sync_dist=False, rank_zero_only=True)
+            self.log(f"progressive/schedule-{key}", int(value), prog_bar=False, sync_dist=False, rank_zero_only=True)
 
         outputs = self.model.shared_step(
             batch=inputs,
