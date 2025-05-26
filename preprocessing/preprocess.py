@@ -151,7 +151,8 @@ def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
         "I. Portion [%]": 1.0,
         "F. Portion [%]": 1.0
     }
-    df = df.append(total_row, ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+
 
     def format_float(x):
         return f"{x:.2%}" if isinstance(x, float) else x
@@ -351,7 +352,7 @@ def process_single_run(args):
     # print(f"[INFO] Processing {in_tag}")
     single_statistics, cut_flows = preprocess(
         run_folder, store_dir, process_info,
-        unique_id=in_tag, cfg_dir=cfg_dir, save=True
+        unique_id=in_tag, cfg_dir=cfg_dir, save=True, verbose=False
     )
 
     return single_statistics, cut_flows

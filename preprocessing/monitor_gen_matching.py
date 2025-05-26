@@ -360,7 +360,8 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         # print(f"[Warning] No files found for process: {process}")
         return None
 
-    for h5name in tqdm(process_files, desc=f'{process} -- Loading files', unit='file'):
+    # for h5name in tqdm(process_files, desc=f'{process} -- Loading files', unit='file'):
+    for h5name in process_files:
         # print(h5name)
         h5fr = h5py.File(h5name, mode='r')
 
