@@ -189,10 +189,10 @@ class EventInfo:
                             for property_name in self.resonance_particle_properties:
                                 if property_name in third_dict:
                                     resonance_particle_properties_tmp.append(third_dict[property_name])
-                                #                                print(f"----{property_name}: {third_dict[property_name]}")
+                                    # print(f"----{property_name}: {third_dict[property_name]}")
                                 else:
                                     resonance_particle_properties_tmp.append(0.0)
-                #                                print(f"----{property_name}: 0.0 (no entry so pad zero)")
+                                    # print(f"----{property_name}: 0.0 (no entry so pad zero)")
 
                 resonance_particle_properties_summary.append(np.array(resonance_particle_properties_tmp))
                 if topology_name not in self.pairing_topology:
@@ -501,7 +501,6 @@ class EventInfo:
 
             for name, normalize in invisible.items()
         )
-
 
         # TODO: feynman_fill (not necessary, but would be nice)
 
