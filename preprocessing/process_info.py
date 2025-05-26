@@ -21,6 +21,8 @@ PDG_Dict = {
     "a_thirty": [36],
     "a_forty": [36],
     "a_sixty": [36],
+    "W+": [24],
+    "W-": [-24],
 }
 
 neutrino_representation = []
@@ -56,7 +58,7 @@ def select_by_pdgId(candidate, candidate_name):
     candidate_pdgId = PDG_Dict[candidate_type]
     select = ak.values_astype(ak.zeros_like(candidate.pdgId), bool)
     for pdgId in candidate_pdgId:
-        select = select | ((candidate.pdgId) == pdgId)
+        select = select | (candidate.pdgId == pdgId)
     return candidate[select]
 
 
@@ -183,7 +185,8 @@ def assign_Reco_LorentzVector(Event_dict, products, parton, candidate_name, reco
                     parton[ak.unflatten(Event_dict[product_name], counts=1, axis=-1) == parton.index].reco_v4,
                     1, axis=-1
                 )[..., 0],
-                default_reco_v4)  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
+                default_reco_v4
+            )  # TODO: There seems to have parton sharing same index. Probably saving dulplicate parton. Not leading problem to training, but may need to take care.
             # print(product_name, ak.type(reconstructed_momentum_dict[product_name]))
 
         if candidate_name not in reconstructed_momentum_dict:

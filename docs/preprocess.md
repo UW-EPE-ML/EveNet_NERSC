@@ -64,8 +64,8 @@ For every sub-run folder:
 
 - **Global Shuffle**
   ```bash
-    python3 NERSC/global_shuffle.py --first_shuffle_percent 2.5 --second_shuffle_percent 5.0 20 \
-    /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250519.237M/
+    python3 NERSC/global_shuffle.py --first_shuffle_percent 2.5 --second_shuffle_percent 1.0 20 \
+    /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250521.342M/
   ```
 
 

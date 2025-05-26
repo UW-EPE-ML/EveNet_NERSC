@@ -1,5 +1,11 @@
+EXCLUDE:
+  Momentum: &Momentum
+    - pt
+    - eta
+    - phi
+
 # ---------------------------------------------------
-# REQUIRED - INPUTS - List all inputs to SPANet here.
+# REQUIRED - INPUTS - List all inputs to EveNet here.
 # ---------------------------------------------------
 INPUTS:
   # -----------------------------------------------------------------------------
@@ -7,7 +13,7 @@ INPUTS:
   # -----------------------------------------------------------------------------
   SEQUENTIAL:
     Source:
-#      mass: log_normalize
+      #      mass: log_normalize
       energy: log_normalize
       pt: log_normalize
       eta: normalize
@@ -96,11 +102,15 @@ EVENT:
       - q2
 
   WZ_1L:
+    W:
+      - l
     Z:
       - q1
       - q2
 
   WW_1L:
+    W1:
+      - l
     W2:
       - q1
       - q2
@@ -114,6 +124,8 @@ EVENT:
       - l2
 
   WZ_3L:
+    W:
+      - l
     Z:
       - l1
       - l2
@@ -131,6 +143,38 @@ EVENT:
     W:
       - q1
       - q2
+  ttW_Leptonic:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - q1
+      - q2
+    W:
+      - l
+  ttW_tHtLWH:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - l
+    W:
+      - q1
+      - q2
+  ttW_tHtLWL:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - l
+    W:
+      - l
 
   ttZ_FullHadronics:
     t1:
@@ -157,10 +201,59 @@ EVENT:
     Z:
       - l1
       - l2
+  ttZ_tHtLZH:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - l
+    Z:
+      - q1
+      - q2
+  ttZ_tHtLZL:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - l
+    Z:
+      - l1
+      - l2
+
 
   WJetsToLNu:
     W:
       - l
+
+  HWW_WpLepWmLep:
+    W+:
+      - l+
+    W-:
+      - l-
+  HWW_WpHadWmHad:
+    W+:
+      - q1
+      - q2
+    W-:
+      - q1
+      - q2
+  HWW_WpHadWmLep:
+    W+:
+      - q1
+      - q2
+    W-:
+      - l-
+  HWW_WpLepWmHad:
+    W+:
+      - l+
+    W-:
+      - q1
+      - q2
+
 
 # ---------------------------------------------------------
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
@@ -235,6 +328,21 @@ PERMUTATIONS:
       - [ q1, q2 ]
     W:
       - [ q1, q2 ]
+  ttW_Leptonic:
+    EVENT:
+      - [ t1, t2 ]
+    t1:
+      - [ q1, q2 ]
+    t2:
+      - [ q1, q2 ]
+  ttW_tHtLWH:
+    t1:
+      - [ q1, q2 ]
+    W:
+      - [ q1, q2 ]
+  ttW_tHtLWL:
+    t1:
+      - [ q1, q2 ]
 
   ttZ_FullHadronics:
     EVENT:
@@ -255,144 +363,127 @@ PERMUTATIONS:
       - [ q1, q2 ]
     Z:
       - [ l1, l2 ]
+  ttZ_tHtLZH:
+    t1:
+      - [ q1, q2 ]
+    Z:
+      - [ q1, q2 ]
+  ttZ_tHtLZL:
+    t1:
+      - [ q1, q2 ]
+    Z:
+      - [ l1, l2 ]
 
   WJetsToLNu:
     - [ ]
 
-
+  HWW_WpLepWmLep:
+    - [ ]
+  HWW_WpHadWmHad:
+    - [ ]
+  HWW_WpHadWmLep:
+    - [ ]
+  HWW_WpLepWmHad:
+    - [ ]
 # ------------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired features to regress from observables.
 # ------------------------------------------------------------------------------
 REGRESSIONS:
 
   TTHadronics:
-    t1:
-      - pt
-      - eta
-      - phi
-    t2:
-      - pt
-      - eta
-      - phi
+    t1: *Momentum
+    t2: *Momentum
 
   TT1L:
-    t1:
-      - pt
-      - eta
-      - phi
-    t2:
-      - pt
-      - eta
-      - phi
-    t2/v:
-      - pt
-      - eta
-      - phi
+    t1: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
 
   TT2L:
-    t1:
-      - pt
-      - eta
-      - phi
-    t1/v:
-      - pt
-      - eta
-      - phi
-    t2:
-      - pt
-      - eta
-      - phi
-    t2/v:
-      - pt
-      - eta
-      - phi
+    t1: *Momentum
+    t1/v: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
+
+  ttW_Leptonic:
+    t1: *Momentum
+    t2: *Momentum
+    W: *Momentum
+    W/v: *Momentum
+  ttW_tHtLWH:
+    t1: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
+    W: *Momentum
+  ttW_tHtLWL:
+    t1: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
+    W: *Momentum
+    W/v: *Momentum
+
+  ttZ_tHtLZH:
+    t1: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
+    Z: *Momentum
+  ttZ_tHtLZL:
+    t1: *Momentum
+    t2: *Momentum
+    t2/v: *Momentum
+    Z: *Momentum
 
   WJetsToQQ:
-    W:
-      - pt
-      - eta
-      - phi
+    W: *Momentum
 
   ZJetsToQQ:
-    Z:
-      - pt
-      - eta
-      - phi
+    Z: *Momentum
 
   ZJetsToLL:
-    Z:
-      - pt
-      - eta
-      - phi
+    Z: *Momentum
 
   ZZ_2L:
-    Z1:
-      - pt
-      - eta
-      - phi
-    Z2:
-      - pt
-      - eta
-      - phi
+    Z1: *Momentum
+    Z2: *Momentum
 
   WZ_1L:
-    W:
-      - pt
-      - eta
-      - phi
-    W/v:
-      - pt
-      - eta
-      - phi
-    Z:
-      - pt
-      - eta
-      - phi
+    W: *Momentum
+    W/v: *Momentum
+    Z: *Momentum
 
   WW_1L:
-    W1:
-      - pt
-      - eta
-      - phi
-    W1/v:
-      - pt
-      - eta
-      - phi
-    W2:
-      - pt
-      - eta
-      - phi
+    W1: *Momentum
+    W1/v: *Momentum
+    W2: *Momentum
 
   WZ_2L:
-    W:
-      - pt
-      - eta
-      - phi
-    Z:
-      - pt
-      - eta
-      - phi
+    W: *Momentum
+    Z: *Momentum
 
   WZ_3L:
-    W:
-      - pt
-      - eta
-      - phi
-    W/v:
-      - pt
-      - eta
-      - phi
-    Z:
-      - pt
-      - eta
-      - phi
+    W: *Momentum
+    W/v: *Momentum
+    Z: *Momentum
 
   WJetsToLNu:
-    W/v:
-      - pt
-      - eta
-      - phi
+    W/v: *Momentum
 
+  HWW_WpLepWmLep:
+    W+: *Momentum
+    W+/v: *Momentum
+    W-: *Momentum
+    W-/v: *Momentum
+  HWW_WpHadWmHad:
+    W+: *Momentum
+    W-: *Momentum
+  HWW_WpHadWmLep:
+    W+: *Momentum
+    W-: *Momentum
+    W-/v: *Momentum
+  HWW_WpLepWmHad:
+    W+: *Momentum
+    W+/v: *Momentum
+    W-: *Momentum
 # -----------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
 # -----------------------------------------------------------------------------
@@ -404,7 +495,7 @@ CLASSIFICATIONS:
 CLASSLABEL:
   EVENT:
     signal:
-      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ ]
+      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]
 
 PARTICLE_PROPERTIES:
   - Energy

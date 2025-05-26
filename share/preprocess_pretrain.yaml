@@ -12,7 +12,6 @@ selections:
 
     pt: "INPUTS/Source/pt"
 
-
   selection_anchors:
     pT:
       lep: &lep_pT "np.min(np.where(is_lep.astype(bool), pt, np.inf), axis=-1) > 10"
@@ -51,7 +50,7 @@ selections:
       - "n_bjet >= 2"
       - *bjet2_pT_sel
     QCD_2b2j:
-      - "(n_bjet >= 2) & (n_jet >= 2)"
+      - "(n_bjet >= 2) & (n_jet >= 4)"
       - *bjet2_pT_sel
       - *jet2_pT_sel
     QCD_4b:
@@ -59,13 +58,13 @@ selections:
       - *bjet4_pT_sel
 
     TTHadronics: &TTHadronics
-      - "n_bjet >= 2"
+      - "(n_bjet >= 2) & (n_jet >= 6)"
       - *bjet2_pT_sel
       - *jet4_pT_sel
     TTHadronics_mlm: *TTHadronics
     TT1L: &TT1L
       - "n_lep >= 1"
-      - "n_bjet >= 2"
+      - "(n_bjet >= 2) & (n_jet >= 4)"
       - *lep1_pT_sel
       - *bjet2_pT_sel
       - *jet2_pT_sel
@@ -78,15 +77,41 @@ selections:
     TT2L_mlm: *TT2L
 
     ttW_FullHadronics: &ttV_FullHadronics
-      - "(n_bjet >= 2) & (n_jet >= 6)"
+      - "(n_bjet >= 2) & (n_jet >= 8)"
       - *bjet2_pT_sel
       - *jet6_pT_sel
+    ttW_Leptonic:
+      - "(n_bjet >= 2) & (n_lep >= 1) & (n_jet >= 6)"
+      - *lep1_pT_sel
+      - *bjet2_pT_sel
+      - *jet4_pT_sel
+    ttW_tHtLWH:
+      - "(n_bjet >= 2) & (n_lep >= 1) & (n_jet >= 6)"
+      - *bjet2_pT_sel
+      - *lep1_pT_sel
+      - *jet4_pT_sel
+    ttW_tHtLWL:
+      - "(n_bjet >= 2) & (n_lep >= 2) & (n_jet >= 4)"
+      - *bjet2_pT_sel
+      - *lep2_pT_sel
+      - *jet2_pT_sel
     ttZ_FullHadronics: *ttV_FullHadronics
     ttZ_Leptonic:
-      - "(n_bjet >= 2) & (n_lep >= 2)"
+      - "(n_bjet >= 2) & (n_lep >= 2) & (n_jet >= 6)"
       - *lep2_pT_sel
       - *bjet2_pT_sel
       - *jet4_pT_sel
+    ttZ_tHtLZH:
+      - "(n_bjet >= 2) & (n_lep >= 1) & (n_jet >= 6)"
+      - *bjet2_pT_sel
+      - *lep1_pT_sel
+      - *jet4_pT_sel
+    ttZ_tHtLZL:
+      - "(n_bjet >= 2) & (n_lep >= 3) & (n_jet >= 4)"
+      - *bjet2_pT_sel
+      - *lep3_pT_sel
+      - *jet2_pT_sel
+
 
     WJetsToQQ: &VJetsToQQ
       - "n_jet >= 2"
@@ -128,6 +153,27 @@ selections:
     WZ_3L:
       - "n_lep >= 3"
       - *lep3_pT_sel
+
+    HWW_WpLepWmLep:
+      - "n_lep >= 2"
+      - *lep2_pT_sel
+
+    HWW_WpHadWmHad:
+      - "n_jet >= 4"
+      - *jet4_pT_sel
+
+    HWW_WpLepWmHad:
+      - "n_lep >= 1"
+      - "n_jet >= 2"
+      - *lep1_pT_sel
+      - *jet2_pT_sel
+
+    HWW_WpHadWmLep:
+      - "n_lep >= 1"
+      - "n_jet >= 2"
+      - *lep1_pT_sel
+      - *jet2_pT_sel
+
 
 process_info:
   default: process_info/pretrain.yaml

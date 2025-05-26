@@ -8,6 +8,13 @@ EXCLUDE:
     l: null
     v: null
 
+  W_lep_plus: &W_lep_plus
+    l+: null
+    v: null
+  W_lep_minus: &W_lep_minus
+    l-: null
+    v: null
+
   Z_had: &Z_had
     q1: null
     q2: null
@@ -107,6 +114,28 @@ ttW_FullHadronics:
     t2: *top_had
     W: *W_had
     SYMMETRY: [ t1, t2 ]
+ttW_Leptonic:
+  category: ttW
+  process_id: 2
+  diagram:
+    t1: *top_had
+    t2: *top_had
+    W: *W_lep
+    SYMMETRY: [ t1, t2 ]
+ttW_tHtLWH:
+  category: ttW
+  process_id: 2
+  diagram:
+    t1: *top_had
+    t2: *top_lep
+    W: *W_had
+ttW_tHtLWL:
+  category: ttW
+  process_id: 2
+  diagram:
+    t1: *top_had
+    t2: *top_lep
+    W: *W_lep
 
 ttZ_FullHadronics:
   category: ttZ
@@ -116,7 +145,6 @@ ttZ_FullHadronics:
     t2: *top_had
     Z: *Z_had
     SYMMETRY: [ t1, t2 ]
-
 ttZ_Leptonic:
   category: ttZ
   process_id: 3
@@ -125,6 +153,20 @@ ttZ_Leptonic:
     t2: *top_had
     Z: *Z_lep
     SYMMETRY: [ t1, t2 ]
+ttZ_tHtLZH:
+  category: ttZ
+  process_id: 3
+  diagram:
+    t1: *top_had
+    t2: *top_lep
+    Z: *Z_had
+ttZ_tHtLZL:
+  category: ttZ
+  process_id: 3
+  diagram:
+    t1: *top_had
+    t2: *top_lep
+    Z: *Z_lep
 
 WJetsToQQ:
   category: WJets
@@ -200,3 +242,28 @@ WZ_3L:
   diagram:
     W: *W_lep
     Z: *Z_lep
+
+HWW_WpLepWmLep:
+  category: HWW
+  process_id: 9
+  diagram:
+    W+: *W_lep_plus
+    W-: *W_lep_minus
+HWW_WpHadWmHad:
+  category: HWW
+  process_id: 9
+  diagram:
+    W+: *W_had
+    W-: *W_had
+HWW_WpLepWmHad:
+  category: HWW
+  process_id: 9
+  diagram:
+    W+: *W_lep_plus
+    W-: *W_had
+HWW_WpHadWmLep:
+  category: HWW
+  process_id: 9
+  diagram:
+    W+: *W_had
+    W-: *W_lep_minus

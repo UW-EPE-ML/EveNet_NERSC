@@ -67,4 +67,19 @@ SingleVisibleDecay:
     nProduct_Lepton: 1
     Product_LeptonCharge: 0
 
+  W+/l+:
+#    Mass: 80.38
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 0
+    nProduct_Lepton: 1
+    Product_LeptonCharge: 0
+
+  W-/l-:
+#    Mass: 80.38
+    Spin: 1
+    nProduct_BJet: 0
+    nProduct_Jet: 0
+    nProduct_Lepton: 1
+    Product_LeptonCharge: 0
 
