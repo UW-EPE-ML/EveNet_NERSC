@@ -79,7 +79,7 @@ class EveNetDataConverter:
                 continue  # Skip if this target doesn't belong to current process
 
             if not daughters:
-                print(f"[WARN] No daughters for {process_name}/{product}, skipping.")
+                # print(f"[WARN] No daughters for {process_name}/{product}, skipping.")
                 continue
 
             target_prefix = f"{label}/{process_name}/{product}" if not direct_from_spanet else f"{label}/{product}"
@@ -88,7 +88,7 @@ class EveNetDataConverter:
             try:
                 indices = np.stack([self.raw_data[field] for field in daughter_fields], axis=-1)
             except KeyError as e:
-                print(f"[WARN] Missing field {e}; skipping {target_prefix}")
+                # print(f"[WARN] Missing field {e}; skipping {target_prefix}")
                 continue
 
             mask = np.all(indices >= 0, axis=1)
@@ -97,7 +97,7 @@ class EveNetDataConverter:
             full_mask[:, row_idx] = mask
             index_mask[:, row_idx, :len(daughters)] = True
 
-            print(f"[INFO] ASSIGNMENT Loaded {target_prefix}")
+            # print(f"[INFO] ASSIGNMENT Loaded {target_prefix}")
 
         output_dict["assignments-indices"] = full_indices
         output_dict["assignments-mask"] = full_mask
@@ -136,7 +136,7 @@ class EveNetDataConverter:
                 except KeyError as e:
                     # print(f"[WARN] Missing {data_key} or {mask_key}, skipping: {e}")
                     continue
-            print(f"[INFO] Recorded {data_key} and {mask_key}")
+            # print(f"[INFO] Recorded {data_key} and {mask_key}")
 
         # Store in output
         output_dict["regression-data"] = regression_data
@@ -169,7 +169,7 @@ class EveNetDataConverter:
             subprocess_id = list(self.event_info.event_mapping.keys()).index(process_name)
         else:
             subprocess_id = -1
-            print(f"[INFO] Process {process_name} not found in event mapping, using -1 as subprocess ID.")
+            # print(f"[INFO] Process {process_name} not found in event mapping, using -1 as subprocess ID.")
         data_selected['METADATA/PROCESS'] = np.zeros_like(
             data_selected['INFO/VetoDoubleAssign'], dtype=int
         ) + subprocess_id
@@ -177,7 +177,7 @@ class EveNetDataConverter:
         n_event_original = len(selection)
         n_event_current = len(data_selected['INFO/VetoDoubleAssign'])
 
-        print(f"Veto Double Assignment:  {n_event_current}/{n_event_original}. [{category}: {self.process}]")
+        # print(f"Veto Double Assignment:  {n_event_current}/{n_event_original}. [{category}: {self.process}]")
 
         self.raw_data = data_selected
         self.total_length = n_event_current

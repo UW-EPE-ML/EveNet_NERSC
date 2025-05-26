@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 
+from tqdm import tqdm
+
 from evenet.control.global_config import global_config
 from evenet.control.event_info import EventInfo
 from preprocessing.monitor_gen_matching import monitor_gen_matching
@@ -140,6 +142,17 @@ def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
     df["I. Portion [%]"] = df["Initial"] / total_cut0
     df["F. Portion [%]"] = df["Final"] / total_final
 
+    # add a total row
+    total_row = {
+        "Process": "Total",
+        "Initial": total_cut0,
+        "Final": total_final,
+        "Eff.": total_final / total_cut0 if total_cut0 else 0,
+        "I. Portion [%]": 1.0,
+        "F. Portion [%]": 1.0
+    }
+    df = df.append(total_row, ignore_index=True)
+
     def format_float(x):
         return f"{x:.2%}" if isinstance(x, float) else x
 
@@ -149,7 +162,7 @@ def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
     return analyzed_str
 
 
-def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
+def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True, verbose: bool = True):
     converted_data = []
 
     # if hasattr(config, 'event_info'):
@@ -175,7 +188,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         )
 
         if matched_data is None:
-            print(f"[WARNING] No matched data for process {process} in dir {in_dir}")
+            if verbose:
+                print(f"[WARNING] No matched data for process {process} in dir {in_dir}")
             continue
 
         converter = EveNetDataConverter(
@@ -282,7 +296,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         else:
             assert (shape_metadata == meta_data), "Shape metadata mismatch"
 
-        print(f"[INFO] Current table size: {flattened_data.nbytes / 1024 / 1024:.2f} MB")
+        if verbose:
+            print(f"[INFO] Current table size: {flattened_data.nbytes / 1024 / 1024:.2f} MB")
 
         converted_data.append(flattened_data)
 
@@ -300,7 +315,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
 
     if len(converted_data) == 0:
-        print(f"[WARNING] No data found for any of the processes in {in_dir}")
+        if verbose:
+            print(f"[WARNING] No data found for any of the processes in {in_dir}")
         return None
 
     final_table = pa.concat_tables(converted_data)
@@ -315,8 +331,9 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         with open(f"{store_dir}/shape_metadata.json", "w") as f:
             json.dump(shape_metadata, f)
 
-        print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
-        print(f"[Saving] Saving {final_table.num_rows} rows to {store_dir}/data_{unique_id}.parquet")
+        if verbose:
+            print(f"[INFO] Final table size: {final_table.nbytes / 1024 / 1024:.2f} MB")
+            print(f"[Saving] Saving {final_table.num_rows} rows to {store_dir}/data_{unique_id}.parquet")
 
         return converted_statistics, cutflows
 
@@ -331,7 +348,7 @@ def process_single_run(args):
     pretrain_dir, run_folder_name, store_dir, process_info, cfg_dir = args
     run_folder = Path(pretrain_dir) / run_folder_name
     in_tag = f"{Path(pretrain_dir).name}_{run_folder_name}"
-    print(f"[INFO] Processing {in_tag}")
+    # print(f"[INFO] Processing {in_tag}")
     single_statistics, cut_flows = preprocess(
         run_folder, store_dir, process_info,
         unique_id=in_tag, cfg_dir=cfg_dir, save=True
@@ -355,7 +372,11 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
                 ))
 
     with Pool(processes=num_workers) as pool:
-        results = pool.map(process_single_run, tasks)
+        results = list(tqdm(
+            pool.imap(process_single_run, tasks),
+            total=len(tasks),
+            desc="Processing runs"
+        ))
 
     # Merge statistics
     PostProcessor.merge(
