@@ -92,6 +92,7 @@ def main():
     logging.info("Stage 1: Partial shuffle and write to temp...")
     stage1_parts = save_batches(ds, first_buffer, temp_dir)
     logging.info(f"Stage 1 complete: wrote {stage1_parts} temp batches.")
+    del ds  # Free memory after stage 1
 
     logging.info("Stage 2: Re-shuffle from temp and write final output...")
     temp_files = list(temp_dir.rglob("*.parquet"))
