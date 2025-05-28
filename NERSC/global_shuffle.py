@@ -48,7 +48,7 @@ def compute_buffer_sizes(ds: Dataset, first_pct: float, second_pct: float) -> tu
 def save_batches(ds: Dataset, buffer_size: int, output_dir: Path) -> int:
     count = 0
     # for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size, batch_format="pandas"):
-    for batch in ds.iter_batches(local_shuffle_buffer_size=int(0.01 * buffer_size), batch_size=buffer_size):
+    for batch in ds.iter_batches(local_shuffle_buffer_size=int(0.005 * buffer_size), batch_size=buffer_size):
         # ray.data.from_pandas(batch).random_shuffle().write_parquet(str(output_dir))
         # test = ray.data.from_pandas(batch)
         # print(test.count())
@@ -76,7 +76,7 @@ def main():
     ds = ray.data.read_parquet(
         [str(f) for f in parquet_files], shuffle="files",
         ray_remote_args={"num_cpus": 1.0},
-        override_num_blocks=4,
+        # override_num_blocks=10,
     )
     total_rows, first_buffer, second_buffer = compute_buffer_sizes(
         ds, args.first_shuffle_percent, args.second_shuffle_percent
