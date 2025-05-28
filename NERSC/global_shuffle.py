@@ -52,7 +52,7 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path) -> int:
         # ray.data.from_pandas(batch).random_shuffle().write_parquet(str(output_dir))
         # test = ray.data.from_pandas(batch)
         # print(test.count())
-
+        print(count)
         count += 1
     return count
 
