@@ -49,7 +49,7 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, shuffle: bool=
     count = 0
 
     if shuffle:
-        local_shuffle_buffer_size = int(0.01 * buffer_size)
+        local_shuffle_buffer_size = buffer_size // 100
     else:
         local_shuffle_buffer_size = None
 
@@ -97,7 +97,7 @@ def main():
 
     logging.info("Stage 2: Re-shuffle from temp and write final output...")
     temp_files = list(temp_dir.rglob("*.parquet"))
-    ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files", ray_remote_args={"num_cpus": 1.0})
+    ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files", ray_remote_args={"num_cpus": 2.0})
     stage2_parts = save_batches(ds2, second_buffer, output_dir, shuffle=False)
     logging.info(f"Stage 2 complete: wrote {stage2_parts} final batches.")
 
