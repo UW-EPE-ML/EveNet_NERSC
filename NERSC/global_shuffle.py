@@ -53,7 +53,7 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, shuffle: bool=
     else:
         local_shuffle_buffer_size = None
 
-    for batch in ds.iter_batches(prefetch_batches=5, local_shuffle_buffer_size=local_shuffle_buffer_size, batch_size=buffer_size, batch_format="pandas"):
+    for batch in ds.iter_batches(prefetch_batches=2, local_shuffle_buffer_size=local_shuffle_buffer_size, batch_size=buffer_size, batch_format="pandas"):
     # for batch in ds.iter_batches(prefetch_batches=5, local_shuffle_buffer_size=int(0.005 * buffer_size), batch_size=buffer_size):
     #     ray.data.from_pandas(batch).write_parquet(str(output_dir))
         output_path = output_dir / f"batch_{count:05d}.parquet"
@@ -62,6 +62,10 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, shuffle: bool=
             pq.write_table(table, output_path)
             print(f"Saved batch {count} to {output_path}")
         # print(count)
+        else:
+            logging.warning(f"Empty batch encountered at index {count}, skipping write.")
+
+        del batch  # Free memory after each batch
         count += 1
     return count
 
@@ -98,7 +102,7 @@ def main():
 
     logging.info("Stage 2: Re-shuffle from temp and write final output...")
     temp_files = list(temp_dir.rglob("*.parquet"))
-    ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files", ray_remote_args={"num_cpus": 2.0})
+    ds2 = ray.data.read_parquet([str(f) for f in temp_files], shuffle="files", ray_remote_args={"num_cpus": 4.0})
     stage2_parts = save_batches(ds2, second_buffer, output_dir, shuffle=False)
     logging.info(f"Stage 2 complete: wrote {stage2_parts} final batches.")
 
