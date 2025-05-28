@@ -55,10 +55,11 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, shuffle: bool=
 
     for batch in ds.iter_batches(prefetch_batches=5, local_shuffle_buffer_size=local_shuffle_buffer_size, batch_size=buffer_size, batch_format="pandas"):
     # for batch in ds.iter_batches(prefetch_batches=5, local_shuffle_buffer_size=int(0.005 * buffer_size), batch_size=buffer_size):
-        ray.data.from_pandas(batch).write_parquet(str(output_dir))
-        # output_path = output_dir / f"batch_{count:05d}.parquet"
-        # table = pa.Table.from_pandas(df=batch)
-        # pq.write_table(table, output_path)
+    #     ray.data.from_pandas(batch).write_parquet(str(output_dir))
+        output_path = output_dir / f"batch_{count:05d}.parquet"
+        if not batch.empty:
+            table = pa.Table.from_pandas(batch)
+            pq.write_table(table, output_path)
         # print(count)
         count += 1
     return count
