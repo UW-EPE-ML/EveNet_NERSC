@@ -50,8 +50,8 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path) -> int:
     # for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size, batch_format="pandas"):
     for batch in ds.iter_batches(local_shuffle_buffer_size=buffer_size, batch_size=buffer_size):
         # ray.data.from_pandas(batch).random_shuffle().write_parquet(str(output_dir))
-        test = ray.data.from_pandas(batch.materialize())
-        print(test.count())
+        # test = ray.data.from_pandas(batch)
+        # print(test.count())
 
         count += 1
     return count
