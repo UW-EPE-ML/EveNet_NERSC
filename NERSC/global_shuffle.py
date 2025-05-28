@@ -76,6 +76,7 @@ def main():
     ds = ray.data.read_parquet(
         [str(f) for f in parquet_files], shuffle="files",
         ray_remote_args={"num_cpus": 1.0},
+        override_num_blocks=4,
     )
     total_rows, first_buffer, second_buffer = compute_buffer_sizes(
         ds, args.first_shuffle_percent, args.second_shuffle_percent
