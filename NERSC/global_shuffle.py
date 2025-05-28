@@ -60,6 +60,7 @@ def save_batches(ds: Dataset, buffer_size: int, output_dir: Path, shuffle: bool=
         if not batch.empty:
             table = pa.Table.from_pandas(batch)
             pq.write_table(table, output_path)
+            print(f"Saved batch {count} to {output_path}")
         # print(count)
         count += 1
     return count
