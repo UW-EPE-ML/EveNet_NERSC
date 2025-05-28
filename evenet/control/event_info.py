@@ -238,6 +238,7 @@ class EventInfo:
         self.generation_pc_condition_names = []
 
         self.generation_pc_indices = []
+        self.generation_pc_names = []
 
         for input_name, input_feature in self.input_features.items():
             if self.input_types[input_name] == InputType.Global:
@@ -262,6 +263,7 @@ class EventInfo:
 
                     if input_feature_element.name in self.generations.get("Events", []):
                         self.generation_pc_indices.append(seq_index)
+                        self.generation_pc_names.append(name)
                     seq_index += 1
 
         # For invisible generation

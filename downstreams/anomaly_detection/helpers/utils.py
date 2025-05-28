@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 import numpy as np
 import awkward as ak
 import torch, os, json
-
+import pandas as pd
 
 class LRScheduler():
     """
@@ -103,3 +103,27 @@ def save_file(
     print(f"[Saving] Saving {flatten_data.num_rows} rows to {save_dir}/data.parquet")
 
     torch.save(norm_dict, f"{save_dir}/normalization{postfix}.pt")
+
+def save_df(
+        save_dir,
+        data_df,
+        pc_index=None,
+        global_index=None,
+    ):
+    os.makedirs(save_dir, exist_ok=True)
+
+    dataset = dict()
+
+    for name, index in pc_index.items():
+        dataset[f"{name}-0"] = data_df["x"][:, 0, index]
+        dataset[f"{name}-1"] = data_df["x"][:, 1, index]
+    for name, index in global_index.items():
+        dataset[f"{name}"] = data_df["conditions"][:, index]
+
+    dataset["classification"] = data_df["classification"]
+    df = pd.DataFrame(dataset)
+
+    df.to_csv(f"{save_dir}/data.csv", index=False)
+
+    print(df)
+

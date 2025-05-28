@@ -21,6 +21,7 @@ def prepare_script(args):
         fold_config['event_info']['default'] = os.path.join(work_dir, config_dir, fold_config['event_info']['default'])
         fold_config['resonance']['default'] = os.path.join(work_dir, config_dir, fold_config['resonance']['default'])
         fold_config['options']['default'] = os.path.join(work_dir, config_dir, fold_config['options']['default'])
+        fold_config['wandb']['run_name'] = f"fold_{ifold}"
 
         fold_config["options"]["Training"]["model_checkpoint_save_path"] = os.path.join(fold_config["options"]["Training"]["model_checkpoint_save_path"], f"fold_{ifold}")
         fold_config["options"]["Dataset"]["val_split"] = [init, init + step]

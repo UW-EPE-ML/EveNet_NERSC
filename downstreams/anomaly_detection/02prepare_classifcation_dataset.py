@@ -22,7 +22,7 @@ from helpers.basic_fit import plot_mass_distribution
 from helpers.flow_sampling import get_mass_samples
 from helpers.stats_functions import curve_fit_m_inv, parametric_fit, check_bkg_for_peaks
 from helpers.plotting import read_feature
-from helpers.utils import save_file
+from helpers.utils import save_file, save_df
 
 from rich.progress import Progress, BarColumn, TimeRemainingColumn
 
@@ -149,6 +149,43 @@ def mix(args):
     gen_sample["classification"] = np.zeros_like(gen_sample["classification"])
     df_data["classification"] = np.ones_like(df_data["classification"])
 
+
+
+
+    # Expand the mask to broadcast over the last dimension (N)
+    mask_expanded = df_data['x_mask'][:, :, np.newaxis]  # (B, P, 1)
+    # Apply the mask: set unmasked values to +inf so they don't affect min
+    x_masked = np.where(mask_expanded, df_data['x'], np.inf)  # (B, P, N)
+    # Get minimum over both batch (B) and position (P) axes
+    min_vals = np.min(x_masked, axis=(0, 1))  # shape: (N,)
+    x = gen_sample["x"]  # shape (M, P, N)
+    x_mask = gen_sample["x_mask"]  # shape (M, P), boolean
+    min_vals = min_vals  # shape (N,)
+    # Expand mask to shape (M, P, 1) for broadcasting
+    mask_exp = x_mask[:, :, np.newaxis]  # (M, P, 1)
+    # Compare x > min_vals, broadcasted over N
+    comparison = x > min_vals  # (M, P, N)
+    # Apply the mask: only evaluate where x_mask is True
+    valid = comparison & mask_exp  # (M, P, N)
+    # Each masked (m, p) must satisfy all features > min_vals
+    valid_particles = np.all(valid | ~mask_exp, axis=2)  # (M, P)
+    # Each event: all masked particles must be valid
+    keep_mask = np.all(valid_particles | ~x_mask, axis=1)  # (M,)
+    # Filtered result
+    gen_sample = {k: v[keep_mask] for k, v in gen_sample.items()}
+
+    min_vals_cond = np.min(df_data["conditions"], axis=(0))  # shape: (N,)
+    # Apply the same logic to conditions
+    comparison = gen_sample["conditions"] > min_vals_cond  # (M, N)
+    print(f"Minimum values for conditions: {min_vals_cond}")
+    print(gen_sample["conditions"])
+    print(comparison)
+    # Apply the mask: only evaluate where x_mask is True
+    keep_mask = np.all(comparison[..., 1:], axis=1)  # (M,)
+    print(keep_mask)
+    # Filtered result
+    gen_sample = {k: v[keep_mask] for k, v in gen_sample.items()}
+
     num_gen = gen_sample["x"].shape[0]
     num_data = df_data["x"].shape[0]
     num_total = num_gen + num_data
@@ -159,19 +196,53 @@ def mix(args):
     norm_dict['subprocess_counts'] = norm_dict['class_counts']
     norm_dict['subprocess_balance'] = norm_dict['class_balance']
 
+
+    print("gen", gen_sample)
+    print("data", df_data)
+
     df_hybrid = {k: np.concatenate([gen_sample[k], df_data[k]], axis=0) for k in gen_sample}
-    df_hybrid["conditions"][..., 0]  = 0 # Remove the mass condition
 
     perm = np.random.permutation(len(next(iter(df_hybrid.values()))))
     df_hybrid = {k: v[perm] for k, v in df_hybrid.items()}
 
-    df_x_mask = np.zeros_like(df_hybrid["x"])
-    df_x_mask[..., global_config.event_info.generation_pc_indices] = 1.0
-    df_hybrid["x"] = df_hybrid["x"] * df_x_mask
+
+
+
+
+    outputdir = clean_and_append(config["output"]["storedir"], "_hybrid_raw")
+    outputdir = clean_and_append(outputdir, postfix)
+
+    save_file(
+        save_dir = os.path.join(outputdir, f"{args.region}"),
+        data_df = df_hybrid,
+        norm_dict = norm_dict,
+        event_filter = None,
+    )
+
+    save_df(
+        save_dir=os.path.join(outputdir, f"{args.region}"),
+        data_df=df_hybrid,
+        pc_index=dict(zip(global_config.event_info.generation_pc_names, global_config.event_info.generation_pc_indices)),
+        global_index=dict(zip(global_config.event_info.generation_pc_condition_names, global_config.event_info.generation_pc_condition_indices))
+    )
+
+    save_df(
+        save_dir=os.path.join(outputdir, "SB"),
+        data_df=df_SB,
+        pc_index=dict(zip(global_config.event_info.generation_pc_names, global_config.event_info.generation_pc_indices)),
+        global_index=dict(zip(global_config.event_info.generation_pc_condition_names, global_config.event_info.generation_pc_condition_indices)),
+    )
+
+
 
     outputdir = clean_and_append(config["output"]["storedir"], "_hybrid")
     outputdir = clean_and_append(outputdir, postfix)
 
+
+    df_x_mask = np.zeros_like(df_hybrid["x"])
+    df_x_mask[..., global_config.event_info.generation_pc_indices] = 1.0
+    df_hybrid["x"] = df_hybrid["x"] * df_x_mask
+    df_hybrid["conditions"][..., 0]  = 0 # Remove the mass condition
     save_file(
         save_dir = os.path.join(outputdir, f"{args.region}"),
         data_df = df_hybrid,
