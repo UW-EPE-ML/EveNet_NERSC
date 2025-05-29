@@ -428,6 +428,10 @@ class EveNetModel(nn.Module):
         outputs = dict()
         if schedules is None:
             schedules = self.schedule_flags
+
+        full_input_point_cloud = None
+        full_global_conditions = None
+
         for schedule_name, flag  in schedules:
             if not flag:
                 continue
@@ -587,7 +591,7 @@ class EveNetModel(nn.Module):
                 generations["neutrino"] = {
                     "vector": pred_point_cloud_vector[:, is_invisible_query, :],
                     "truth": truth_invisible_point_cloud_vector.detach(),
-                    "mask": invisible_point_cloud_mask
+                    "mask": invisible_point_cloud_mask.contiguous()
                 }
 
         return {

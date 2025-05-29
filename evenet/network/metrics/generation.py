@@ -471,6 +471,7 @@ def shared_step(
             mask=masking,
             feature_dim=feature_dim,
         )
+
         if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-global"] = global_gen_loss
@@ -491,9 +492,10 @@ def shared_step(
                 num_steps_neutrino=num_steps_neutrino,
             )
 
-    loss = (
-                   global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(
+    loss = (global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(
         outputs)
+    print(f"Training: {model.training}, loss scale: {event_loss_scale}, total sum: {torch.sum(masking) if masking is not None else masking}, Global loss: {global_gen_loss.item()}, Recon loss: {recon_gen_loss.item()}, Truth loss: {truth_gen_loss.item()}, loss: {loss.item()}")
+
     return loss, generation_loss
 
 

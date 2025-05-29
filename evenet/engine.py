@@ -315,6 +315,7 @@ class EveNetEngine(L.LightningModule):
 
             loss_raw['assignment'] = scaled_ass_loss.flatten()[0]
 
+        print("self.recon_generation_cfg.loss_scale", self.recon_generation_cfg.loss_scale)
         if self.generation_include and outputs["generations"] != dict():
             scaled_gen_loss, detailed_gen_loss = gen_step(
                 batch=batch,
@@ -338,9 +339,12 @@ class EveNetEngine(L.LightningModule):
                 invisible_padding=self.model.invisible_padding,
                 update_metric=update_metric,
             )
+
             loss_raw["generation"] = scaled_gen_loss
-            loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
-            loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
+            if "generation-truth" in loss_head_dict:
+                loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
+            if "generation-recon" in loss_head_dict:
+                loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
 
@@ -956,7 +960,7 @@ class EveNetEngine(L.LightningModule):
             if self.pretrain_ckpt_path is not None:
                 print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
                 ckpt = torch.load(self.pretrain_ckpt_path, map_location=self.device)
-                self.safe_load_state(self.model, ckpt['state_dict'])
+                safe_load_state(self.model, ckpt['state_dict'])
 
             # EMA
             if self.ema_cfg.get("enable", False):
