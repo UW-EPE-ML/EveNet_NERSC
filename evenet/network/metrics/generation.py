@@ -494,7 +494,7 @@ def shared_step(
 
     loss = (global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(
         outputs)
-    print(f"Training: {model.training}, loss scale: {event_loss_scale}, total sum: {torch.sum(masking) if masking is not None else masking}, Global loss: {global_gen_loss.item()}, Recon loss: {recon_gen_loss.item()}, Truth loss: {truth_gen_loss.item()}, loss: {loss.item()}")
+    # print(f"Training: {model.training}, loss scale: {event_loss_scale}, total sum: {torch.sum(masking) if masking is not None else masking}, Global loss: {global_gen_loss.item()}, Recon loss: {recon_gen_loss.item()}, Truth loss: {truth_gen_loss.item()}, loss: {loss.item()}")
 
     return loss, generation_loss
 

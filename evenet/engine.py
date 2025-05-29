@@ -315,7 +315,6 @@ class EveNetEngine(L.LightningModule):
 
             loss_raw['assignment'] = scaled_ass_loss.flatten()[0]
 
-        print("self.recon_generation_cfg.loss_scale", self.recon_generation_cfg.loss_scale)
         if self.generation_include and outputs["generations"] != dict():
             scaled_gen_loss, detailed_gen_loss = gen_step(
                 batch=batch,
