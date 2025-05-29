@@ -80,7 +80,8 @@ def concatenate_h5_datasets(indir):
         concatenated_data['INPUTS/Source/etag'] != 0,
         concatenated_data['INPUTS/Source/utag'] != 0
     ).astype(np.float32)
-    concatenated_data['INPUTS/Source/charge'] = np.zeros_like(concatenated_data['INPUTS/Source/isLepton'], dtype=np.float32)
+    concatenated_data['INPUTS/Source/charge'] = np.zeros_like(concatenated_data['INPUTS/Source/isLepton'],
+                                                              dtype=np.float32)
 
     return concatenated_data
 
@@ -134,7 +135,6 @@ def flatten_dict(data: dict, delimiter: str = ":"):
 
 
 def calculate_extra_variables(data: dict):
-
     mask = data['INPUTS/Source/MASK']
 
     num_electron = (data['INPUTS/Source/etag'] * mask).sum(axis=1)
@@ -148,6 +148,7 @@ def calculate_extra_variables(data: dict):
         'EXTRA/num_bjet': num_bjet,
         'EXTRA/num_jet': num_jet,
     }
+
 
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True):
     converted_data = []
