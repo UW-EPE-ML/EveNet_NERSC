@@ -107,6 +107,12 @@ def safe_load_state(model: nn.Module, state_dict: dict, prefix_to_strip: str = "
     # Strip prefix (e.g., "model.")
     clean_sd = {k.replace(prefix_to_strip, ""): v for k, v in state_dict.items()}
 
+    for k, v in clean_sd.items():
+        if "_normalizer" in k:
+            if verbose:
+                print(f"[safe_load_state] ⚠️ Ignored normalizer parameter: {k}")
+    clean_sd = {k: v for k, v in clean_sd.items() if "_normalizer" not in k}
+
     model_sd = model.state_dict()
     filtered_sd = {}
     for k, v in clean_sd.items():
