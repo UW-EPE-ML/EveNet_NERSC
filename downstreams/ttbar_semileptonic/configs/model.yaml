@@ -67,17 +67,17 @@ Assignment:
   hidden_dim: 64
   split_symmetric_attention: true
   position_embedding_dim: 16
-  num_attention_heads: 8
+  num_attention_heads: 4
   transformer_dim_scale: 2.0
   num_jet_embedding_layers: 0
-  num_jet_encoder_layers: 0
+  num_jet_encoder_layers: 2
   num_detection_layers: 2
   dropout: 0.1
   combinatorial_scale: 0.0
   encode_event_token: true
   activation: GELU
-  num_encoder_layers: 4 # At least 1 layer, otherwise detection will not work
-  num_linear_layers: 2
+  num_encoder_layers: 3 # At least 1 layer, otherwise detection will not work
+  num_linear_layers: 3
   skip_connection: true
   encoder_skip_connection: true
 
@@ -91,13 +91,27 @@ GlobalGeneration:
   activation: SILU
   dropout: 0.0
 
-EventGeneration:
-  hidden_dim: 64
+  
+ReconGeneration:
+  hidden_dim: 256
   num_layers: 3
   num_heads: 4
   dropout: 0.1
   layer_scale: true
   layer_scale_init: 1.0e-05
-  drop_probability: 0.0
-  feature_drop: 0.0
+  drop_probability: 0.1
+  feature_drop: 0.1
   extend_batch: true
+
+TruthGeneration:
+  hidden_dim: 256
+  num_layers: 3
+  num_heads: 4
+  dropout: 0.1
+  layer_scale: true
+  layer_scale_init: 1.0e-05
+  drop_probability: 0.1
+  feature_drop: 0.1
+  extend_batch: true
+  neutrino_position_encode: true
+  max_position_length: 36 # Must be larger than max object number

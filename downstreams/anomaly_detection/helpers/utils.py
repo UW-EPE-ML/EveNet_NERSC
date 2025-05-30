@@ -116,7 +116,7 @@ def save_df(
 
     for name, index in pc_index.items():
         dataset[f"{name}-0"] = data_df["x"][:, 0, index]
-        dataset[f"{name}-1"] = data_df["x"][:, 1, index]
+        dataset[f"{name}-1"] = data_df["x"][:, 1, index]    
     for name, index in global_index.items():
         dataset[f"{name}"] = data_df["conditions"][:, index]
 

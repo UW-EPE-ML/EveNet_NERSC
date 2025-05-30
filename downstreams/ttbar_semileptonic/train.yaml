@@ -1,11 +1,11 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/"
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/train/"
   number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 4096
+  batch_size: 2048
   prefetch_batches: 2
   use_gpu: true
 
@@ -21,15 +21,15 @@ options:
   Training:
     total_epochs: 100
     epochs: 100
-    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=49-v1.ckpt"
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/checkpoint"
+    model_checkpoint_load_path: null
     pretrain_model_load_path: null
     #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
     #    learning_rate: &lr 0.00075
     #    learning_rate_body: &lr_body 0.0001
-    learning_rate: &lr 0.0005
-    learning_rate_body: &lr_body 0.0005
+    learning_rate: &lr 0.0002
+    learning_rate_body: &lr_body 0.0002
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
@@ -71,15 +71,15 @@ options:
 
   Dataset:
     dataset_limit: 1.0
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
+    normalization_file: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/train/normalization.pt"
     #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
     #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     train_validation_split: 0.95
 
 network:
-  default: configs/model.yaml
+  #  default: configs/model.yaml
   #  default: configs/model_large.yaml
-  #  default: configs/pretrain.yaml
+  default: configs/pretrain.yaml
 
   # overwrites
   # ...

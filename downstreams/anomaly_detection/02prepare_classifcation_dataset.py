@@ -146,11 +146,13 @@ def mix(args):
     else:
         df_data = df_SB
 
-    gen_sample["classification"] = np.zeros_like(gen_sample["classification"])
-    df_data["classification"] = np.ones_like(df_data["classification"])
+    gen_sample["classification"] = np.zeros_like(gen_sample["classification"], dtype=np.int64)
+    df_data["classification"] = np.ones_like(df_data["classification"], dtype=np.int64)
 
 
+    print(gen_sample["x"].shape[0])
 
+    print(gen_sample["x"].shape, df_data["x"].shape)
 
     # Expand the mask to broadcast over the last dimension (N)
     mask_expanded = df_data['x_mask'][:, :, np.newaxis]  # (B, P, 1)
@@ -164,7 +166,7 @@ def mix(args):
     # Expand mask to shape (M, P, 1) for broadcasting
     mask_exp = x_mask[:, :, np.newaxis]  # (M, P, 1)
     # Compare x > min_vals, broadcasted over N
-    comparison = x > min_vals  # (M, P, N)
+    comparison = x[..., global_config.event_info.generation_pc_indices] > min_vals[global_config.event_info.generation_pc_indices]  # (M, P, N)
     # Apply the mask: only evaluate where x_mask is True
     valid = comparison & mask_exp  # (M, P, N)
     # Each masked (m, p) must satisfy all features > min_vals
@@ -173,6 +175,9 @@ def mix(args):
     keep_mask = np.all(valid_particles | ~x_mask, axis=1)  # (M,)
     # Filtered result
     gen_sample = {k: v[keep_mask] for k, v in gen_sample.items()}
+
+    print("after x_mask filtering", gen_sample["x"].shape[0])
+
 
     min_vals_cond = np.min(df_data["conditions"], axis=(0))  # shape: (N,)
     # Apply the same logic to conditions
@@ -186,16 +191,16 @@ def mix(args):
     # Filtered result
     gen_sample = {k: v[keep_mask] for k, v in gen_sample.items()}
 
+    if args.max_background is not None and args.max_background < gen_sample["x"].shape[0]:
+        gen_sample = {k: v[:args.max_background] for k, v in gen_sample.items()}
+
     num_gen = gen_sample["x"].shape[0]
     num_data = df_data["x"].shape[0]
     num_total = num_gen + num_data
-
-
     norm_dict['class_counts'] = torch.tensor([num_gen, num_data], dtype=torch.float32)
     norm_dict['class_balance'] = torch.tensor([num_total/num_gen, num_total/num_data], dtype=torch.float32)
     norm_dict['subprocess_counts'] = norm_dict['class_counts']
     norm_dict['subprocess_balance'] = norm_dict['class_balance']
-
 
     print("gen", gen_sample)
     print("data", df_data)
@@ -204,10 +209,6 @@ def mix(args):
 
     perm = np.random.permutation(len(next(iter(df_hybrid.values()))))
     df_hybrid = {k: v[perm] for k, v in df_hybrid.items()}
-
-
-
-
 
     outputdir = clean_and_append(config["output"]["storedir"], "_hybrid_raw")
     outputdir = clean_and_append(outputdir, postfix)
@@ -257,6 +258,7 @@ def main():
     parser.add_argument("config_workflow", type = str)
     parser.add_argument("--region", type = str, default = "SR")
     parser.add_argument("--no_signal", action = "store_true", default = False)
+    parser.add_argument("--max_background", type = int, default = None)
     # Parse command-line arguments
     args = parser.parse_args()
     # Explore the provided HDF5 file

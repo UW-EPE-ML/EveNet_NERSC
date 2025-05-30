@@ -1,0 +1,26 @@
+input:
+  event_info: "/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config-data-pretrain/event_info.yaml"
+
+fit:
+  bkg-fit-degree: 5
+
+
+output:
+  plotdir: 'results/scratch-ip3d/data'
+  storedir: '/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-CMSOpenData-scratch-ip3d/EveNetInput'
+
+train:
+  config: '/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config-data-pretrain/full_train_scratch.yaml'
+train-cls:
+  config: '/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config-data-pretrain/full_train_cls.yaml'
+
+mass-windows:
+  SB-left: 5.0
+  SR-left: 9.0
+  SR-right: 10.6
+  SB-right: 16.0
+  SR-bins: 12
+
+
+padding:
+  pad-number: 2

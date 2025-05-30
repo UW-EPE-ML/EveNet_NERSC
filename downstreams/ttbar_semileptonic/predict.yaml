@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/test/"
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/test/"
   number_of_workers: 4
   resources_per_worker: {
     "CPU": 30,
@@ -15,7 +15,7 @@ options:
   # For prediction Only
   prediction:
     # The directory where the prediction data is saved
-    output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.SPANet/"
+    output_dir: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/checkpoint/test-predict"
     # The filename of the prediction data
     filename: "prediction-small.pt"
 
@@ -29,7 +29,7 @@ options:
     total_epochs: 50
     epochs: 50
     #    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=49-v1.ckpt"
+    model_checkpoint_load_path: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/checkpoint"
     pretrain_model_load_path: null
 
     learning_rate: &lr 0.000075
@@ -67,12 +67,12 @@ options:
   Dataset:
     dataset_limit: 1.0
     #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
+    normalization_file: "/pscratch/sd/t/tihsu/database/evenet-semi-leptonic-ttbar/train/normalization.pt"
 
 network:
-  default: configs/model.yaml
+  #  default: configs/model.yaml
   #  default: configs/model_large.yaml
-  #  default: configs/pretrain.yaml
+  default: configs/pretrain.yaml
   # overwrites
   # ...
 

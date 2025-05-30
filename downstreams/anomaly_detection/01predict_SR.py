@@ -81,7 +81,10 @@ def predict(rank, world_size, gen_num_events, args):
         config = global_config,
         device = torch.device(device),
         normalization_dict=normalization_dict,
-        point_cloud_generation=True
+        point_cloud_generation=True,
+        global_generation=True,
+        classification=True,
+        regression=True,
     ).to(device)
 
     new_state_dict = dict()
@@ -307,8 +310,8 @@ def main():
     parser.add_argument("config_workflow", type = str)
     parser.add_argument("--checkpoint", type = str)
     parser.add_argument("--gen_num_events", type = int, default = 10240)
-    parser.add_argument("--batch_size", type = int, default = 1024)
-    parser.add_argument("--num_steps", type = int, default = 20)
+    parser.add_argument("--batch_size", type = int, default = 2048)
+    parser.add_argument("--num_steps", type = int, default = 200)
     parser.add_argument("--region", type = str, default = "SR")
     parser.add_argument("--no_signal", action = "store_true", default = False)
     parser.add_argument("--ngpu", type = int, default = 1)

@@ -1,0 +1,52 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB_hybrid"
+  number_of_workers: 16
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+  batch_size: 2048
+  prefetch_batches: 2
+
+wandb:
+  project: "anomaly-detection-cls-valid"
+  entity: "ytchou97-university-of-washington"
+  name: "toy-model"
+  tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node" ]
+
+options:
+  default: options.yaml
+
+  # overwrites
+  Training:
+    epochs: 300
+    patience: 30
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB_hybrid"
+    model_checkpoint_load_path: null
+
+    pretrain_model_load_path: null
+
+    Components:
+      Classification:
+        include: true
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput/SB_hybrid/normalization.pt"
+
+network:
+  default: network.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info_cls.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance.yaml
+
+  # overwrites
+  # ...
