@@ -956,13 +956,22 @@ class EveNetEngine(L.LightningModule):
         )
 
         if self.global_rank == 0:
+            ema_enable = self.ema_cfg.get("enable", False)
+            ema_replace = self.ema_cfg.get("replace_model_after_load", False)
+            print(f"[Model] --> EMA enabled: {ema_enable}")
+            print(f"[Model] --> EMA replace model after load: {ema_replace}")
+
             if self.pretrain_ckpt_path is not None:
                 print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
                 ckpt = torch.load(self.pretrain_ckpt_path, map_location=self.device)
-                safe_load_state(self.model, ckpt['state_dict'])
+
+                if ema_enable and 'ema_state_dict' in ckpt and ema_replace:
+                    safe_load_state(self.model, ckpt['ema_state_dict'])
+                else:
+                    safe_load_state(self.model, ckpt['state_dict'])
 
             # EMA
-            if self.ema_cfg.get("enable", False):
+            if ema_enable:
                 self.ema_model = EMA(
                     model=self.model, decay=self.ema_cfg.get("decay", 0.999)
                 )
