@@ -304,6 +304,10 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
             m = np.where(m < 0, 0, m)  # set negative mass to 0
             data_dict['INPUTS/Conditions/' + k] = m
 
+        # For LHE particles
+        for key_ in [k for k in objects.keys() if k.startswith('lhe/')]:
+            data_dict[f'EXTRA/{key_}'] = ak.to_numpy(objects[key_])
+
         # Store matched indices
         for product, value in matched_index_dict.items():
             output_name = build_output_name(product, process, diagram, tag="TARGETS")
@@ -386,6 +390,10 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
     for key_ in data_dict:
         if key_ == 'event':
             object_ = ak.flatten((ak.from_numpy(data_dict[key_])), axis=1)
+            objects[key_] = object_
+            continue
+        if 'lhe/' in key_:
+            object_ = ak.from_numpy(data_dict[key_])
             objects[key_] = object_
             continue
         object_ = ak.from_regular(ak.from_numpy(data_dict[key_]))

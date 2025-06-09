@@ -256,3 +256,27 @@ class EveNetDataConverter:
             "invisible-num-valid": num_valid_invisible,
             "invisible-num-raw": num_raw_invisible,
         }
+
+    def load_extra(self, extra_keys: dict):
+        def flatten_dict_paths(d, prefix=""):
+            paths = []
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    new_prefix = f"{prefix}/{k}" if prefix else k
+                    paths.extend(flatten_dict_paths(v, new_prefix))
+            elif isinstance(d, list):
+                for item in d:
+                    if isinstance(item, (dict, list)):
+                        paths.extend(flatten_dict_paths(item, prefix))
+                    else:
+                        paths.append(f"{prefix}/{item}")
+            else:
+                paths.append(f"{prefix}/{d}")
+            return paths
+
+        keys = flatten_dict_paths(extra_keys, prefix="EXTRA")
+
+        return {
+            key: self.raw_data[key] for key in keys if key in self.raw_data
+        }
+

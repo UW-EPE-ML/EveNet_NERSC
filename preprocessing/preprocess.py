@@ -120,6 +120,10 @@ def unflatten_dict(
 
 
 def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
+    if cutflows == {}:
+        print("[WARNING] No cutflows to analyze.")
+        return "No cutflows to analyze."
+
     # First build the DataFrame with basic stats
     summary_data = []
     for process, cuts in cutflows.items():
@@ -234,6 +238,10 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             **assignments,
             **regressions,
         }
+        if hasattr(global_config, 'EXTRA'):
+            extra = converter.load_extra(extra_keys=global_config.EXTRA)
+            process_data.update(extra)
+
 
         # Apply Selections
         sel_config = global_config.get("selections", {})
