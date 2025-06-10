@@ -154,21 +154,23 @@ Training:
         epoch_ratio: 1.0
         transition_ratio: 0.0
         loss_weights:
-          generation: [ 1.0, 1.0 ]
+          generation-truth: [ 1.0, 1.0 ]
+          generation-recon: [ 1.0, 1.0 ]
           classification: [ 1.0, 1.0 ]
           classification-noised: [ 1.0, 1.0 ]
           regression: [ 1.0, 1.0 ]
           assignment: [ 1.0, 1.0 ]
         train_parameters:
-          noise_prob: [ 0.0, 1.0 ]
+          noise_prob: [ 1.0, 1.0 ]
           reco_attn_mask: [ 0.0, 0.0 ]
           ema_decay: [ 0.999, 0.999 ]
 
-      - name: "gen_pretrain"
+      - name: "test, make no sense"
         epoch_ratio: 0.2
         transition_ratio: 0.2  # ramp over 20% of this stage
         loss_weights:
-          generation: [ 1.0, 1.0 ]
+          generation-truth: [ 1.0, 1.0 ]
+          generation-recon: [ 1.0, 1.0 ]
           classification: [ 0.0, 0.0 ]
           classification-noised: [ 1.0, 1.0 ]
           regression: [ 0.0, 0.0 ]

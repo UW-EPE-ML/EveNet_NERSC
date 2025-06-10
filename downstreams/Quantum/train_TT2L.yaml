@@ -88,7 +88,6 @@ network:
 
   Body:
     PET:
-#      local_Krank: 2
       feature_drop: 0.0
   ReconGeneration:
     feature_drop: 0.0
