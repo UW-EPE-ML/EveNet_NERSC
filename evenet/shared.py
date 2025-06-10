@@ -184,9 +184,6 @@ def prepare_datasets(
             batch_size=platform_info.batch_size * global_config.platform.prefetch_batches,
         )
 
-        print(train_ds.materialize().stats())
-        print(val_ds.materialize().stats())
-
         return train_ds, val_ds, train_ds.count(), val_ds.count()
 
 
