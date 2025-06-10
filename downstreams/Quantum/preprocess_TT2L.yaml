@@ -35,12 +35,12 @@ selections:
       jet4_pT_sel: &jet4_pT_sel "(np.sum((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, axis=-1) > 3) & (-np.partition(-np.where((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, pt, -np.inf), 3, axis=-1)[:, 3] > 20)"
       jet6_pT_sel: &jet6_pT_sel "(np.sum((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, axis=-1) > 5) & (-np.partition(-np.where((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, pt, -np.inf), 5, axis=-1)[:, 5] > 20)"
 
-#  selections:
-#    TT2L:
-#      - "n_lep >= 2"
-#      - "n_bjet >= 2"
-#      - *lep2_pT_sel
-#      - *bjet2_pT_sel
+  selections:
+    TT2L:
+      - "n_lep >= 2"
+      - "n_bjet >= 2"
+      - *lep2_pT_sel
+      - *bjet2_pT_sel
 
 EXTRA:
   lhe:
