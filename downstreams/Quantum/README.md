@@ -22,7 +22,7 @@ done
 
 To run the training, go to main directory and run the following command:
 ```
-python evenet/train.py downstreams/nu2flow/train.yaml --load_all
+python evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
 ```
 
 To run the evaluation, go to main directory and run the following command:
