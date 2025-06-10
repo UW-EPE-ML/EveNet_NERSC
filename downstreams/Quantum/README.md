@@ -13,8 +13,8 @@ IN_BASE="/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/data/Quantum/TT2L
 OUT_BASE="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L"
 
 for dataset in train; do
-    python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
-        --in_dir "$IN_BASE/$dataset" \
+    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
+        --pretrain_dirs "$IN_BASE/$dataset" \
         --store_dir "$OUT_BASE/$dataset"
 done
 ```

@@ -48,14 +48,15 @@ For every sub-run folder:
     output_dir="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/"
 
     python3 preprocessing/preprocess.py share/preprocess_pretrain.yaml \
+        --c 25 \
         --pretrain_dirs \
             ${pretrain_dir}/Run_2.Dec20 \
             ${pretrain_dir}/Run_2.Dec21 \
             ${pretrain_dir}/Run_2.Dec22 \
             ${pretrain_dir}/Run_2.Pretrain.20250505 \
             ${pretrain_dir}/Run_2.Pretrain.20250507 \
-            ${pretrain_dir}/Run_3.Pretrain.20250526 \
-        --store_dir ${output_dir}/run.20250526.688M | tee ${output_dir}/run.20250526.688M.log
+            ${pretrain_dir}/Run_3.Pretrain.20250527.Run2Extra \
+        --store_dir ${output_dir}/run.20250527.654M | tee ${output_dir}/run.20250527.654M.log
     ```
 
     This command will:
@@ -65,8 +66,8 @@ For every sub-run folder:
 
 - **Global Shuffle**
   ```bash
-    python3 NERSC/global_shuffle.py --first_shuffle_percent 2.5 --second_shuffle_percent 1.0 20 \
-    /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250521.342M/
+    python3 NERSC/global_shuffle.py --first_shuffle_percent 1.0 --second_shuffle_percent 0.5 25 \
+    /pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250527.654M/
   ```
 
 
