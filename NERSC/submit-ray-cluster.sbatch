@@ -48,6 +48,6 @@ cd ../ && source setup.sh
 
 #shifter python3 evenet/train.py share/pretrain-yulei.yaml
 
-shifter python3 evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
+shifter python3 evenet/train.py downstreams/Quantum/train_TT2L.yaml
 
 exit
