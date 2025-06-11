@@ -522,9 +522,6 @@ class EveNetEngine(L.LightningModule):
 
         extra_save = self.config.options.prediction.get('extra_save', {})
 
-        print(outputs.keys())
-        print(extra_save)
-
         for key in extra_save:
             if key in batch:
                 outputs[key] = batch[key]

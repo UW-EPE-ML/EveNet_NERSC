@@ -19,21 +19,21 @@ options:
     # The filename of the prediction data
     filename: "TT2L-pretrain.pt"
 
-  extra_save:
-    - EXTRA/lhe/W+
-    - EXTRA/lhe/W-
-    - EXTRA/lhe/b
-    - EXTRA/lhe/b~
-    - EXTRA/lhe/e+
-    - EXTRA/lhe/e-
-    - EXTRA/lhe/mu+
-    - EXTRA/lhe/mu-
-    - EXTRA/lhe/t
-    - EXTRA/lhe/t~
-    - EXTRA/lhe/nu(e)
-    - EXTRA/lhe/nu(e)~
-    - EXTRA/lhe/nu(mu)
-    - EXTRA/lhe/nu(mu)~
+    extra_save:
+      - EXTRA/lhe/W+
+      - EXTRA/lhe/W-
+      - EXTRA/lhe/b
+      - EXTRA/lhe/b~
+      - EXTRA/lhe/e+
+      - EXTRA/lhe/e-
+      - EXTRA/lhe/mu+
+      - EXTRA/lhe/mu-
+      - EXTRA/lhe/t
+      - EXTRA/lhe/t~
+      - EXTRA/lhe/nu(e)
+      - EXTRA/lhe/nu(e)~
+      - EXTRA/lhe/nu(mu)
+      - EXTRA/lhe/nu(mu)~
 
   Training:
     total_epochs: 500
