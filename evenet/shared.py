@@ -43,6 +43,8 @@ def make_process_fn(base_dir: Path):
         if drop_column_prefix and not getattr(component, "include", False):
             drop_column_prefix.append(prefix)
 
+    print(f"Drop column prefixes: {drop_column_prefix}")
+
     return partial(
         process_event_batch,
         shape_metadata=shape_metadata,
