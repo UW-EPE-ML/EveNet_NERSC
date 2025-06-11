@@ -1,0 +1,125 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/train"
+  number_of_workers: 4
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+  batch_size: 4096
+  prefetch_batches: 2
+  use_gpu: true
+
+options:
+  default: configs_TT2L/options.yaml
+
+  # For prediction Only
+  prediction:
+    # The directory where the prediction data is saved
+    output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.quantum/"
+    # The filename of the prediction data
+    filename: "TT2L-pretrain.pt"
+
+  extra_save:
+    - EXTRA/lhe/W+
+    - EXTRA/lhe/W-
+    - EXTRA/lhe/b
+    - EXTRA/lhe/b~
+    - EXTRA/lhe/e+
+    - EXTRA/lhe/e-
+    - EXTRA/lhe/mu+
+    - EXTRA/lhe/mu-
+    - EXTRA/lhe/t
+    - EXTRA/lhe/t~
+    - EXTRA/lhe/nu(e)
+    - EXTRA/lhe/nu(e)~
+    - EXTRA/lhe/nu(mu)
+    - EXTRA/lhe/nu(mu)~
+
+  Training:
+    total_epochs: 500
+    epochs: 500
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l/epoch=153_train=0.5416_val=0.5498.ckpt"
+    pretrain_model_load_path: null
+
+    diffusion_every_n_epochs: 50 # how often to run diffusion
+    diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
+
+    learning_rate: &lr 0.0005
+    learning_rate_body: &lr_body 0.000025
+    weight_decay: &wd 0.01
+    Components:
+      GlobalEmbedding:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      PET:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      ObjectEncoder:
+        learning_rate: *lr_body
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      Classification:
+        include: false
+        include_cross_term: false
+      Regression:
+        include: false
+      Assignment:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+      GlobalGeneration:
+        include: false
+      ReconGeneration:
+        include: false
+      TruthGeneration:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+        diffusion_steps: 200
+
+    EarlyStopping:
+      patience: 200
+      min_delta: 0.0
+      monitor: "val/generation-truth"
+      mode: "min"
+      verbose: true
+
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/train/normalization.pt"
+    val_split: [ 0.8, 1.0 ]
+
+
+network:
+  #  default: configs/model.yaml
+  #  default: configs/model_large.yaml
+  default: configs_TT2L/pretrain.yaml
+
+  Body:
+    PET:
+      feature_drop: 0.0
+  ReconGeneration:
+    feature_drop: 0.0
+  TruthGeneration:
+    feature_drop: 0.0
+  # overwrites
+  # ...
+
+event_info:
+  default: configs_TT2L/event_info.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: configs_TT2L/resonance.yaml
+
+  # overwrites
+  # ...

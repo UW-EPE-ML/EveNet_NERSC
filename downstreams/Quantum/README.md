@@ -27,5 +27,5 @@ python evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
 
 To run the evaluation, go to main directory and run the following command:
 ```
-python evenet/predict.py downstreams/nu2flow/predict.yaml
+python evenet/predict.py downstreams/Quantum/train_TT2L.yaml
 ```
