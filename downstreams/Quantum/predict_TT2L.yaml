@@ -19,6 +19,7 @@ options:
     # The filename of the prediction data
     filename: "TT2L-pretrain.pt"
 
+    save_point_cloud: true
     extra_save:
       - EXTRA/lhe/W+
       - EXTRA/lhe/W-
