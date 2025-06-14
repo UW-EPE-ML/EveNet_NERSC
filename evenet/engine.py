@@ -520,6 +520,9 @@ class EveNetEngine(L.LightningModule):
         outputs.pop('full_global_conditions')
         outputs.pop('alpha')
 
+        if self.config.options.prediction.get('save_point_cloud', False):
+            outputs["full_input_point_cloud"] = inputs['x']
+
         extra_save = self.config.options.prediction.get('extra_save', {})
 
         for key in extra_save:
