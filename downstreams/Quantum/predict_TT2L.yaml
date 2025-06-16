@@ -68,7 +68,7 @@ options:
       Regression:
         include: false
       Assignment:
-        include: false
+        include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
