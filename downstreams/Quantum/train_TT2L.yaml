@@ -29,8 +29,8 @@ options:
     diffusion_every_n_epochs: 50 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.00025
-    learning_rate_body: &lr_body 0.000025
+    learning_rate: &lr 0.0001
+    learning_rate_body: &lr_body 0.00001
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
@@ -69,9 +69,9 @@ options:
         diffusion_steps: 200
 
     EarlyStopping:
-      patience: 200
+      patience: 25
       min_delta: 0.0
-      monitor: "val/generation-truth"
+      monitor: "val/loss"
       mode: "min"
       verbose: true
 
