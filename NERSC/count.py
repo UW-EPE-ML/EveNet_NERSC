@@ -135,9 +135,6 @@ summary_df["Total"] = summary_df.sum(axis=1)
 #    (You can adjust this rule as needed!)
 bkg_processes = [col for col in summary_df.columns if col not in ["Total"] and "Signal" not in col]
 
-# 3️⃣ Sum bkg processes per run
-summary_df["Total_Bkgs"] = summary_df[bkg_processes].sum(axis=1)
-
 # 4️⃣ Add grand total row
 summary_df.loc["Total"] = summary_df.sum()
 
