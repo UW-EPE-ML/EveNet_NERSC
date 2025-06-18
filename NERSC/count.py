@@ -5,6 +5,19 @@ from collections import defaultdict
 import random
 from tqdm import tqdm
 import pandas as pd
+from multiprocessing import Pool, cpu_count
+
+
+def _h5_metadata_single_file(file_path):
+    try:
+        with h5py.File(file_path, 'r') as f:
+            first_key = list(f.keys())[0]
+            n_entries = f[first_key].shape[0]
+        process_name = "_".join(Path(file_path).stem.split("_")[:-1])
+        return (process_name, file_path, n_entries)
+    except Exception:
+        return None
+
 
 # ---------------------------
 # CONFIG
@@ -34,44 +47,54 @@ random.seed(SEED)
 # ---------------------------
 print(f"Scanning all .h5 files in {len(INPUT_ROOTS)} roots...")
 
-process_files = defaultdict(list)  # process_name -> list of (Path, entries)
-
+# gather all files first
+all_files = []
 for root in INPUT_ROOTS:
-    print(f"  Scanning {root} ...")
     for run_dir in root.iterdir():
         if run_dir.is_dir():
-            for file in run_dir.glob("*.h5"):
-                try:
-                    with h5py.File(file, 'r') as f:
-                        first_key = list(f.keys())[0]
-                        n_entries = f[first_key].shape[0]
-                    process_name = "_".join(file.stem.split("_")[:-1])
-                    process_files[process_name].append( (file, n_entries) )
-                except Exception as e:
-                    print(f"⚠️ Could not read {file}: {e}")
+            all_files += list(run_dir.glob("*.h5"))
+
+print(f"Found {len(all_files)} total files.")
+
+# parallel read: Pool
+print("Extracting metadata in parallel...")
+with Pool(processes=max(1, cpu_count() - 1)) as pool:
+    results = list(tqdm(pool.imap(_h5_metadata_single_file, all_files), total=len(all_files)))
+
+# build process_files dict
+process_files = defaultdict(list)
+for item in results:
+    if item:
+        process, file_path, n_entries = item
+        process_files[process].append( (Path(file_path), n_entries) )
 
 print(f"✔️ Found {len(process_files)} unique processes across all roots")
 
 # ---------------------------
-# 2️⃣ Check: assert enough files per process
+# 2️⃣ Determine feasible NUM_RUNS based on available files per process
 # ---------------------------
 print("Checking file counts per process...")
-for process, files in process_files.items():
-    if len(files) < NUM_RUNS:
-        print(f"⚠️ WARNING: Process '{process}' has only {len(files)} files, but {NUM_RUNS} runs requested!")
-        assert False, f"Process '{process}' has too few files: {len(files)} < {NUM_RUNS}"
+
+min_files_per_process = min(len(files) for files in process_files.values())
+
+if NUM_RUNS > min_files_per_process:
+    print(f"⚠️ WARNING: Some processes have too few files for {NUM_RUNS} runs.")
+    print(f"👉 Automatically reducing NUM_RUNS from {NUM_RUNS} to {min_files_per_process} to avoid missing processes.")
+    NUM_RUNS = min_files_per_process
+
+print(f"✅ Final number of runs: {NUM_RUNS}")
 
 # ---------------------------
 # 3️⃣ Bin pack by total entries per process
 # ---------------------------
 print(f"Distributing files into {NUM_RUNS} runs by total entries...")
 
-run_plan = defaultdict(list)   # run_idx -> list of (Path, entries)
+run_plan = defaultdict(list)  # run_idx -> list of (Path, entries)
 entries_summary = defaultdict(lambda: defaultdict(int))  # run_idx -> process -> entries
 
 for process, files in tqdm(process_files.items(), desc="Balancing processes"):
     files.sort(key=lambda x: -x[1])  # largest first
-    bins = [ (0, []) for _ in range(NUM_RUNS) ]
+    bins = [(0, []) for _ in range(NUM_RUNS)]
     for file_path, n_entries in files:
         min_idx = min(range(NUM_RUNS), key=lambda i: bins[i][0])
         bins[min_idx] = (bins[min_idx][0] + n_entries, bins[min_idx][1] + [(file_path, n_entries)])
