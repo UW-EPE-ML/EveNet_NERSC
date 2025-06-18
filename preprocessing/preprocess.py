@@ -167,6 +167,17 @@ def analyze_cutflow(cutflows: dict[str, dict[str, int]]):
     return analyzed_str
 
 
+def analyze_weight(process_info, current_entries):
+    total_entries = process_info.get('total_entries', current_entries)
+    xsec = process_info.get('xsec', 0)
+
+    if xsec > 0:
+        sf = xsec / total_entries # assume luminosity is 1 pb
+    else:
+        sf = 1.0
+
+    return np.ones(current_entries) * sf
+
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True, verbose: bool = True):
     converted_data = []
 
@@ -237,6 +248,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
             **assignments,
             **regressions,
+
+            'event_weight': analyze_weight(process_info[process], len(num_vectors)),
         }
         if hasattr(global_config, 'EXTRA'):
             extra = converter.load_extra(extra_keys=global_config.EXTRA)
@@ -286,19 +299,21 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         # Count the number of unique processes
         # class_counts = np.bincount(process_data['classification'], minlength=len(unique_process_ids))
         # Or simply use the process ID and set the length of the array to the number of unique processes
-        class_counts = np.zeros(len(unique_process_ids), dtype=np.int32)
-        class_counts[process_info[process]['process_id']] = len(process_data['classification'])
+        class_counts = np.zeros(len(unique_process_ids), dtype=np.float32)
+        # class_counts[process_info[process]['process_id']] = len(process_data['classification'])
+        class_counts[process_info[process]['process_id']] = sum(process_data['event_weight'])
 
         total_subprocess = global_config.event_info.event_mapping
-        subprocess_counts = np.zeros(len(total_subprocess), dtype=np.int32)
+        subprocess_counts = np.zeros(len(total_subprocess), dtype=np.float32)
         if process in total_subprocess:
-            subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
+            # subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
+            subprocess_counts[list(total_subprocess.keys()).index(process)] = sum(process_data['event_weight'])
 
         assignment_mask_per_process = {}
         assignment_idx = {key: i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
         for key, i in assignment_idx.items():
             particle = key.split('/')[2]
-            assignment_mask_per_process[particle] = assignments['assignments-mask'][:, i]
+            assignment_mask_per_process[particle] = process_data['assignments-mask'][:, i] * process_data['event_weight']
 
         if shape_metadata is None:
             shape_metadata = meta_data
@@ -319,6 +334,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             class_counts=class_counts,
             subprocess_counts=subprocess_counts,
             invisible=process_data['x_invisible'],
+            event_weight=process_data['event_weight'],
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)

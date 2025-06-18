@@ -46,3 +46,5 @@ TT2L:
       W:
         l-: null
         v: null
+  total_entries: 10000
+  xsec: 13033.42 # pb

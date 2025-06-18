@@ -2,15 +2,26 @@ import numpy as np
 import torch
 from decimal import Decimal, getcontext
 from collections import OrderedDict
+import warnings
 
 
-def masked_stats(arr):
+def masked_stats(arr, weights=None):
     mask = arr != 0
-    values = np.where(mask, arr, 0)
 
-    count = mask.sum(axis=0)
-    sum_ = values.sum(axis=0)
-    sumsq = (values ** 2).sum(axis=0)
+    if weights is None:
+        factor = mask  # 1 for valid entries, 0 for masked out
+    else:
+        weights = np.asarray(weights)
+        if weights.ndim == 1:
+            weights = weights[:, None]  # broadcast over columns
+        factor = weights * mask  # zero where masked out
+
+    values = arr * mask
+    w_values = values * factor  # = arr * mask * factor = arr * factor
+
+    sum_ = w_values.sum(axis=0)
+    sumsq = (w_values ** 2).sum(axis=0)
+    count = factor.sum(axis=0)
 
     return {"sum": sum_, "sumsq": sumsq, "count": count}
 
@@ -89,7 +100,28 @@ def compute_classification_balance(class_counts: np.ndarray) -> np.ndarray:
     """
     Wrapper to compute effective class weights from raw class frequency counts.
     """
-    # return compute_effective_counts_from_freq(class_counts)
+    class_counts = np.asarray(class_counts, dtype=np.float64)
+
+    if np.all(class_counts < 1):
+        warnings.warn(
+            "All class counts are < 1. Assuming these are fractions. "
+            "Reweighting by simple inverse ratio to the largest."
+        )
+        max_val = np.max(class_counts)
+        if max_val == 0:
+            raise ValueError("All class counts are zero. Cannot compute balance.")
+        weights = max_val / class_counts
+        # normalize to sum ≈ num_classes for consistency
+        weights *= len(class_counts) / np.sum(weights)
+        return weights.astype(np.float32)
+
+    # Some counts < 1 but not all: clip them to 1
+    if np.any(class_counts < 1):
+        warnings.warn(
+            "Some class counts are < 1. Clipping them to 1 to avoid instability in effective number calculation."
+        )
+        class_counts = np.where(class_counts < 1, 1.0, class_counts)
+
     return compute_effective_counts_from_freq_decimal(class_counts.tolist(), precision=50)
 
 
@@ -262,17 +294,17 @@ class PostProcessor:
         self.assignment_mask = {p: [] for p in global_config.process_info}
         self.event_equivalence_classes = global_config.event_info.event_equivalence_classes
 
-    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible):
-        x_stats = masked_stats(x.reshape(-1, x.shape[-1]))
-        cond_stats = masked_stats(conditions)
-        regression_stats = masked_stats(regression)
-        num_vectors_stats = masked_stats(num_vectors)
+    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible, event_weight=None):
+        x_stats = masked_stats(x.reshape(-1, x.shape[-1]), None)
+        cond_stats = masked_stats(conditions, None)
+        regression_stats = masked_stats(regression, None)
+        num_vectors_stats = masked_stats(num_vectors, None)
 
         if invisible.size == 0:
             reshaped = np.empty((0, invisible.shape[-1]))  # safe manual reshape
         else:
             reshaped = invisible.reshape(-1, invisible.shape[-1])
-        invisible_stats = masked_stats(reshaped)
+        invisible_stats = masked_stats(reshaped,  None)
 
         self.stats.append({
             "x": x_stats,
