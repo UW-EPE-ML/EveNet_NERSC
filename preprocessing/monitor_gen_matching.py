@@ -369,6 +369,8 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         # print(h5name)
         h5fr = h5py.File(h5name, mode='r')
 
+        print(f"Processing file: {h5name}, dataset : {list(h5fr)}, dataset_structure: {dataset_structure}")
+
         if dataset_structure is None:
             dataset_structure = find_dataset_name(h5fr, list(h5fr))
             # print(dataset_structure)
