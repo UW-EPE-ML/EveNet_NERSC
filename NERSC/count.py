@@ -39,6 +39,7 @@ OUTPUT_ROOT = Path(data_prefix) / "Combined_Balanced"
 
 NUM_RUNS = 500
 SEED = 42
+CPU_MAX = 50
 
 random.seed(SEED)
 
@@ -58,7 +59,7 @@ print(f"Found {len(all_files)} total files.")
 
 # parallel read: Pool
 print("Extracting metadata in parallel...")
-with Pool(processes=max(1, cpu_count() - 1)) as pool:
+with Pool(processes=min(CPU_MAX, cpu_count() - 1)) as pool:
     results = list(tqdm(pool.imap(_h5_metadata_single_file, all_files), total=len(all_files)))
 
 # build process_files dict
@@ -126,7 +127,23 @@ print("Saving per-run, per-process entries summary...")
 
 summary_df = pd.DataFrame.from_dict(entries_summary, orient="index").fillna(0).astype(int)
 summary_df.index.name = "Run"
+
+# 1️⃣ Total entries per run (all processes)
+summary_df["Total"] = summary_df.sum(axis=1)
+
+# 2️⃣ Define bkg processes: e.g., all processes NOT containing 'Signal'
+#    (You can adjust this rule as needed!)
+bkg_processes = [col for col in summary_df.columns if col not in ["Total"] and "Signal" not in col]
+
+# 3️⃣ Sum bkg processes per run
+summary_df["Total_Bkgs"] = summary_df[bkg_processes].sum(axis=1)
+
+# 4️⃣ Add grand total row
+summary_df.loc["Total"] = summary_df.sum()
+
+# 5️⃣ Save
 summary_df.to_csv(OUTPUT_ROOT / "entries_summary.csv")
 
 print(f"✅ Done! Combined balanced runs created.")
 print(f"📄 Summary CSV saved to: {OUTPUT_ROOT / 'entries_summary.csv'}")
+print(f"📊 Bkg processes summed: {bkg_processes}")
