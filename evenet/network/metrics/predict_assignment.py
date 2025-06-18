@@ -57,7 +57,7 @@ def mask_jet(data: torch.Tensor, num_partons: int, max_jets: int, index: torch.T
     elif num_partons == 2:
         data = data.reshape((batch_size, max_jets, max_jets))
         data[torch.arange(batch_size), index, :] = value
-        data[:, :, index] = value
+        data[torch.arange(batch_size), :, index] = value
     elif num_partons == 3:
         data = data.reshape((batch_size, max_jets, max_jets, max_jets))
         data[torch.arange(batch_size), index, :, :] = value

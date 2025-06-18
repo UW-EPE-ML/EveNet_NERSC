@@ -312,4 +312,4 @@ class Evaluation(NamedTuple):
     reference: Dict[str, NDArray[np.float32]]
     resonance: Dict[str, NDArray[np.float32]]
     resonance_target: Dict[str, NDArray[np.float32]]
-    resonance_mask: Dict[str, NDArray[np.bool]]
+    resonance_mask: Dict[str, NDArray[np.bool_]]
