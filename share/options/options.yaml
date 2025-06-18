@@ -18,6 +18,8 @@ Training:
   diffusion_every_n_epochs: 20 # how often to run diffusion
   diffusion_every_n_steps: 5 # how often to run diffusion inside the valid epoch
 
+  apply_event_weight: true # whether to apply event weight to the loss
+
 
   Components:
     GlobalEmbedding:

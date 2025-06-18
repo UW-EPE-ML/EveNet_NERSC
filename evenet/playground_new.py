@@ -29,9 +29,9 @@ from matplotlib import pyplot as plt
 from evenet.utilities.debug_tool import DebugHookManager
 from evenet.engine import EveNetEngine
 
-########################
+#########################
 ## Debug configuration ##
-########################
+#########################
 
 wandb_enable = True
 n_epoch = 10

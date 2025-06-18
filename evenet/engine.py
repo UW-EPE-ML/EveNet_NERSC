@@ -127,6 +127,7 @@ class EveNetEngine(L.LightningModule):
         ###### Initialize Loss ######
         self.include_famo: bool = self.config.options.Training.get("FAMO", {}).get("turn_on", False)
         self.famo_detailed_loss: bool = self.config.options.Training.FAMO.get("detailed_loss", False)
+        self.apply_event_weight: bool = self.config.options.Training.get("apply_event_weight", False)
 
         self.cls_loss = None
         if self.classification_cfg.include:
@@ -195,6 +196,10 @@ class EveNetEngine(L.LightningModule):
     ):
         batch_size = batch["x"].shape[0]
         device = self.device
+        if self.apply_event_weight:
+            event_weight = batch.get("event_weight", None)
+        else:
+            event_weight = None
 
         current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
         task_weights = current_parameters["loss_weights"]
@@ -251,6 +256,7 @@ class EveNetEngine(L.LightningModule):
                 metrics=self.classification_metrics_train if self.training else self.classification_metrics_valid,
                 device=device,
                 update_metric=update_metric,
+                event_weight=event_weight,
             )
 
             loss_raw["classification"] = scaled_cls_loss
@@ -261,13 +267,13 @@ class EveNetEngine(L.LightningModule):
                 cls_output=next(iter(outputs["classification-noised"].values())),
                 cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
-                event_weight=outputs["alpha"] * outputs["alpha"],
+                event_weight=(outputs["alpha"] * outputs["alpha"] * event_weight) if event_weight is not None else (outputs["alpha"] * outputs["alpha"]),
                 loss_dict=loss_head_dict,
                 loss_scale=self.classification_cfg.loss_scale_cross_term,
                 metrics=self.classification_metrics_train_cross_term if self.training else self.classification_metrics_valid_cross_term,
                 device=device,
                 update_metric=update_metric,
-                loss_name="classification-noised"
+                loss_name="classification-noised",
             )
 
             loss_raw["classification-noised"] = scaled_cls_loss_cross_term  # TODO: check if this is correct for famo
@@ -278,9 +284,10 @@ class EveNetEngine(L.LightningModule):
             reg_output = outputs["regression"]
             reg_output = torch.cat([v.view(batch_size, -1) for v in reg_output.values()], dim=-1)
             reg_loss = self.reg_loss(
-                reg_output,
-                target_regression.float(),
-                target_regression_mask.float(),
+                predict=reg_output,
+                target=target_regression.float(),
+                mask=target_regression_mask.float(),
+                event_weight=event_weight,
             ).mean()
             # loss = loss + reg_loss * self.regression_cfg.loss_scale
 
@@ -310,6 +317,7 @@ class EveNetEngine(L.LightningModule):
                 point_cloud_mask=inputs['x_mask'],
                 subprocess_id=inputs["subprocess_id"],
                 update_metric=update_metric,
+                event_weight=event_weight,
                 **self.ass_args['step']
             )
 
@@ -337,6 +345,7 @@ class EveNetEngine(L.LightningModule):
                 loss_head_dict=loss_head_dict,
                 invisible_padding=self.model.invisible_padding,
                 update_metric=update_metric,
+                event_weight=event_weight,
             )
 
             loss_raw["generation"] = scaled_gen_loss

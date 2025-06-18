@@ -436,9 +436,9 @@ def shared_step(
         num_steps_point_cloud=100,
         num_steps_neutrino=100,
         diffusion_on: bool = False,
-
         invisible_padding: int = 0,
         update_metric: bool = True,
+        event_weight: torch.Tensor = None,
 ):
     generation_loss = dict()
 
@@ -470,6 +470,7 @@ def shared_step(
             target=generation_result["truth"],
             mask=masking,
             feature_dim=feature_dim,
+            event_weight=event_weight
         )
 
         if generation_target == "global":

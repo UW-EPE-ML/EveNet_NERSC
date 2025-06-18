@@ -245,7 +245,9 @@ def shared_step(
     )
     if event_weight is not None:
         cls_loss  = cls_loss * event_weight
-    cls_loss = cls_loss.mean()
+        cls_loss = cls_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
+    else:# Sum over classes if multi-class
+        cls_loss = cls_loss.mean()
 
     loss = cls_loss * loss_scale
     loss_dict[loss_name] = cls_loss

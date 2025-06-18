@@ -413,6 +413,7 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
     # Merge cutflows
     cutflows = defaultdict(lambda: defaultdict(int))
 
+    print("results", results)
     for result in results:
         for process, cuts in result[1].items():
             for cut, count in cuts.items():

@@ -840,6 +840,7 @@ def shared_step(
         metrics: dict[str, SingleProcessAssignmentMetrics],
         process_to_topology: dict[str, dict[str, float]],
         update_metric: bool = True,
+        event_weight = None
 ):
     num_processes = len(event_permutations)
 
@@ -854,6 +855,7 @@ def shared_step(
         targets=targets,
         targets_mask=targets_mask,
         process_id=subprocess_id,
+        event_weight=event_weight
     )
 
     assignment_predict = dict()

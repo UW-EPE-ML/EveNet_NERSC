@@ -94,7 +94,12 @@ def convert_target_assignment_array(
     return target_assignment, target_assignment_mask, process_mask, process_weight
 
 @time_decorator(name="[Assignment] assignment_cross_entropy_loss")
-def assignment_cross_entropy_loss(prediction: Tensor, target_data: Tensor, target_mask: Tensor, gamma: float) -> Tensor:
+def assignment_cross_entropy_loss(
+        prediction: Tensor,
+        target_data: Tensor,
+        target_mask: Tensor,
+        gamma: float
+) -> Tensor:
     """
     Calculates the cross-entropy loss for assignment predictions with focal scaling.
 
@@ -245,7 +250,8 @@ def loss_single_process(
         focal_gamma: float,
         particle_index_tensor: Union[Tensor, None],
         particle_weights_tensor: Union[Tensor, None],
-        process_weight: Union[List[Tensor], None]
+        process_weight: Union[List[Tensor], None],
+        event_weight: Union[Tensor, None] = None
 ):
     """
     Calculates both detection and assignment losses for a single process.
@@ -298,13 +304,17 @@ def loss_single_process(
             detection = detections[symmetry_element[0]]
             detection_target = torch.stack([detections_target[symmetry_index] for symmetry_index in symmetry_element])
             detection_target = detection_target.sum(0).long()
-            detection_losses.append(F.cross_entropy(
+
+            detection_loss = F.cross_entropy(
                 input=detection,
                 target=detection_target,
                 reduction='none',
                 ignore_index=-1,
-            ))
+            )
+            detection_losses.append(detection_loss)
+
             process_masking.append(process_mask[symmetry_element[0]])
+
             process_weighting.append(
                 process_weight[symmetry_element[0]]
                 if process_weight[symmetry_element[0]] is not None else torch.ones_like(process_mask[symmetry_element[0]])
@@ -312,8 +322,14 @@ def loss_single_process(
 
     process_masking = torch.stack(process_masking).float()
     process_weighting = torch.stack(process_weighting).float()
-    detection_losses = torch.stack(detection_losses) * process_masking * process_weighting
-    valid_process = torch.sum(process_masking)
+
+    if event_weight is not None:
+        detection_losses = torch.stack(detection_losses) * process_masking * process_weighting * event_weight.unsqueeze(-1)
+        valid_process = torch.sum(process_masking * process_weighting * event_weight.unsqueeze(-1))
+    else:
+        detection_losses = torch.stack(detection_losses) * process_masking * process_weighting
+        valid_process = torch.sum(process_masking * process_weighting)
+
     if valid_process > 0:
         detection_loss = torch.sum(detection_losses) / valid_process
     else:
@@ -345,12 +361,15 @@ def loss_single_process(
     if process_weight[0] is not None:
         particle_balance_weight *= process_weight[0].unsqueeze(0)
 
-    valid_assignments = torch.sum(torch.stack(targets_mask).float())
+    if event_weight is not None:
+        assignment_loss = symmetric_losses * event_weight.unsqueeze(-1) * particle_balance_weight * torch.stack(targets_mask).float()
+        valid_assignments = torch.sum(torch.stack(targets_mask).float() * event_weight.unsqueeze(-1) * particle_balance_weight)
+    else:
+        assignment_loss = symmetric_losses * particle_balance_weight * torch.stack(targets_mask).float()
+        valid_assignments = torch.sum(torch.stack(targets_mask).float() * particle_balance_weight)
 
     if valid_assignments > 0:
-        assignment_loss = symmetric_losses * torch.stack(targets_mask).float()
-        assignment_loss = assignment_loss * particle_balance_weight
-        assignment_loss = torch.sum(assignment_loss) / valid_assignments.clamp(min=1.0)  # TODO: Check balance and masking
+        assignment_loss = torch.sum(assignment_loss) / valid_assignments.clamp(min=1e-6)  # TODO: Check balance and masking
     else:
         assignment_loss = torch.zeros_like(valid_assignments, requires_grad=True)
 
@@ -372,7 +391,8 @@ def loss(
         num_targets: Dict,
         focal_gamma: float,
         particle_balance: Union[Dict, None] = None,
-        process_balance: Union[Tensor, None] = None
+        process_balance: Union[Tensor, None] = None,
+        event_weight: Union[Tensor, None] = None
 ):
     """
     Main loss function that calculates assignment and detection losses across all processes.
@@ -402,6 +422,7 @@ def loss(
         focal_gamma: Focusing parameter for focal scaling
         particle_balance: Optional dictionary for particle balancing
         process_balance: Optional tensor for process balancing
+        event_weight: Optional tensor for event weighting
 
     Returns:
         Dictionary containing assignment and detection losses for each process
@@ -435,7 +456,8 @@ def loss(
             focal_gamma,
             particle_balance.get(process, [None, None])[0] if particle_balance else None,
             particle_balance.get(process, [None, None])[1] if particle_balance else None,
-            process_weight[process]
+            process_weight[process],
+            event_weight=event_weight
         )
         loss_summary["assignment"][process] = assignment_loss # / num_processes # not scale with num processes
         loss_summary["detection"][process] = detection_loss # / num_processes # not scale with num processes
