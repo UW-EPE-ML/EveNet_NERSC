@@ -369,10 +369,13 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         # print(h5name)
         h5fr = h5py.File(h5name, mode='r')
 
-        print(f"Processing file: {h5name}, dataset : {list(h5fr)}, dataset_structure: {dataset_structure}")
+        # print(f"Processing file: {h5name}, dataset : {list(h5fr)}, dataset_structure: {dataset_structure}")
 
         if dataset_structure is None:
             dataset_structure = find_dataset_name(h5fr, list(h5fr))
+
+            dataset_structure = [element for element in dataset_structure if element != 'genpart_lastcopy']
+
             # print(dataset_structure)
             for key_ in dataset_structure:
                 data_dict[key_] = np.array(list(h5fr[key_]))
