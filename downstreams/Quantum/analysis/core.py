@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 import vector
 import numpy as np
@@ -65,39 +67,97 @@ def compute_full_density_matrix(C: dict[str, float], B: dict[str, float]) -> np.
     return eigenvalues
 
 
-def calculate_B_C(
-        result: pd.DataFrame, bins: int, kappas: tuple[float, float] = (1.0, -1.0)
-) -> dict[str, float]:
+def build_histograms(
+        df: pd.DataFrame, bins: int = 100,
+) -> dict[str, dict]:
     """
-    result: dict with keys like 'cos_theta_A_n', ...
-    bins: number of bins
-    kappas: (kappa_A, kappa_B)
-    Returns: dict with B and C QE terms
+    Input:
+        df: DataFrame with columns like 'cos_theta_A_n', etc.
+        bins: number of bins
+    Output:
+        dict: key -> {'counts': array, 'edges': array, 'errors': array}
     """
-    qe = {}
+    histograms = {}
 
-    # Helper: compute histogram mean
-    def hist_mean(arr):
-        counts, edges = np.histogram(arr, bins=bins, range=(-1, 1))
-        centers = 0.5 * (edges[:-1] + edges[1:])
-        total = counts.sum()
-        return np.sum(counts * centers) / total if total > 0 else 0
-
-    # Polarization terms B: A and B, axes n/r/k
+    # 6 polarization terms: A_n, A_r, A_k, B_n, B_r, B_k
     for which, axis in product(['A', 'B'], ['n', 'r', 'k']):
         key = f'cos_theta_{which}_{axis}'
-        kappa = kappas[0] if which == 'A' else kappas[1]
-        qe[f'B_{which}{axis}'] = hist_mean(result[key]) * 3 / kappa
+        values = df[key].values
+        counts, edges = np.histogram(values, bins=bins, range=(-1, 1))
+        errors = np.sqrt(counts)
+        histograms[f'B_{which}{axis}'] = {
+            'counts': counts,
+            'edges': edges,
+            'errors': errors
+        }
 
-    # Spin correlation terms C: pairs of axes (9 total)
+    # 9 spin correlation terms: A_x * B_y for (n,r,k)
     for ax1, ax2 in product(['n', 'r', 'k'], repeat=2):
-        prod = result[f'cos_theta_A_{ax1}'] * result[f'cos_theta_B_{ax2}']
-        qe[f'C_{ax1}{ax2}'] = hist_mean(prod) * 9 / (kappas[0] * kappas[1])
+        keyA = f'cos_theta_A_{ax1}'
+        keyB = f'cos_theta_B_{ax2}'
+        product_values = df[keyA] * df[keyB]
+        counts, edges = np.histogram(product_values, bins=bins, range=(-1, 1))
+        errors = np.sqrt(counts)
+        histograms[f'C_{ax1}{ax2}'] = {
+            'counts': counts,
+            'edges': edges,
+            'errors': errors
+        }
 
-    return qe
+    return histograms
 
 
-def evaluate_quantum_results_with_uncertainties(results: dict, results_up: dict | None, results_down: dict | None) -> dict:
+def calculate_B_C(
+        histograms: dict[str, dict],
+        kappas: tuple[float, float] = (1.0, -1.0)
+) -> tuple[dict[Any, Any], dict[Any, Any], dict[Any, Any]]:
+    result = {}
+    result_up = {}
+    result_down = {}
+
+    def mean_and_error(counts, edges, errors):
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        total = counts.sum()
+        if total == 0:
+            return 0.0, 0.0
+
+        mean = np.sum(centers * counts) / total
+
+        # Propagated uncertainty
+        partials = (centers * total - np.sum(centers * counts)) / total ** 2
+        variance = np.sum((partials ** 2) * (errors ** 2))
+        return mean, np.sqrt(variance)
+
+    # ✅ 1) B terms: for which, axis
+    for which, axis in product(['A', 'B'], ['n', 'r', 'k']):
+        key = f'B_{which}{axis}'
+        h = histograms[key]
+        mean, mean_err = mean_and_error(h['counts'], h['edges'], h['errors'])
+        kappa = kappas[0] if which == 'A' else kappas[1]
+        scaled_mean = mean * 3 / kappa
+        scaled_err = mean_err * 3 / abs(kappa)
+        result[key] = scaled_mean
+        result_up[key] = scaled_mean + scaled_err
+        result_down[key] = scaled_mean - scaled_err
+
+    # ✅ 2) C terms: for ax1, ax2
+    for ax1, ax2 in product(['n', 'r', 'k'], repeat=2):
+        key = f'C_{ax1}{ax2}'
+        h = histograms[key]
+        mean, mean_err = mean_and_error(h['counts'], h['edges'], h['errors'])
+        kappa_prod = kappas[0] * kappas[1]
+        scaled_mean = mean * 9 / kappa_prod
+        scaled_err = mean_err * 9 / abs(kappa_prod)
+        result[key] = scaled_mean
+        result_up[key] = scaled_mean + scaled_err
+        result_down[key] = scaled_mean - scaled_err
+
+    # return nominal, up, down values
+    return result, result_up, result_down
+
+
+def evaluate_quantum_results_with_uncertainties(results: dict, results_up: dict | None,
+                                                results_down: dict | None) -> dict:
     """Compute eigenvalues and uncertainties using first-order perturbation theory with precomputed up/down values."""
     quantum_results = {}
 
@@ -171,6 +231,41 @@ def evaluate_quantum_results_with_uncertainties(results: dict, results_up: dict 
         }
 
     return quantum_results
+
+
+def build_results(truth_result, recon_result):
+    for df in [truth_result, recon_result]:
+        df['m_tt'] = df['mass']
+
+        # 6 polarization terms: A_n, A_r, A_k, B_n, B_r, B_k
+        for which, axis in product(['A', 'B'], ['n', 'r', 'k']):
+            key = f'cos_theta_{which}_{axis}'
+            df[f'B_{which}{axis}'] = df[key]
+            # replace exactly zero values with NaN
+            df[f'B_{which}{axis}'] = df[f'B_{which}{axis}'].replace(0, np.nan)
+
+        # 9 spin correlation terms: A_x * B_y for (n,r,k)
+        for ax1, ax2 in product(['n', 'r', 'k'], repeat=2):
+            keyA = f'cos_theta_A_{ax1}'
+            keyB = f'cos_theta_B_{ax2}'
+            df[f'C_{ax1}{ax2}'] = df[keyA] * df[keyB]
+            # replace exactly zero values with NaN
+            df[f'C_{ax1}{ax2}'] = df[f'C_{ax1}{ax2}'].replace(0, np.nan)
+
+    full_result = truth_result.merge(
+        recon_result,
+        left_index=True,
+        right_index=True,
+        suffixes=('_truth', '_recon')
+    )
+
+    # drop the original cos_theta columns
+    for col in full_result.columns:
+        if col.startswith('cos_theta_'):
+            full_result.drop(columns=col, inplace=True)
+
+    return full_result
+
 
 class Core:
     def __init__(
