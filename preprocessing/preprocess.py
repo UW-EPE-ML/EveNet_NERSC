@@ -176,7 +176,7 @@ def analyze_weight(process_info, current_entries):
     else:
         sf = 1.0
 
-    return np.ones(current_entries) * sf
+    return np.ones(current_entries, dtype=np.float32) * sf
 
 def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: bool = True, verbose: bool = True):
     converted_data = []
