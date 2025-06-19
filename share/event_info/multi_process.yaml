@@ -70,6 +70,10 @@ EVENT:
       - b
       - l-
 
+  WJetsToLNu:
+    W:
+      - l
+
   WJetsToQQ:
     W:
       - q1
@@ -101,17 +105,23 @@ EVENT:
       - q1
       - q2
 
-  WZ_1L:
-    W:
-      - l
-    Z:
-      - q1
-      - q2
-
   WW_1L:
     W1:
       - l
     W2:
+      - q1
+      - q2
+
+  WW_2L:
+    W+:
+      - l+
+    W-:
+      - l-
+
+  WZ_1L:
+    W:
+      - l
+    Z:
       - q1
       - q2
   
@@ -224,11 +234,6 @@ EVENT:
       - l1
       - l2
 
-
-  WJetsToLNu:
-    W:
-      - l
-
   HWW_WpLepWmLep:
     W+:
       - l+
@@ -301,12 +306,15 @@ PERMUTATIONS:
     Z2:
       - [ q1, q2 ]
 
-  WZ_1L:
-    Z:
-      - [ q1, q2 ]
-
   WW_1L:
     W2:
+      - [ q1, q2 ]
+
+  WW_2L:
+    - []
+
+  WZ_1L:
+    Z:
       - [ q1, q2 ]
 
   WZ_2L:
@@ -433,6 +441,9 @@ REGRESSIONS:
     t2/v: *Momentum
     Z: *Momentum
 
+  WJetsToLNu:
+    W/v: *Momentum
+
   WJetsToQQ:
     W: *Momentum
 
@@ -446,15 +457,21 @@ REGRESSIONS:
     Z1: *Momentum
     Z2: *Momentum
 
-  WZ_1L:
-    W: *Momentum
-    W/v: *Momentum
-    Z: *Momentum
-
   WW_1L:
     W1: *Momentum
     W1/v: *Momentum
     W2: *Momentum
+
+  WW_2L:
+    W+: *Momentum
+    W+/v: *Momentum
+    W-: *Momentum
+    W-/v: *Momentum
+
+  WZ_1L:
+    W: *Momentum
+    W/v: *Momentum
+    Z: *Momentum
 
   WZ_2L:
     W: *Momentum
@@ -464,9 +481,6 @@ REGRESSIONS:
     W: *Momentum
     W/v: *Momentum
     Z: *Momentum
-
-  WJetsToLNu:
-    W/v: *Momentum
 
   HWW_WpLepWmLep:
     W+: *Momentum
