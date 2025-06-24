@@ -8,14 +8,15 @@ To run data preprocessing, go to main directory and run the following command:
 #!/bin/bash
 
 PREPROCESS_SCRIPT="downstreams/Quantum/preprocess/preprocess_TT2L.py"
-YAML_CONFIG="downstreams/Quantum/preprocess_TT2L.yaml"
+YAML_DIR="downstreams/Quantum/"
 IN_BASE="/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/data/Quantum/TT2L"
 OUT_BASE="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L"
 
-for dataset in train; do
-    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG" \
+for dataset in train test; do
+    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_DIR/preprocess_TT2L_$dataset.yaml" \
         --pretrain_dirs "$IN_BASE/$dataset" \
-        --store_dir "$OUT_BASE/$dataset"
+        --store_dir "$OUT_BASE/$dataset" \
+        --cpu_max 100
 done
 ```
 
