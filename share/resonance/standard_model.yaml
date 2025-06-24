@@ -44,14 +44,14 @@ DiObjectDecay:
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
   W+/qq:
-    Mass: 80.38
+#    Mass: 80.38
     Spin: 1
     nProduct_BJet: 0
     nProduct_Jet: 2
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
   W-/qq:
-    Mass: 80.38
+#    Mass: 80.38
     Spin: 1
     nProduct_BJet: 0
     nProduct_Jet: 2

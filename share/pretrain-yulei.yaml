@@ -97,7 +97,7 @@ options:
             reco_attn_mask: [ 1.0, 1.0 ]
             ema_decay: [ 0.5, 0.9 ]
 
-        - name: "generation"
+        - name: "warm-up all"
           epoch_ratio: 0.1
           transition_ratio: 1.0
           loss_weights:
