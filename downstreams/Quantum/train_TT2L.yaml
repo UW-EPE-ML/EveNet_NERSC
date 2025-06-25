@@ -20,8 +20,8 @@ options:
   default: configs_TT2L/options.yaml
 
   Training:
-    total_epochs: 200
-    epochs: 200
+    total_epochs: 150
+    epochs: 150
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l"
     #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.SPANet/TT1L/best_epoch=49-v1.ckpt"
 #    pretrain_model_load_path: null
@@ -75,6 +75,15 @@ options:
       monitor: "val/loss"
       mode: "min"
       verbose: true
+
+    EMA:
+      enable: true               # Enable or disable EMA
+      decay: 0.999               # EMA decay rate
+      start_epoch: 0             # Start updating EMA after this epoch
+      update_every_n_steps: 1    # Update EMA every N steps
+
+      replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
+      replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
 
   Dataset:
     dataset_limit: 1.0
