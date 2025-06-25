@@ -216,7 +216,11 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
         )
 
         # Filter the data
-        converter.filter_process(process=process, process_info=process_info[process])
+        converter.filter_process(
+            process=process,
+            process_info=process_info[process],
+            veto_double_assign=global_config.get("veto_double_assign", True),
+        )
 
         # Load Point Cloud and Mask
         sources = converter.load_sources()
@@ -274,7 +278,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
                 context = make_context(aliases)
                 mask = np.ones_like(next(iter(context.values())), dtype=bool)
                 cutflow = {
-                    "cut_0: all": np.count_nonzero(mask),
+                    # "cut_0: all": np.count_nonzero(mask),
+                    "cut_0: all": int(matched_data['total_entries']),
                 }
 
                 for i, expr in enumerate(selection_map[selection_name]):

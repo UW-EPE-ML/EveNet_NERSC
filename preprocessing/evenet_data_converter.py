@@ -151,12 +151,20 @@ class EveNetDataConverter:
         output_dict[f"classification-EVENT/signal"] = self.raw_data[f"{label}/EVENT/signal"]
         return output_dict
 
-    def filter_process(self, process: str, process_info: dict):
+    def filter_process(self, process: str, process_info: dict, veto_double_assign: bool = True):
         process_id = process_info['process_id']
         category = process_info['category']
 
-        selection = self.raw_data["INFO/VetoDoubleAssign"]
-        data_selected = {key: arr[selection] for key, arr in self.raw_data.items()}
+        if veto_double_assign:
+            selection = self.raw_data["INFO/VetoDoubleAssign"]
+        else:
+            selection = np.ones(len(self.raw_data["INFO/VetoDoubleAssign"]), dtype=bool)
+
+        data_selected = {
+            key: arr[selection]
+            for key, arr in self.raw_data.items()
+            if isinstance(arr, np.ndarray)
+        }
 
         data_selected['CLASSIFICATIONS/EVENT/signal'] = np.zeros_like(
             data_selected['INFO/VetoDoubleAssign'], dtype=int

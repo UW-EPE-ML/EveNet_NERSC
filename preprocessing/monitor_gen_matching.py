@@ -360,6 +360,7 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         if re.match(os.path.join(in_dir, "{process}_[0-9]+\\.h5".format(process=process)), h5name)
     ]
 
+    total_entries = 0
     if len(process_files) == 0:
         # print(f"[Warning] No files found for process: {process}")
         return None
@@ -383,6 +384,8 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         else:
             for key_ in dataset_structure:
                 data_dict[key_] = np.concatenate([data_dict[key_], np.array(list(h5fr[key_]))])
+
+        total_entries += h5fr.attrs.get('total_entries', len(data_dict['genpart']))
 
         h5fr.close()
 
@@ -448,6 +451,7 @@ def monitor_gen_matching(in_dir, process, feynman_diagram_process, out_dir=None,
         for histogram_name in dqm_plot:
             draw_hist(dqm_plot[histogram_name], histogram_name, plot_dir, histogram_name)
 
+    processed_data['total_entries'] = total_entries
     return processed_data
 
 
