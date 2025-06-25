@@ -1,4 +1,5 @@
 max_neutrinos: 2
+veto_double_assign: true
 
 selections:
   aliases:

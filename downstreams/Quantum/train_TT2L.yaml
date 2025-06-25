@@ -13,6 +13,7 @@ wandb:
   project: "qe-tt2l"
   entity: "ytchou97-university-of-washington"
   name: "tt2l"
+  run-name: "tt2l-quantum"
   tags: [ "NERSC", "TT2L", "Neutrinos", "QE" ]
 
 options:
