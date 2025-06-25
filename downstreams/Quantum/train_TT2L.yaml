@@ -13,7 +13,7 @@ wandb:
   project: "qe-tt2l"
   entity: "ytchou97-university-of-washington"
   name: "tt2l"
-  run-name: "tt2l-quantum"
+  run-name: "pretrain-ema-ds1p0"
   tags: [ "NERSC", "TT2L", "Neutrinos", "QE" ]
 
 options:
