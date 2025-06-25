@@ -2,6 +2,7 @@ import copy
 import os
 from pathlib import Path
 from typing import Optional
+import glob
 
 import ray
 from ray.actor import ActorHandle
@@ -28,8 +29,17 @@ def predict_func(cfg):
         prefetch_batches=cfg['prefetch_batches'],
     )
 
+
     if global_config.options.Training.model_checkpoint_load_path:
-        ckpt_path = global_config.options.Training.model_checkpoint_load_path
+        if Path(global_config.options.Training.model_checkpoint_load_path).is_dir():
+            checkpoint_dir = global_config.options.Training.model_checkpoint_load_path
+            ckpt_files = glob.glob(os.path.join(checkpoint_dir, "*.ckpt"))
+            if ckpt_files:
+                ckpt_path = max(ckpt_files, key=os.path.getmtime)
+            else:
+                ckpt_path = None  # or raise an error/log a message
+        else:
+            ckpt_path = global_config.options.Training.model_checkpoint_load_path
         print(f"Loading checkpoint from model_checkpoint_load_path: {ckpt_path}")
     elif global_config.options.Training.pretrain_model_load_path:
         ckpt_path = None
