@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/train"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/test"
   number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.quantum/"
     # The filename of the prediction data
-    filename: "TT2L-pretrain.pt"
+    filename: "pretrain-ema-ds1p0.pt"
 
     save_point_cloud: true
     extra_save:
@@ -40,7 +40,7 @@ options:
     total_epochs: 500
     epochs: 500
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l/ass_gen_1.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l/pretrain-ema-ds1p0.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 50 # how often to run diffusion
@@ -92,9 +92,18 @@ options:
       mode: "min"
       verbose: true
 
+    EMA:
+      enable: true               # Enable or disable EMA
+      decay: 0.999               # EMA decay rate
+      start_epoch: 0             # Start updating EMA after this epoch
+      update_every_n_steps: 1    # Update EMA every N steps
+
+      replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
+      replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
+
   Dataset:
-    dataset_limit: 0.5
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/train/normalization.pt"
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/Quantum-TT2L/test/normalization.pt"
     val_split: [ 0.8, 1.0 ]
 
 
