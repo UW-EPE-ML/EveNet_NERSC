@@ -35,7 +35,7 @@ options:
 
     learning_rate: &lr 0.00005
 #    learning_rate_body: &lr_body 0.000005
-    learning_rate_body: &lr 0.00005
+    learning_rate_body: &lr_body 0.00005
     weight_decay: &wd 0.01
     Components:
       GlobalEmbedding:
