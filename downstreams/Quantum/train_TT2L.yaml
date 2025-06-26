@@ -14,7 +14,7 @@ wandb:
   entity: "ytchou97-university-of-washington"
   name: "tt2l"
 #  run_name: "pretrain-ema-ds1p0"
-  run_name: "scratch-ema-ds1p0"
+  run_name: "scratch-ema-ds1p0-lr_half"
   tags: [ "NERSC", "TT2L", "Neutrinos", "QE" ]
 
 options:
