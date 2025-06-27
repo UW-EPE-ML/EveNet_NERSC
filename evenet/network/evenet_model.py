@@ -618,7 +618,7 @@ class EveNetModel(nn.Module):
 
         if mode == "global":
             """
-            Predict the number of point clouds diffusion vector in the batchs.
+            Predict the number of point clouds diffusion vector in the batches.
             noise_x: (batch_size, 1)
             """
             global_conditions = cond_x['conditions'].unsqueeze(1)  # (batch_size, 1, num_conditions)
