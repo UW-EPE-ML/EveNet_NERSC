@@ -153,9 +153,13 @@ class GenerationMetrics:
 
 
             new_x = input_set.copy()
+
+            print(new_x['x'].shape, new_x['x_mask'].shape)
+            print(new_x['x'], new_x['x_mask'])
+
             new_x = model.sequential_normalizer(
-                x=new_x,
-                mask=input_set["x_mask"],
+                x=new_x['x'],
+                mask=input_set["x_mask"].unsqueeze(-1),
             )
             for i in range(data_shape[-1]):
                 if i in self.target_event_index:
@@ -163,7 +167,7 @@ class GenerationMetrics:
                     predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[
                         ..., i]
                     # truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
-                    truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = new_x['x'][..., i]
+                    truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = new_x[..., i]
 
 
         if self.neutrino_generation:
