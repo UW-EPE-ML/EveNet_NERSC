@@ -143,7 +143,7 @@ class GenerationMetrics:
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
                 pred_fn=predict_for_point_cloud,
-                normalize_fn=model.sequential_normalizer,
+                # normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_point_cloud,
                 noise_mask=input_set["x_mask"].unsqueeze(-1),  # [B, T, 1] to match noise x
@@ -151,12 +151,20 @@ class GenerationMetrics:
                 process_name=f"PointCloud",
             )
 
+
+            new_x = input_set.copy()
+            new_x = model.sequential_normalizer(
+                x=new_x,
+                mask=input_set["x_mask"],
+            )
             for i in range(data_shape[-1]):
                 if i in self.target_event_index:
                     masking[f"point cloud-{self.sequential_feature_names[i]}"] = input_set["x_mask"]
                     predict_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = generated_distribution[
                         ..., i]
-                    truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
+                    # truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
+                    truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = new_x['x'][..., i]
+
 
         if self.neutrino_generation:
             #####################################
