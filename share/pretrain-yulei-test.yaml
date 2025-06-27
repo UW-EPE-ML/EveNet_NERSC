@@ -25,7 +25,7 @@ options:
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/epoch=4_train=2.5971_val=2.7559.ckpt"
     pretrain_model_load_path: null
 
-    diffusion_every_n_epochs: 5 # how often to run diffusion
+    diffusion_every_n_epochs: 2 # how often to run diffusion
     diffusion_every_n_steps: 10 # how often to run diffusion inside the valid epoch
 
     learning_rate: &lr 0.000018
