@@ -57,6 +57,12 @@ For every sub-run folder:
             ${pretrain_dir}/Run_2.Pretrain.20250507 \
             ${pretrain_dir}/Run_3.Pretrain.20250527.Run2Extra \
         --store_dir ${output_dir}/run.20250527.654M | tee ${output_dir}/run.20250527.654M.log
+  
+    shifter python3 preprocessing/preprocess.py share/preprocess_pretrain.yaml \
+        --c 60 \
+        --pretrain_dirs \
+        ${pretrain_dir}/Combined_Balanced \
+        --store_dir ${output_dir}/run.20250625.2700M
     ```
 
     This command will:

@@ -41,37 +41,47 @@ def pre_bin(df_all, bin_edges, recon_types=None):
             # b = truth_col + truth_mtt_col * ( len(edges) - 1 )
             df_new[f"{var}_truth_final"] = df_new[truth_col] + df_new[truth_mtt_col] * var_bin_numbers
             df_new[f"{var}_{recon_type}_final"] = df_new[reco_col] + df_new[reco_mtt_col] * var_bin_numbers
+    if 'weight' in df_all.columns:
+        df_new['weight'] = df_all['weight']
 
     return df_new
 
 
-def build_response(df_in: pd.DataFrame, truth_col: str, recon_col: str, bin_nums: int = 16):
+def build_response(df_in: pd.DataFrame, truth_col: str, recon_col: str, bin_nums: int = 16, weight_col: str = None):
     response = ROOT.RooUnfoldResponse(bin_nums, -0.5, bin_nums - 0.5)
 
     for row in df_in.itertuples():
         truth_val = getattr(row, truth_col)
         reco_val = getattr(row, recon_col)
+        if weight_col is not None:
+            weight_val = getattr(row, weight_col)
+        else:
+            weight_val = 1.0
 
         if truth_val != np.nan and reco_val != np.nan:
-            response.Fill(reco_val, truth_val)
+            response.Fill(reco_val, truth_val, weight_val)
         elif truth_val != np.nan:
-            response.Miss(truth_val)
+            response.Miss(truth_val, weight_val)
 
     return response
 
 
-def build_histograms(df_in: pd.DataFrame, truth_col: str, recon_col: str, bin_nums: int = 16):
+def build_histograms(df_in: pd.DataFrame, truth_col: str, recon_col: str, bin_nums: int = 16, weight_col: str = None):
     h_truth = ROOT.TH1D(f"h_{truth_col}", "Truth", bin_nums, -0.5, bin_nums - 0.5)
     h_reco = ROOT.TH1D(f"h_{recon_col}", "Reco", bin_nums, -0.5, bin_nums - 0.5)
 
     for row in df_in.itertuples():
         truth_val = getattr(row, truth_col)
         reco_val = getattr(row, recon_col)
+        if weight_col is not None:
+            weight_val = getattr(row, weight_col)
+        else:
+            weight_val = 1.0
 
         if truth_val != np.nan:
-            h_truth.Fill(truth_val)
+            h_truth.Fill(truth_val, weight_val)
         if reco_val != np.nan:
-            h_reco.Fill(reco_val)
+            h_reco.Fill(reco_val, weight_val)
 
     return h_truth, h_reco
 
@@ -116,7 +126,7 @@ def hist_to_df(hist, name="hist", nbins=16):
     return pd.DataFrame(data)
 
 
-def main(full_df: pd.DataFrame, bin_edges: dict[str, np.ndarray]):
+def main(full_df: pd.DataFrame, bin_edges: dict[str, np.ndarray], weight_col: str = None):
     plot_path = Path("plots/unfolding")
     plot_path.mkdir(parents=True, exist_ok=True)
 
@@ -134,17 +144,19 @@ def main(full_df: pd.DataFrame, bin_edges: dict[str, np.ndarray]):
             response = build_response(
                 df_in=df_in,
                 truth_col=f"{var}_truth_final", recon_col=f"{var}_{category}_final",
-                bin_nums=bin_nums
+                bin_nums=bin_nums,
+                weight_col=weight_col
             )
 
             h_truth, h_measure = build_histograms(
                 df_in=df_in,
                 truth_col=f"{var}_truth_final", recon_col=f"{var}_{category}_final",
-                bin_nums=bin_nums
+                bin_nums=bin_nums,
+                weight_col=weight_col
             )
 
             unfold = ROOT.RooUnfoldSvd(response, h_measure, 5)
-            hUnfold = unfold.Hunfold()
+            hUnfold = unfold.Hunfold(3)
 
             # unfold.PrintTable(ROOT.cout, h_truth)
             plot_histograms(h_truth, h_measure, hUnfold, save_path=plot_path / f"{var}_{category}.pdf")

@@ -122,10 +122,7 @@ def calculate_B_C(
             return 0.0, 0.0
 
         mean = np.sum(centers * counts) / total
-
-        # Propagated uncertainty
-        partials = (centers * total - np.sum(centers * counts)) / total ** 2
-        variance = np.sum((partials ** 2) * (errors ** 2))
+        variance = np.sum(((centers - mean) / total) ** 2 * errors ** 2)
         return mean, np.sqrt(variance)
 
     # ✅ 1) B terms: for which, axis
