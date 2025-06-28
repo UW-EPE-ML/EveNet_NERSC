@@ -63,7 +63,7 @@ def register_dataset(
     """Registers a Ray dataset, preprocesses it, and returns dataset and event count."""
     ds = ray.data.read_parquet(
         parquet_files,
-        override_num_blocks=len(parquet_files) * min(platform_info.number_of_workers, 32),
+        override_num_blocks=len(parquet_files) * min(platform_info.number_of_workers, 4),
         ray_remote_args={
             "num_cpus": 0.5,
         },

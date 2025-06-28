@@ -355,18 +355,18 @@ def shared_epoch_end(
             })
             plt.close(fig_logits[i])
 
-            if j in fig_rocs:
+            if i in fig_rocs:
                 logger.log({
-                    f"{prefix}classification/roc_{class_name}": wandb.Image(fig_rocs[j])
+                    f"{prefix}classification/roc_{class_name}": wandb.Image(fig_rocs[i])
                 })
-                plt.close(fig_rocs[j])
+                plt.close(fig_rocs[i])
 
                 logger.log({
-                    f"{prefix}classification/train_auc_{class_name}": aucs[j]
+                    f"{prefix}classification/train_auc_{class_name}": aucs[i]
                 })
 
                 logger.log({
-                    f"{prefix}classification/valid_auc_{class_name}": aucs_valid[j]
+                    f"{prefix}classification/valid_auc_{class_name}": aucs_valid[i]
                 })
 
             # if module is not None:
