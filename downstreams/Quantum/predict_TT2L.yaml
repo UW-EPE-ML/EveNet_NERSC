@@ -17,7 +17,8 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.quantum/"
     # The filename of the prediction data
-    filename: "scratch-ema-ds1p0-lr_half.pt"
+#    filename: "scratch-ema-ds1p0-lr_half.pt"
+    filename: "pretrain-ema-ds1p0.new.pt"
 
     save_point_cloud: true
     extra_save:
@@ -40,7 +41,7 @@ options:
     total_epochs: 500
     epochs: 500
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l/scratch-ema-ds1p0-lr_half.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.quantum/tt2l/pretrain-ema-ds1p0.new.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 50 # how often to run diffusion
