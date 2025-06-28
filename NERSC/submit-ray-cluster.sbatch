@@ -1,18 +1,19 @@
 #!/bin/bash
 
 #SBATCH -C gpu
-#SBATCH --time=00:10:00
-#SBATCH -q debug
-#SBATCH -A nstaff
+#SBATCH --time=04:00:00
+#SBATCH -q regular
+#SBATCH -A m5019_g
 
 ### This script works for any number of nodes, Ray will find and manage all resources
-#SBATCH --nodes=2
+#SBATCH --nodes=128
 
 ### Give all resources on each node to a single Ray task, ray can manage the resources internally
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=128
 
+#SBATCH --reservation=_CAP_EveNet_EPS
 
 head_node=$(hostname)
 head_node_ip=$(hostname --ip-address)
@@ -46,7 +47,7 @@ sleep 5
 # export the parent directory of the script to the PYTHONPATH
 cd ../ && source setup.sh
 
-shifter python3 evenet/train.py share/pretrain-yulei-test.yaml
+shifter python3 evenet/train.py share/pretrain-yulei.yaml
 
 #shifter python3 evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
 
