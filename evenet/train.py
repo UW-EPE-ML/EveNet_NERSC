@@ -193,6 +193,10 @@ def main(args):
     print('finished!')
     print(result)
 
+    import torch.distributed as dist
+    if dist.is_initialized():
+      dist.destroy_process_group()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="EveNet Training Program")
