@@ -90,6 +90,9 @@ class Normalizer(nn.Module):
             else:
                 inv_cdf_index = self.inv_cdf_index
 
+            print(f"Inv CDF index: {self.inv_cdf_index}")
+            print(f"Inv CDF index after filtering: {inv_cdf_index}")
+
             x_partial = x[..., inv_cdf_index].contiguous()
             x_partial = self.normal.cdf(x_partial)
             # x_partial = x_partial * 2 * (math.sqrt(3) + 0.1) - (math.sqrt(3) + 0.1)
@@ -106,4 +109,8 @@ class Normalizer(nn.Module):
         # x = torch.where(self.log_mask_expanded, torch.expm1(x), x) # TODO
         if mask is not None:
             x = x * mask
+
+        print(f"Normalizer: mean {current_mean}")
+        print(f"Normalizer: std {current_std}")
+
         return x

@@ -143,7 +143,7 @@ class GenerationMetrics:
             generated_distribution = self.sampler.sample(
                 data_shape=data_shape,
                 pred_fn=predict_for_point_cloud,
-                # normalize_fn=model.sequential_normalizer,
+                normalize_fn=model.sequential_normalizer,
                 eta=eta,
                 num_steps=num_steps_point_cloud,
                 noise_mask=input_set["x_mask"].unsqueeze(-1),  # [B, T, 1] to match noise x
