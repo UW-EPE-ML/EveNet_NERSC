@@ -5,15 +5,15 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 1024
+  batch_size: 512
   prefetch_batches: 2
 
 wandb:
   project: "Pretrain"
   entity: "ytchou97-university-of-washington"
   name: "Pretrain"
-  run_name: "nominal"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla" ]
+  run_name: "nominal-large"
+  tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "LargeModel", "Vanilla" ]
 
 options:
   default: options/options.yaml
@@ -22,7 +22,7 @@ options:
     total_epochs: 10
     epochs: 6
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/epoch=5_train=3.2731_val=3.5346.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/epoch=1_train=0.5351_val=0.5097.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 1 # how often to run diffusion
