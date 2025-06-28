@@ -63,7 +63,7 @@ def register_dataset(
     """Registers a Ray dataset, preprocesses it, and returns dataset and event count."""
     ds = ray.data.read_parquet(
         parquet_files,
-        override_num_blocks=len(parquet_files) * platform_info.number_of_workers,
+        override_num_blocks=len(parquet_files) * min(platform_info.number_of_workers, 16),
         ray_remote_args={
             "num_cpus": 0.5,
         },
@@ -71,8 +71,9 @@ def register_dataset(
         shuffle="files" if file_shuffling else None,
     )
 
-    total_events = ds.count()
-    ds = ds.limit(int(total_events * dataset_limit))
+    if dataset_limit < 1.0:
+        total_events = ds.count()
+        ds = ds.limit(int(total_events * dataset_limit))
     total_events = ds.count()
 
     ds = ds.map_batches(
