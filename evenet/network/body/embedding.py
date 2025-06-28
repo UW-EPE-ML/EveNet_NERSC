@@ -132,7 +132,7 @@ class GlobalVectorEmbedding(nn.Module):
         # Embed vectors into latent space.
         # output: (max_vectors, batch_size, final_embedding_dim)
         # --------------------------------
-        embeddings = x.contiguous()
+        embeddings = x
         encoded = self.embedding_stack(
             vectors=embeddings,
             mask=mask
@@ -203,7 +203,7 @@ class LocalEmbeddingLayer(nn.Module):
         """
         mask = mask.to(torch.int)
         coord_shift = 999.0 * (mask == 0).float()
-        local_features = x.contiguous()
+        local_features = x
         for idx, local_embed in enumerate(self.local_embed_layer):
             local_features = local_embed(
                 points=coord_shift + points,
@@ -341,7 +341,7 @@ class PETBody(nn.Module):
             )
             encoded = local_features + encoded  # Combine with original features
 
-        skip_connection = encoded.contiguous()
+        skip_connection = encoded
         for transformer_block in self.transformer_blocks:
             encoded = transformer_block(
                 x=encoded,

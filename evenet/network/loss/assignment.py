@@ -324,8 +324,8 @@ def loss_single_process(
     process_weighting = torch.stack(process_weighting).float()
 
     if event_weight is not None:
-        detection_losses = torch.stack(detection_losses) * process_masking * process_weighting * event_weight.unsqueeze(-1)
-        valid_process = torch.sum(process_masking * process_weighting * event_weight.unsqueeze(-1))
+        detection_losses = torch.stack(detection_losses) * process_masking * process_weighting * event_weight.view(-1, *([1] * (process_masking.dim() - 1)))
+        valid_process = torch.sum(process_masking * process_weighting * event_weight.view(-1, *([1] * (process_masking.dim() - 1))))
     else:
         detection_losses = torch.stack(detection_losses) * process_masking * process_weighting
         valid_process = torch.sum(process_masking * process_weighting)
@@ -362,8 +362,8 @@ def loss_single_process(
         particle_balance_weight *= process_weight[0].unsqueeze(0)
 
     if event_weight is not None:
-        assignment_loss = symmetric_losses * event_weight.unsqueeze(-1) * particle_balance_weight * torch.stack(targets_mask).float()
-        valid_assignments = torch.sum(torch.stack(targets_mask).float() * event_weight.unsqueeze(-1) * particle_balance_weight)
+        assignment_loss = symmetric_losses * event_weight.unsqueeze(0) * particle_balance_weight * torch.stack(targets_mask).float()
+        valid_assignments = torch.sum(torch.stack(targets_mask).float() * event_weight.unsqueeze(0) * particle_balance_weight)
     else:
         assignment_loss = symmetric_losses * particle_balance_weight * torch.stack(targets_mask).float()
         valid_assignments = torch.sum(torch.stack(targets_mask).float() * particle_balance_weight)

@@ -115,7 +115,7 @@ class AssignmentHead(nn.Module):
         num_jets = output.shape[1]
 
         # batch_sequence_mask: [B, T, 1] Positive mask indicating jet is real.
-        batch_sequence_mask = mask.contiguous()
+        batch_sequence_mask = mask
 
         # =========================================================================================
         # Padding mask
@@ -190,9 +190,9 @@ class AssignmentHead(nn.Module):
         # sequential_padding_mask : [B, TS]
         # sequential_sequence_mask : [TS, B, 1]
         # --------------------------------------------------------
-        sequential_particle_vectors = encoded_vectors.contiguous()
-        sequential_padding_mask = ~(point_cloud_mask.squeeze(-1)).bool().contiguous()
-        sequential_sequence_mask = point_cloud_mask.contiguous()
+        sequential_particle_vectors = encoded_vectors
+        sequential_padding_mask = ~(point_cloud_mask.squeeze(-1)).bool()
+        sequential_sequence_mask = point_cloud_mask
 
         # --------------------------------------------------------------------
         # Create the vector distribution logits and the correctly shaped mask.
@@ -431,12 +431,12 @@ class SharedAssignmentHead(nn.Module):
                     topology_name = ''.join(self.product_particles[process][event_particle_name].names)
                     topology_name = f"{event_particle_name}/{topology_name}"
                     topology_name = re.sub(r'\d+', '', topology_name)
-                    assignments[process].append(branch_decoder_result[topology_name]["assignment"].contiguous())
-                    detections[process].append(branch_decoder_result[topology_name]["detection"].contiguous())
+                    assignments[process].append(branch_decoder_result[topology_name]["assignment"])
+                    detections[process].append(branch_decoder_result[topology_name]["detection"])
 
         else:
             for topology_name in branch_decoder_result:
-                assignments[topology_name] = branch_decoder_result[topology_name]["assignment"].contiguous()
-                detections[topology_name] = branch_decoder_result[topology_name]["detection"].contiguous()
+                assignments[topology_name] = branch_decoder_result[topology_name]["assignment"]
+                detections[topology_name] = branch_decoder_result[topology_name]["detection"]
 
         return assignments, detections, event_token

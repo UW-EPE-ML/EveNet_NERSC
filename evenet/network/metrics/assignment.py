@@ -220,9 +220,19 @@ class SingleProcessAssignmentMetrics:
 
             names_clean = [name.replace('/', '') for name in names]
 
-            cluster_name = map(dict.fromkeys, names_clean)
-            cluster_name = map(lambda x: x.keys(), cluster_name)
-            cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
+            # cluster_name = map(dict.fromkeys, names_clean)
+            # cluster_name = map(lambda x: x.keys(), cluster_name)
+            # cluster_name = ''.join(reduce(lambda x, y: x & y, cluster_name))
+
+            # Build a list of sets of characters
+            char_sets = [set(name) for name in names_clean]
+
+            # Find the common characters
+            common_chars = reduce(lambda x, y: x & y, char_sets)
+
+            # Preserve order based on the first name in names_clean
+            cluster_name = ''.join([c for c in names_clean[0] if c in common_chars])
+
             clusters.append((cluster_name, names, orbit))  # ['t', ['t1', 't2'], Orbit]
 
             cluster_group = self.target_groups[names[0]]

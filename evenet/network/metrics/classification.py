@@ -3,7 +3,9 @@ from typing import Callable
 import numpy as np
 import torch
 import wandb
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.preprocessing import label_binarize
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
@@ -13,7 +15,7 @@ from evenet.utilities.debug_tool import time_decorator
 
 
 class ClassificationMetrics:
-    def __init__(self, num_classes, device, normalize=False, num_bins=50):
+    def __init__(self, num_classes, device, normalize=False, num_bins=100):
         self.train_matrix = None
         self.train_hist_store = None
         self.device = device
@@ -163,6 +165,9 @@ class ClassificationMetrics:
 
     def plot_logits(self, class_names):
         results = {}
+        auc_scores = {}
+        auc_scores_valid = {}
+        roc_curves = {}
 
         # Use training store if provided, else default to self.hist_store
         train_hist_store = self.train_hist_store if self.train_hist_store is not None else self.hist_store
@@ -220,7 +225,61 @@ class ClassificationMetrics:
 
             results[true_cls] = fig
 
-        return results
+
+        # === 2. ROC Plot ===
+        for target_cls in range(self.num_classes):
+            fig_roc, ax_roc = plt.subplots(figsize=(8, 6))
+            y_true_list = np.array([])
+            y_score_list = np.array([])
+            y_true_list_valid = np.array([])
+            y_score_list_valid = np.array([])
+            weights = np.array([])
+            weights_valid = np.array([])
+            bin_centers = 0.5 * (self.bins[1:] + self.bins[:-1])
+
+            for true_cls in range(self.num_classes):
+                counts = train_hist_store[true_cls, target_cls]
+                counts_valid = self.hist_store[true_cls, target_cls]
+                if true_cls == target_cls:
+                    y_true = np.ones_like(counts)
+                    y_true_valid = np.ones_like(counts_valid)
+                else:
+                    y_true = np.zeros_like(counts)
+                    y_true_valid = np.zeros_like(counts_valid)
+                y_true_list = np.concatenate([y_true_list, y_true])
+                y_score_list = np.concatenate([y_score_list, bin_centers])
+                weights = np.concatenate([weights, counts])
+                y_true_list_valid = np.concatenate([y_true_list_valid, y_true_valid])
+                y_score_list_valid = np.concatenate([y_score_list_valid, bin_centers])
+                weights_valid = np.concatenate([weights_valid, counts_valid])
+
+            if weights.sum() == 0 or weights_valid.sum() == 0:
+                print(f"Warning: No data for target class {target_cls}. Skipping ROC plot.")
+                continue
+            fpr, tpr, _ = roc_curve(y_true_list, y_score_list, sample_weight=weights)
+            roc_auc = auc(fpr, tpr)
+            auc_scores[target_cls] = roc_auc
+
+            # Plot ROC curve
+            fpr_valid, tpr_valid, _ = roc_curve(y_true_list_valid, y_score_list_valid, sample_weight=weights_valid)
+            auc_valid = auc(fpr_valid, tpr_valid)
+            auc_scores_valid[target_cls] = auc_valid
+
+            plt.plot(fpr, tpr, color=colors[target_cls], lw=2, label=f"AUC = {roc_auc:.3f}")
+            plt.plot(fpr_valid, tpr_valid, '--', color=colors[target_cls], lw=2, label=f"AUC[valid] = {auc_valid:.3f}")
+            plt.plot([0, 1], [0, 1], 'k--', lw=1)
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.grid(True)
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.title(f"ROC Curve: {class_names[target_cls]}")
+            plt.legend(loc="lower right")
+            plt.tight_layout()
+
+            roc_curves[target_cls] = fig_roc
+
+        return results, roc_curves, auc_scores, auc_scores_valid
 
 
 @time_decorator(name="[Classification] shared_step")
@@ -268,6 +327,7 @@ def shared_epoch_end(
         metrics_train: ClassificationMetrics,
         num_classes: list[str],
         logger,
+        module = None,
         prefix: str = "",
 ):
     metrics_valid.reduce_across_gpus()
@@ -287,13 +347,32 @@ def shared_epoch_end(
         })
         plt.close(fig_cm)
 
-        fig_logits = metrics_valid.plot_logits(class_names=num_classes)
+        fig_logits, fig_rocs, aucs, aucs_valid = metrics_valid.plot_logits(class_names=num_classes)
         for i, class_name in enumerate(num_classes):
             logger.log({
                 f"{prefix}classification/logits_{class_name}": wandb.Image(fig_logits[i])
                 # f"classification/logits_{class_name}": fig_logits[i]
             })
             plt.close(fig_logits[i])
+
+            if i in fig_rocs:
+                logger.log({
+                    f"{prefix}classification/roc_{class_name}": wandb.Image(fig_rocs[i])
+                })
+                plt.close(fig_rocs[i])
+
+                logger.log({
+                    f"{prefix}classification/train_auc_{class_name}": aucs[i]
+                })
+
+                logger.log({
+                    f"{prefix}classification/valid_auc_{class_name}": aucs_valid[i]
+                })
+
+            if module is not None:
+                module.log(f"{prefix}classification/train_auc_{class_name}", aucs[i], prog_bar=True, sync_dist=False)
+
+                module.log(f"{prefix}classification/valid_auc_{class_name}", aucs_valid[i], prog_bar=True, sync_dist=False)
 
     metrics_valid.reset(cm=True, logits=True)
     if metrics_train:

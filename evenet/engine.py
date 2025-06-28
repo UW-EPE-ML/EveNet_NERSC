@@ -791,6 +791,7 @@ class EveNetEngine(L.LightningModule):
                 metrics_train=self.classification_metrics_train,
                 num_classes=self.num_classes,
                 logger=self.logger.experiment,
+                module = self
             )
 
         if self.classification_cfg.include_cross_term:
