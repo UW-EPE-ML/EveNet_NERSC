@@ -87,7 +87,7 @@ options:
       start_epoch: 0             # Start updating EMA after this epoch
       update_every_n_steps: 1    # Update EMA every N steps
 
-      replace_model_after_load: false    # After loading checkpoint, copy EMA weights into model
+      replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
       replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
 
   Dataset:
