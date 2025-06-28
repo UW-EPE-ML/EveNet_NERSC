@@ -25,7 +25,7 @@ Body:
       - 2
       - 3
     num_local_layer: 16
-    num_layers: 24
+    num_layers: 32
     drop_probability: 0.1
     talking_head: false
     layer_scale: true
@@ -40,7 +40,7 @@ Body:
     num_attention_heads: 16
     transformer_dim_scale: 2.0
     num_embedding_layers: 2
-    num_encoder_layers: 8
+    num_encoder_layers: 2
     dropout: 0.1
     skip_connection: true
     encoder_skip_connection: true
