@@ -178,6 +178,7 @@ class EveNetEngine(L.LightningModule):
         ###### Progressive Training ######
         self.task_scheduler: Union[ProgressiveTaskScheduler, None] = None
         self.progressive_index = 0
+        self.current_schedule = None
 
         ###### Last ######
         # self.save_hyperparameters()
@@ -214,23 +215,25 @@ class EveNetEngine(L.LightningModule):
         }
 
         schedules = {k: v for (k, v) in self.model.schedule_flags}
-        if self.training:
-            # Evaluate which tasks are active based on weights
-            task_gate = {
-                "generation": task_weights.get("generation-recon", 0) > 0,
-                "neutrino_generation": task_weights.get("generation-truth", 0) > 0,
-                "deterministic": (
-                                         task_weights.get("classification", 0)
-                                         + task_weights.get("regression", 0)
-                                         + task_weights.get("assignment", 0)
-                                 ) > 0,
-            }
+        # if self.training:
+        # Evaluate which tasks are active based on weights
+        task_gate = {
+            "generation": task_weights.get("generation-recon", 0) > 0,
+            "neutrino_generation": task_weights.get("generation-truth", 0) > 0,
+            "deterministic": (
+                                     task_weights.get("classification", 0)
+                                     + task_weights.get("regression", 0)
+                                     + task_weights.get("assignment", 0)
+                             ) > 0,
+        }
 
-            # Combine schedule flags and weight gating
-            schedules = {
-                key: schedules[key] and task_gate.get(key, False)
-                for key in schedules
-            }
+        # Combine schedule flags and weight gating
+        schedules = {
+            key: schedules[key] and task_gate.get(key, False)
+            for key in schedules
+        }
+
+        self.current_schedule = schedules
 
         # logging schedules
         for key, value in schedules.items():
@@ -346,6 +349,7 @@ class EveNetEngine(L.LightningModule):
                 invisible_padding=self.model.invisible_padding,
                 update_metric=update_metric,
                 event_weight=event_weight,
+                schedules=schedules,
             )
 
             loss_raw["generation"] = scaled_gen_loss
@@ -784,7 +788,7 @@ class EveNetEngine(L.LightningModule):
 
     @time_decorator()
     def on_validation_epoch_end(self) -> None:
-        if self.classification_cfg.include:
+        if self.classification_cfg.include and self.current_schedule.get("deterministic", False):
             cls_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.classification_metrics_valid,
@@ -794,7 +798,7 @@ class EveNetEngine(L.LightningModule):
                 module = self
             )
 
-        if self.classification_cfg.include_cross_term:
+        if self.classification_cfg.include_cross_term and self.current_schedule.get("deterministic", False):
             cls_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.classification_metrics_valid_cross_term,
@@ -804,7 +808,7 @@ class EveNetEngine(L.LightningModule):
                 prefix="cross-term-"
             )
 
-        if self.assignment_cfg.include:
+        if self.assignment_cfg.include and self.current_schedule.get("deterministic", False):
             ass_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.assignment_metrics_valid,
@@ -812,7 +816,7 @@ class EveNetEngine(L.LightningModule):
                 logger=self.logger.experiment,
             )
 
-        if self.generation_include:
+        if self.generation_include and (self.current_schedule.get("generation", False) or self.current_schedule.get("neutrino_generation", False)):
             gen_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.generation_metrics_valid,

@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Union
 
 import numpy as np
 import torch
@@ -74,7 +74,8 @@ class GenerationMetrics:
             num_steps_global=20,
             num_steps_point_cloud=40,
             num_steps_neutrino=40,
-            eta=1.0
+            eta=1.0,
+            schedules: Union[None, dict] = None
     ):
         model.eval()
 
@@ -83,6 +84,13 @@ class GenerationMetrics:
         process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
             input_set['conditions_mask']).long()  # (batch_size, 1)
         masking = dict()
+
+        do_recon = True
+        do_truth = True
+        if schedules is not None:
+            do_recon = schedules.get('generation', False)
+            do_truth = schedules.get('neutrino_generation', False)
+
         if self.global_generation:
             ####################################
             ##  Step 1: Generate num vectors  ##
@@ -124,7 +132,7 @@ class GenerationMetrics:
                     input_set = copy.deepcopy(input_set)
                     input_set['conditions'][..., self.target_global_index] = generated_global
 
-        if self.point_cloud_generation:
+        if self.point_cloud_generation and do_recon:
             ####################################
             ##  Step 2: Generate point cloud  ##
             ####################################
@@ -159,7 +167,7 @@ class GenerationMetrics:
                     truth_distribution[f"point cloud-{self.sequential_feature_names[i]}"] = input_set['x'][..., i]
 
 
-        if self.neutrino_generation:
+        if self.neutrino_generation and do_truth:
             #####################################
             ## Generate invisible point cloud  ##
             #####################################
@@ -440,6 +448,7 @@ def shared_step(
         invisible_padding: int = 0,
         update_metric: bool = True,
         event_weight: torch.Tensor = None,
+        schedules: Union[None, dict] = None
 ):
     generation_loss = dict()
 
@@ -492,6 +501,7 @@ def shared_step(
                 num_steps_global=num_steps_global,
                 num_steps_point_cloud=num_steps_point_cloud,
                 num_steps_neutrino=num_steps_neutrino,
+                schedules=schedules,
             )
 
     loss = (global_gen_loss * global_loss_scale + recon_gen_loss * event_loss_scale + truth_gen_loss * invisible_loss_scale) / len(
