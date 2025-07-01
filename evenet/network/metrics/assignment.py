@@ -312,6 +312,7 @@ class SingleProcessAssignmentMetrics:
                     "den": 0,
                 }
 
+    @time_decorator(name="[Assignment] update step")
     def update(
             self,
             best_indices,
