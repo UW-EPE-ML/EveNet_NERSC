@@ -390,12 +390,16 @@ class EveNetEngine(L.LightningModule):
 
     def log_loss(self, loss, loss_head, loss_dict, prefix: str):
         for name, val in loss_head.items():
+            print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
             self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
 
         for name, val in loss_dict.items():
             for n, v in val.items():
+                print(f"[Step {self.current_step}] loss_3.2: {n}, {v}", flush=True)
                 self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
+
+        print(f"[Step {self.current_step}] loss_3.3", flush=True)
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         print(f"train batch end: {batch_idx}")
