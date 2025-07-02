@@ -208,7 +208,8 @@ class EveNetEngine(L.LightningModule):
 
         # logging training parameters
         for name, val in train_parameters.items():
-            self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=False, rank_zero_only=True)
+            if self.global_rank == 0:
+                self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=False)
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
@@ -237,7 +238,8 @@ class EveNetEngine(L.LightningModule):
 
         # logging schedules
         for key, value in schedules.items():
-            self.log(f"progressive/schedule-{key}", int(value), prog_bar=False, sync_dist=False, rank_zero_only=True)
+            if self.global_rank == 0:
+                self.log(f"progressive/schedule-{key}", int(value), prog_bar=False, sync_dist=False)
 
         outputs = self.model.shared_step(
             batch=inputs,
@@ -368,10 +370,12 @@ class EveNetEngine(L.LightningModule):
             if weight > 0:
                 loss = loss + loss_raw[name]
                 if self.training:
-                    self.log(f'progressive/loss_weight/{name}', weight, prog_bar=False, sync_dist=True)
+                    if self.global_rank == 0:
+                        self.log(f'progressive/loss_weight/{name}', weight, prog_bar=False, sync_dist=False)
 
         if self.training:
-            self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
+            if self.global_rank == 0:
+                self.log('progressive/loss-rank-0', loss, prog_bar=False, sync_dist=False)
 
         if self.training:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train")
@@ -429,7 +433,7 @@ class EveNetEngine(L.LightningModule):
         # #     print(f"[Task {task}] Loss: {loss.item()}")
         # #     print_params_used_by_loss(loss, self.model)
         #
-        if self.current_step % self.log_gradient_step == 0:
+        if self.current_step % self.log_gradient_step == 0 and self.global_rank == 0:
             self.log_task_gradient(task_losses, shared_params)
 
         # # === Backward for EveNet Main Part (multitask) ===
@@ -596,7 +600,9 @@ class EveNetEngine(L.LightningModule):
             grad_mag = get_total_gradient(module)
             num_params = sum(p.numel() for p in module.parameters() if p.grad is not None)
             grad_avg = grad_mag / num_params if num_params > 0 else 0.0
-            self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=True)
+
+            if self.global_rank == 0:
+                self.log(f"grad_head/{name}", grad_avg, prog_bar=False, sync_dist=False)
 
     def log_task_gradient(self, task_loss_dict, shared_params):
         """
@@ -634,7 +640,7 @@ class EveNetEngine(L.LightningModule):
                 grad_norm,
                 on_step=True,
                 logger=True,
-                sync_dist=True
+                sync_dist=False
             )
 
         # Stack into [T, D]
@@ -658,7 +664,7 @@ class EveNetEngine(L.LightningModule):
                     sim_matrix[i, j],
                     on_step=True,
                     logger=True,
-                    sync_dist=True
+                    sync_dist=False
                 )
 
     def sync_gradients_ddp(self, model, average=True, exclude_modules=()):
@@ -829,7 +835,6 @@ class EveNetEngine(L.LightningModule):
     @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
-        self.log("progress", self.progressive_index, prog_bar=True, sync_dist=False)
 
     @time_decorator()
     def safe_manual_backward(self, loss, *args, **kwargs):
