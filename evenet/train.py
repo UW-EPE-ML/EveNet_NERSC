@@ -130,7 +130,11 @@ def main(args):
     runtime_env = {
         "env_vars": {
             "PYTHONPATH": f"{Path(__file__).resolve().parent.parent}:{os.environ.get('PYTHONPATH', '')}",
-            "WANDB_API_KEY": os.environ["WANDB_API_KEY"]
+            "WANDB_API_KEY": os.environ["WANDB_API_KEY"],
+            "NCCL_BLOCKING_WAIT": "1",
+            "NCCL_ASYNC_ERROR_HANDLING": "1",
+            "NCCL_DEBUG": "INFO",
+            "NCCL_TIMEOUT": "180"
         }
     }
 
