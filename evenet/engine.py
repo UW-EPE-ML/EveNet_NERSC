@@ -403,6 +403,8 @@ class EveNetEngine(L.LightningModule):
         self.current_step = int(schedulers[0].state_dict().get("last_epoch", self.current_step))
         step = self.current_step
 
+        print(f"[Step {step}] train step start", flush=True)
+
         gradient_heads, loss_head = self.prepare_heads_loss()
         loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
             batch=batch, batch_idx=batch_idx,
@@ -502,7 +504,7 @@ class EveNetEngine(L.LightningModule):
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
         # self.current_step += 1
-        print(f"[Step {step} Rank {self.global_rank}] train step done")
+        print(f"[Step {step}] train step done", flush=True)
         return final_loss.mean()
 
     # @time_decorator
