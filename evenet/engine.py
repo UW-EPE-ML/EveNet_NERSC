@@ -394,6 +394,10 @@ class EveNetEngine(L.LightningModule):
                 self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
+    def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
+        print(f"train batch end: {batch_idx}")
+
+
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
 

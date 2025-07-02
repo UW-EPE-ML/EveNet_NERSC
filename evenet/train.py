@@ -86,7 +86,7 @@ def train_func(cfg):
 
     trainer = L.Trainer(
         max_epochs=max_epochs,
-        strategy=RayDDPStrategy(find_unused_parameters=True),
+        strategy=RayDDPStrategy(find_unused_parameters=True, timeout=180),
         plugins=[RayLightningEnvironment()],
         callbacks=[
             EveNetTrainCallback(),
