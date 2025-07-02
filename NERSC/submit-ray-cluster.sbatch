@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -C gpu&hbm80g
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH -q regular
 #SBATCH -A m5019_g
 
@@ -49,8 +49,8 @@ sleep 5
 # export the parent directory of the script to the PYTHONPATH
 cd ../ && source setup.sh
 
-#shifter python3 evenet/train.py share/pretrain-yulei.yaml
-shifter python3 evenet/train.py share/pretrain-yulei-large.yaml
+shifter python3 evenet/train.py share/pretrain-yulei.yaml
+#shifter python3 evenet/train.py share/pretrain-yulei-large.yaml
 
 #shifter python3 evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
 

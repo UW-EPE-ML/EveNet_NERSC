@@ -25,8 +25,8 @@ options:
     model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/nominal.epoch9.ckpt"
     pretrain_model_load_path: null
 
-    diffusion_every_n_epochs: 1 # how often to run diffusion
-    diffusion_every_n_steps: 50 # how often to run diffusion inside the valid epoch
+    diffusion_every_n_epochs: 3 # how often to run diffusion
+    diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
 
     learning_rate: &lr 0.000018
     #    learning_rate: &lr 0.000045
