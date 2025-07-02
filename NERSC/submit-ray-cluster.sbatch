@@ -49,11 +49,9 @@ sleep 5
 # export the parent directory of the script to the PYTHONPATH
 cd ../ && source setup.sh
 
-export NCCL_BLOCKING_WAIT=1
-export NCCL_ASYNC_ERROR_HANDLING=1
-#export NCCL_DEBUG_SUBSYS=ALL
-export NCCL_DEBUG=INFO
-export NCCL_TIMEOUT=180
+export TORCH_NCCL_BLOCKING_WAIT=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+export TORCH_NCCL_TIMEOUT=180
 
 shifter python3 evenet/train.py share/pretrain-yulei.yaml
 #shifter python3 evenet/train.py share/pretrain-yulei-large.yaml
