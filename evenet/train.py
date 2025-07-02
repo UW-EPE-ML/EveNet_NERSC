@@ -134,7 +134,8 @@ def main(args):
             "NCCL_BLOCKING_WAIT": "1",
             "NCCL_ASYNC_ERROR_HANDLING": "1",
             "NCCL_DEBUG": "INFO",
-            "NCCL_TIMEOUT": "180"
+            "NCCL_TIMEOUT": "180",
+            "NCCL_DEBUG_SUBSYS": "ALL",
         }
     }
 
