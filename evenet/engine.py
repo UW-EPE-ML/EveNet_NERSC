@@ -395,7 +395,14 @@ class EveNetEngine(L.LightningModule):
 
         for name, val in loss_dict.items():
             for n, v in val.items():
-                print(f"[Step {self.current_step}] loss_3.2: {n}, {v}", flush=True)
+                if v is None:
+                    print(f"[Rank {self.global_rank}] Skipping log for {n}/{prefix}/{name}: value is None")
+                    continue
+                if not torch.is_tensor(v):
+                    v = torch.tensor(v, device=self.device)
+                if not torch.isfinite(v).all():
+                    print(f"[Rank {self.global_rank}] Non-finite value in {n}/{prefix}/{name}: {v}")
+                    continue
                 self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
@@ -414,16 +421,16 @@ class EveNetEngine(L.LightningModule):
         self.current_step = int(schedulers[0].state_dict().get("last_epoch", self.current_step))
         step = self.current_step
 
-        print(f"[Step {step}] train step start", flush=True)
+        # print(f"[Step {step}] train step start", flush=True)
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        print(f"[Step {step}] share step start", flush=True)
+        # print(f"[Step {step}] share step start", flush=True)
         loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
             update_metric=True,
         )
-        print(f"[Step {step}] share step end", flush=True)
+        # print(f"[Step {step}] share step end", flush=True)
         final_loss = loss
         famo_logs = None
         if self.include_famo:
@@ -516,7 +523,7 @@ class EveNetEngine(L.LightningModule):
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
         # self.current_step += 1
-        print(f"[Step {step}] train step done", flush=True)
+        # print(f"[Step {step}] train step done", flush=True)
         return final_loss.mean()
 
     # @time_decorator
