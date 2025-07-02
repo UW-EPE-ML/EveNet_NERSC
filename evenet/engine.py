@@ -502,6 +502,7 @@ class EveNetEngine(L.LightningModule):
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
         # self.current_step += 1
+        print(f"[Step {step} Rank {self.global_rank}] train step done")
         return final_loss.mean()
 
     # @time_decorator
