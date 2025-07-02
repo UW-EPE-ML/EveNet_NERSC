@@ -456,7 +456,11 @@ class EveNetEngine(L.LightningModule):
         # if gen_global_loss:
         #     gen_global_loss.mean().backward()
 
+        if self.global_rank == 0:
+            print(f"[Step {step}] Loss: {final_loss.item()}")
         self.safe_manual_backward(loss.mean())
+        if self.global_rank == 0:
+            print(f"[Step {step}] Backward done")
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
