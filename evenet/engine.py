@@ -364,7 +364,7 @@ class EveNetEngine(L.LightningModule):
 
         loss = torch.zeros(1, device=self.device, requires_grad=True)
 
-        print(f"[Step {self.current_step}] loss_1", flush=True)
+        # print(f"[Step {self.current_step}] loss_1", flush=True)
         for name, loss_val in loss_raw.items():
             weight = task_weights.get(name, 0.0)
             loss_raw[name] = loss_val * weight
@@ -374,39 +374,39 @@ class EveNetEngine(L.LightningModule):
                     if self.global_rank == 0:
                         self.log(f'progressive/loss_weight/{name}', weight, prog_bar=False, sync_dist=False)
 
-        print(f"[Step {self.current_step}] loss_2", flush=True)
+        # print(f"[Step {self.current_step}] loss_2", flush=True)
         if self.training:
             if self.global_rank == 0:
                 self.log('progressive/loss-rank-0', loss, prog_bar=False, sync_dist=False)
 
-        print(f"[Step {self.current_step}] loss_3", flush=True)
+        # print(f"[Step {self.current_step}] loss_3", flush=True)
         if self.training:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train")
         else:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val")
-        print(f"[Step {self.current_step}] loss_4", flush=True)
+        # print(f"[Step {self.current_step}] loss_4", flush=True)
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
                                                                                   outputs["full_global_conditions"]]
 
     def log_loss(self, loss, loss_head, loss_dict, prefix: str):
         for name, val in loss_head.items():
-            print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
+            # print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
             self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
 
         for name, val in loss_dict.items():
             for n, v in val.items():
                 if v is None:
-                    print(f"[Rank {self.global_rank}] Skipping log for {n}/{prefix}/{name}: value is None")
+                    # print(f"[Rank {self.global_rank}] Skipping log for {n}/{prefix}/{name}: value is None")
                     continue
                 if not torch.is_tensor(v):
                     v = torch.tensor(v, device=self.device)
                 if not torch.isfinite(v).all():
-                    print(f"[Rank {self.global_rank}] Non-finite value in {n}/{prefix}/{name}: {v}")
+                    # print(f"[Rank {self.global_rank}] Non-finite value in {n}/{prefix}/{name}: {v}")
                     continue
                 self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
-        print(f"[Step {self.current_step}] loss_3.3", flush=True)
+        # print(f"[Step {self.current_step}] loss_3.3", flush=True)
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         print(f"train batch end: {batch_idx}")
