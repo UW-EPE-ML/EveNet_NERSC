@@ -128,6 +128,10 @@ def calculate_B_C(
     # ✅ 1) B terms: for which, axis
     for which, axis in product(['A', 'B'], ['n', 'r', 'k']):
         key = f'B_{which}{axis}'
+
+        if key not in histograms:
+            continue
+
         h = histograms[key]
         mean, mean_err = mean_and_error(h['counts'], h['edges'], h['errors'])
         kappa = kappas[0] if which == 'A' else kappas[1]
@@ -140,6 +144,10 @@ def calculate_B_C(
     # ✅ 2) C terms: for ax1, ax2
     for ax1, ax2 in product(['n', 'r', 'k'], repeat=2):
         key = f'C_{ax1}{ax2}'
+
+        if key not in histograms:
+            continue
+
         h = histograms[key]
         mean, mean_err = mean_and_error(h['counts'], h['edges'], h['errors'])
         kappa_prod = kappas[0] * kappas[1]
@@ -233,6 +241,7 @@ def evaluate_quantum_results_with_uncertainties(results: dict, results_up: dict 
 def build_results(truth_result, recon_result):
     for df in [truth_result, recon_result]:
         df['m_tt'] = df['mass']
+        df['theta_cm'] = df['theta_cm']
 
         # 6 polarization terms: A_n, A_r, A_k, B_n, B_r, B_k
         for which, axis in product(['A', 'B'], ['n', 'r', 'k']):
