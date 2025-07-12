@@ -88,7 +88,7 @@ options:
       stages:
         - name: "masking point prediction"
 #          epoch_ratio: 0.1
-          epoch_ratio: 1.0
+          epoch_ratio: 0.0
           transition_ratio: 0.75
           loss_weights:
             generation-truth: [ 0.0, 0.0 ]
