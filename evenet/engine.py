@@ -409,7 +409,8 @@ class EveNetEngine(L.LightningModule):
         # print(f"[Step {self.current_step}] loss_3.3", flush=True)
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
-        print(f"train batch end: {batch_idx}")
+        # print(f"train batch end: {batch_idx}")
+        pass
 
 
     @time_decorator()
@@ -479,9 +480,9 @@ class EveNetEngine(L.LightningModule):
         #     gen_global_loss.mean().backward()
 
 
-        print(f"[Step {step}] Loss: {final_loss.item()}")
+        # print(f"[Step {step}] Loss: {final_loss.item()}")
         self.safe_manual_backward(loss.mean())
-        print(f"[Step {step}] Backward done")
+        # print(f"[Step {step}] Backward done")
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
@@ -886,14 +887,15 @@ class EveNetEngine(L.LightningModule):
         warmup_steps = warm_up_factor * self.steps_per_epoch
         self.total_steps = epochs * self.steps_per_epoch
 
-        print(f"--> Optimizer Configuration:")
-        print("word_size: ", world_size)
-        print("dataset_size: ", dataset_size)
-        print("steps_per_epoch: ", self.steps_per_epoch)
-        print("warmup_steps: ", warmup_steps)
-        print("total_steps: ", self.total_steps)
-        print("batch_size: ", batch_size)
-        print("warm_up_factor: ", warm_up_factor)
+        if self.global_rank == 0:
+            print(f"--> Optimizer Configuration:")
+            print("word_size: ", world_size)
+            print("dataset_size: ", dataset_size)
+            print("steps_per_epoch: ", self.steps_per_epoch)
+            print("warmup_steps: ", warmup_steps)
+            print("total_steps: ", self.total_steps)
+            print("batch_size: ", batch_size)
+            print("warm_up_factor: ", warm_up_factor)
 
         betas = (0.95, 0.99)
 
@@ -938,7 +940,8 @@ class EveNetEngine(L.LightningModule):
 
         optimizers, schedulers = [], []
         for name, modules in self.model_parts.items():
-            print(f"Configuring optimizer/scheduler for {name} with modules: {modules['modules']}")
+            if self.global_rank == 0:
+                print(f"Configuring optimizer/scheduler for {name} with modules: {modules['modules']}")
 
             if not modules:
                 continue
@@ -946,7 +949,8 @@ class EveNetEngine(L.LightningModule):
             params = [p for m in valid_modules for p in m.parameters()]
 
             if len(params) == 0:
-                print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
+                if self.global_rank == 0:
+                    print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
                 continue
 
             opt, sch = create_optim_schedule(
@@ -967,7 +971,8 @@ class EveNetEngine(L.LightningModule):
 
         # Add FAMO optimizer
         if hasattr(self.model, "famo") and hasattr(self.model.famo, "optimizer"):
-            print(f"[FAMO] --> Adding FAMO optimizer")
+            if self.global_rank == 0:
+                print(f"[FAMO] --> Adding FAMO optimizer")
             optimizers.append(self.model.famo.optimizer)
 
         # Add Scheduler
@@ -1007,11 +1012,13 @@ class EveNetEngine(L.LightningModule):
         if self.global_rank == 0:
             ema_enable = self.ema_cfg.get("enable", False)
             ema_replace = self.ema_cfg.get("replace_model_after_load", False)
-            print(f"[Model] --> EMA enabled: {ema_enable}")
-            print(f"[Model] --> EMA replace model after load: {ema_replace}")
+            if self.global_rank == 0:
+                print(f"[Model] --> EMA enabled: {ema_enable}")
+                print(f"[Model] --> EMA replace model after load: {ema_replace}")
 
             if self.pretrain_ckpt_path is not None:
-                print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
+                if self.global_rank == 0:
+                    print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
                 ckpt = torch.load(self.pretrain_ckpt_path, map_location=self.device)
 
                 if ema_enable and 'ema_state_dict' in ckpt and ema_replace:
@@ -1055,7 +1062,8 @@ class EveNetEngine(L.LightningModule):
                 }
             self.model_parts[group]['modules'].append(key)
 
-        print("model parts: ", self.model_parts)
+        if self.global_rank == 0:
+            print("model parts: ", self.model_parts)
 
         ### Initialize FAMO ###
         famo_task_list = ["classification", "regression", "assignment", "generation"]
@@ -1069,9 +1077,10 @@ class EveNetEngine(L.LightningModule):
             turn_on=self.include_famo,
             logits_bound=self.config.options.Training.FAMO.get("logits_bound", 1.0),
         ))
-        print(f"[FAMO] {self.__class__.__name__} FAMO Applied? --> {self.include_famo}")
-        print(f"[FAMO]  ✅FAMO✅ will be applied to {famo_task_list}!")
-        print(f"[FAMO]  ❌Transition❌ will turn off if FAMO applied!")
+        if self.global_rank == 0:
+            print(f"[FAMO] {self.__class__.__name__} FAMO Applied? --> {self.include_famo}")
+            print(f"[FAMO]  ✅FAMO✅ will be applied to {famo_task_list}!")
+            print(f"[FAMO]  ❌Transition❌ will turn off if FAMO applied!")
 
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)
@@ -1089,7 +1098,8 @@ class EveNetEngine(L.LightningModule):
         if self.ema_model is not None and self.ema_cfg.get("replace_model_at_end", False):
             ema_sd = {f"model.{k}": v for k, v in self.ema_model.state_dict().items()}
             checkpoint["state_dict"] = ema_sd
-            print("[Model] --> Saved EMA weights instead of current model weights")
+            if self.global_rank == 0:
+                print("[Model] --> Saved EMA weights instead of current model weights")
 
         # Always save EMA weights separately as well
         if self.ema_model is not None:
@@ -1098,10 +1108,12 @@ class EveNetEngine(L.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         if self.ema_model is not None and 'ema_state_dict' in checkpoint:
             self.ema_model.load_state_dict(checkpoint['ema_state_dict'], device=self.device)
-            print(f"[Model] --> Loading EMA model")
+            if self.global_rank == 0:
+                print(f"[Model] --> Loading EMA model")
             if self.ema_cfg.get("replace_model_after_load", False):
                 self.ema_model.copy_to(self.model)
-                print(f"[Model] --> Replacing model with EMA model after loading checkpoint")
+                if self.global_rank == 0:
+                    print(f"[Model] --> Replacing model with EMA model after loading checkpoint")
 
     def prepare_heads_loss(self):
         gradient_heads = {}
