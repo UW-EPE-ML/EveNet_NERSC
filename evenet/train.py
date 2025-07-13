@@ -135,6 +135,7 @@ def main(args):
             # "TORCH_NCCL_ASYNC_ERROR_HANDLING": "1",
             "TORCH_NCCL_TIMEOUT": "180",
             # "NCCL_DEBUG_SUBSYS": "ALL",
+            "TORCH_NCCL_TRACE_BUFFER_SIZE": "1000000",
         }
     }
 
