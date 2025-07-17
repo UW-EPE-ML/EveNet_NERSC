@@ -58,6 +58,18 @@ def compute_head_weights_per_process(product_mappings, pairing_topology) -> dict
         process_to_head_weights[process] = weights
     return process_to_head_weights
 
+def compute_segment_tags(product_mappings, pairing_topology, resonance_info) -> dict[str, dict[str, float]]:
+    process_to_segment_tags = {}
+    for process, particles in product_mappings.items():
+        process_to_segment_tags[process] = {}
+        for resonance_name, child_map in particles.items():
+            topology_key = build_topology_key(resonance_name, child_map)
+            if topology_key in pairing_topology:
+                process_to_segment_tags[process][resonance_name] = resonance_info[pairing_topology[topology_key]["pairing_topology_category"]][topology_key].get('segment_tag', 0)
+            else:
+                print(f"[warn] '{topology_key}' not found in pairing_topology")
+    return process_to_segment_tags
+
 
 class EventInfo:
     def __init__(
@@ -72,6 +84,7 @@ class EventInfo:
             product_particles: Dict[str, EventDict[str, Particles]],
 
             # Information about auxiliary values attached to this event.
+            segmentations: Dict[str, Dict[str, str]],
             regressions: FeynmanDict[str, List[RegressionInfo]],
             classifications: FeynmanDict[str, List[ClassificationInfo]],
             class_label: Dict[str, Dict],
@@ -135,6 +148,8 @@ class EventInfo:
                     max_indices = len(list(permutation_element))
                     if max_indices > self.max_event_particles:
                         self.max_event_particles = max_indices
+
+        self.segmentations = segmentations
 
         self.regressions = regressions
         self.regression_types = {
@@ -292,6 +307,11 @@ class EventInfo:
         self.process_to_topology: dict[str, dict[str, float]] = compute_head_weights_per_process(
             self.product_mappings, self.pairing_topology
         )
+        self.process_to_segment_tags: dict[str, dict[str, float]] = compute_segment_tags(
+            self.product_mappings, self.pairing_topology, self.resonance_info
+        )
+        self.total_segment_tags = max(v for _, tags in self.process_to_segment_tags.items() for v in tags.values()) + 1
+
 
     # def normalized_features(self, input_name: str) -> NDArray[bool]:
     #     return np.array([feature.normalize for feature in self.input_features[input_name]])
@@ -464,6 +484,11 @@ class EventInfo:
             event_particles_summary[process] = event_particles
             product_particles_summary[process] = product_particles
 
+        # Extract Segmentation Information.
+        # -------------------------------
+        segmentations = key_with_default(config, SpecialKey.Segmentations, default={})
+
+
         # Extract Regression Information.
         # -------------------------------
         regressions = key_with_default(config, SpecialKey.Regressions, default={})
@@ -511,11 +536,12 @@ class EventInfo:
             input_features,
             event_particles_summary,
             product_particles_summary,
+            segmentations,
             regressions,
             classifications,
             class_label,
             resonance_info,
             resonance_particle_property,
             generations,
-            invisible_input_features
+            invisible_input_features,
         )

@@ -324,6 +324,8 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
             base_mask = (n_lepton == n_gen_lepton) & (momentum.pt > 0)
             data_dict[f"{output_name}/MASK"] = ak.to_numpy(base_mask)
 
+            data_dict[f'SPECIAL/{product}'] = np.stack([ak.to_numpy(momentum)[f] for f in ('rho', 'eta', 'phi', 'tau')], axis=-1).astype(np.float32)
+
             if last_particle in neutrino_representation:
                 store_valid_components(
                     data_dict, output_name, momentum, data_dict[f"{output_name}/MASK"],

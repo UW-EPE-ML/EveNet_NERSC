@@ -194,7 +194,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     cutflows = {}
     for process in global_config.process_info:
-        # for process in ["TT2L"]:
+    # for process in ["TT2L"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -233,6 +233,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
         invisible = converter.load_invisible(max_num_neutrinos=global_config.get("max_neutrinos", 2))
 
+        segmentations = converter.load_segmentation(segment_tag_map=global_config.event_info.process_to_segment_tags)
+
         process_data = {
             'num_vectors': num_vectors,
             'num_sequential_vectors': num_sequential_vectors,
@@ -252,6 +254,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
             **assignments,
             **regressions,
+            **segmentations,
 
             'event_weight': analyze_weight(process_info[process], len(num_vectors)),
         }
@@ -314,6 +317,8 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             # subprocess_counts[list(total_subprocess.keys()).index(process)] = len(process_data['classification'])
             subprocess_counts[list(total_subprocess.keys()).index(process)] = sum(process_data['event_weight'])
 
+        segment_class_counts = np.sum(np.sum(process_data['segmentation-class'], axis=1) * process_data['event_weight'].reshape(-1, 1), axis=0)
+
         assignment_mask_per_process = {}
         assignment_idx = {key: i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
         for key, i in assignment_idx.items():
@@ -340,6 +345,9 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             subprocess_counts=subprocess_counts,
             invisible=process_data['x_invisible'],
             event_weight=process_data['event_weight'],
+
+            segment_class_counts=segment_class_counts,
+            segment_regression=process_data['segmentation-momentum'],
         )
         # Add assignment mask
         converted_statistics.add_assignment_mask(process, assignment_mask_per_process)
@@ -418,7 +426,6 @@ def run_parallel(cfg, cfg_dir, num_workers=8):
     # Merge cutflows
     cutflows = defaultdict(lambda: defaultdict(int))
 
-    print("results", results)
     for result in results:
         for process, cuts in result[1].items():
             for cut, count in cuts.items():

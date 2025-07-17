@@ -139,6 +139,7 @@ class SpecialKey(str, Enum):
     Inputs = "INPUTS"
     Targets = "TARGETS"
     Particle = "PARTICLE"
+    Segmentations = "SEGMENTATIONS"
     Regressions = "REGRESSIONS"
     Permutations = "PERMUTATIONS"
     Classifications = "CLASSIFICATIONS"

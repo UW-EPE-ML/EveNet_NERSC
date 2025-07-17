@@ -160,6 +160,7 @@ def merge_stats(stats_list):
         "regression": None,
         "input_num": None,
         "invisible": None,
+        'segment_regression': None,
     }
 
     for s in stats_list:
@@ -171,6 +172,7 @@ def merge_stats(stats_list):
 
     total['class_counts'] = np.sum([s["class_counts"] for s in stats_list], axis=0)
     total['subprocess_counts'] = np.sum([s["subprocess_counts"] for s in stats_list], axis=0)
+    total['segment_class_counts'] = np.sum([s["segment_class_counts"] for s in stats_list], axis=0)
 
     # Final result
     result = {
@@ -182,6 +184,10 @@ def merge_stats(stats_list):
         "class_balance": compute_classification_balance(total["class_counts"]),
         "subprocess_counts": total["subprocess_counts"],
         "subprocess_balance": compute_classification_balance(total["subprocess_counts"]),
+
+        "segment_class_counts": total["segment_class_counts"],
+        "segment_class_balance": compute_classification_balance(total["segment_class_counts"]),
+        "segment_regression": compute_mean_std(total["segment_regression"]),
 
         "invisible": compute_mean_std(total["invisible"]),
     }
@@ -294,11 +300,16 @@ class PostProcessor:
         self.assignment_mask = {p: [] for p in global_config.process_info}
         self.event_equivalence_classes = global_config.event_info.event_equivalence_classes
 
-    def add(self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible, event_weight=None):
+    def add(
+            self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible,
+            segment_class_counts, segment_regression,
+            event_weight=None
+    ):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]), None)
         cond_stats = masked_stats(conditions, None)
         regression_stats = masked_stats(regression, None)
         num_vectors_stats = masked_stats(num_vectors, None)
+        segment_regression_stats = masked_stats(segment_regression, None)
 
         if invisible.size == 0:
             reshaped = np.empty((0, invisible.shape[-1]))  # safe manual reshape
@@ -313,6 +324,8 @@ class PostProcessor:
             "input_num": num_vectors_stats,
             "class_counts": class_counts,
             "subprocess_counts": subprocess_counts,
+            "segment_class_counts": segment_class_counts,
+            "segment_regression": segment_regression_stats,
 
             "invisible": invisible_stats,
         })
@@ -365,6 +378,12 @@ class PostProcessor:
             'particle_balance': particle_balance,
             'subprocess_counts': torch.tensor(merged_stats["subprocess_counts"], dtype=torch.float32),
             'subprocess_balance': torch.tensor(merged_stats["subprocess_balance"], dtype=torch.float32),
+
+            'segment_class_counts': torch.tensor(merged_stats["segment_class_counts"], dtype=torch.float32),
+            'segment_class_balance': torch.tensor(merged_stats["segment_class_balance"], dtype=torch.float32),
+
+            'segment_regression_mean': torch.tensor(merged_stats["segment_regression"]["mean"], dtype=torch.float32),
+            'segment_regression_std': torch.tensor(merged_stats["segment_regression"]["std"], dtype=torch.float32),
 
             'invisible_mean': {
                 'Source': torch.tensor(merged_stats["invisible"]["mean"], dtype=torch.float32),

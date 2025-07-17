@@ -10,6 +10,8 @@ HadronicTop:
     nProduct_Jet: 3
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 1
 
 LeptonicTop:
   t/bl+:
@@ -19,6 +21,9 @@ LeptonicTop:
     nProduct_Jet: 1
     nProduct_Lepton: 1
     Product_LeptonCharge: 1
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 2
+
   t/bl-:
     Mass: 172.76
     Spin: 0.5
@@ -26,6 +31,8 @@ LeptonicTop:
     nProduct_Jet: 1
     nProduct_Lepton: 1
     Product_LeptonCharge: -1
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 2
 
   t/bl:
     Mass: 172.76
@@ -33,6 +40,8 @@ LeptonicTop:
     nProduct_BJet: 1
     nProduct_Jet: 1
     nProduct_Lepton: 1
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 2
 
 
 DiObjectDecay:
@@ -43,6 +52,9 @@ DiObjectDecay:
     nProduct_Jet: 2
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 3
+
   W+/qq:
 #    Mass: 80.38
     Spin: 1
@@ -50,6 +62,8 @@ DiObjectDecay:
     nProduct_Jet: 2
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 4
   W-/qq:
 #    Mass: 80.38
     Spin: 1
@@ -57,6 +71,8 @@ DiObjectDecay:
     nProduct_Jet: 2
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 4
   Z/qq:
     Mass: 91.19
     Spin: 1
@@ -64,6 +80,8 @@ DiObjectDecay:
     nProduct_Jet: 2
     nProduct_Lepton: 0
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 5
   Z/ll:
     Mass: 91.19
     Spin: 1
@@ -71,6 +89,8 @@ DiObjectDecay:
     nProduct_Jet: 0
     nProduct_Lepton: 2
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 6
 
 SingleVisibleDecay:
   W/l:
@@ -80,6 +100,8 @@ SingleVisibleDecay:
     nProduct_Jet: 0
     nProduct_Lepton: 1
     Product_LeptonCharge: 0
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 7
 
   W+/l+:
 #    Mass: 80.38
@@ -88,6 +110,8 @@ SingleVisibleDecay:
     nProduct_Jet: 0
     nProduct_Lepton: 1
     Product_LeptonCharge: 1
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 8
 
   W-/l-:
 #    Mass: 80.38
@@ -96,4 +120,5 @@ SingleVisibleDecay:
     nProduct_Jet: 0
     nProduct_Lepton: 1
     Product_LeptonCharge: -1
-
+    # this is for segmentation head, starting from 1 (0 is reserved for no decay)
+    segment_tag: 8

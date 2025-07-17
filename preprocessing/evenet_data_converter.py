@@ -25,6 +25,7 @@ class EveNetDataConverter:
         self.process = process
         self.rename_to = rename_to
         self.total_length = len(self.raw_data["INFO/VetoDoubleAssign"])
+        self.point_cloud_dim = self.raw_data['INPUTS/Source/MASK'].shape[1]
 
         if self.rename_to:
             for key in list(self.raw_data.keys()):
@@ -102,6 +103,47 @@ class EveNetDataConverter:
         output_dict["assignments-indices"] = full_indices
         output_dict["assignments-mask"] = full_mask
         output_dict["assignments-indices-mask"] = index_mask
+
+        return output_dict
+
+    def load_segmentation(self, segment_tag_map):
+        current_process = self.process if self.rename_to is None else self.rename_to
+
+        gen_momentum_label = f"SPECIAL/EVENT"
+
+        num_events = self.total_length
+        max_seg = self.event_info.total_segment_tags
+        max_event_seg = max(len(tags) for tags in segment_tag_map.values()) + 1
+
+        output_dict = {
+            'segmentation-class': np.zeros((num_events, max_event_seg, max_seg), dtype=int),
+            'segmentation-data': np.zeros((num_events, max_event_seg, self.point_cloud_dim), dtype=bool),
+            'segmentation-momentum': np.zeros((num_events, max_event_seg, 4), dtype=np.float32),
+            'segmentation-mask': np.zeros((num_events, max_event_seg), dtype=bool),
+        }
+
+        i = 0
+        for resonance, seg_tag in segment_tag_map.get(current_process, {}).items():
+            # one-hot encode the segmentation class
+            output_dict['segmentation-class'][:, i, seg_tag] = 1
+            output_dict['segmentation-mask'][:, i] = True
+            # fill the momentum if available
+            if f"{gen_momentum_label}/{resonance}" in self.raw_data:
+                output_dict['segmentation-momentum'][:, i, :] = self.raw_data[f"{gen_momentum_label}/{resonance}"]
+            # fill the assignment mask
+            # output_dict['segmentation-mask'][:, i, seg_tag] = 1
+            label = f"TARGETS/{current_process}/{resonance}/"
+            for children in [c for c in self.raw_data.keys() if c.startswith(label)]:
+                valid_mask = self.raw_data[children] >= 0
+                output_dict['segmentation-data'][
+                    np.arange(num_events)[valid_mask], i, self.raw_data[children][valid_mask]] = True
+            i += 1
+
+        # assign the last segment to the rest of the events
+        output_dict['segmentation-class'][:, i, 0] = 1
+        output_dict['segmentation-mask'][:, i] = True
+        others_true = np.any(np.delete(output_dict['segmentation-data'], i, axis=1), axis=1)
+        output_dict['segmentation-data'][:, i, :] = ~others_true
 
         return output_dict
 
@@ -287,4 +329,3 @@ class EveNetDataConverter:
         return {
             key: self.raw_data[key] for key in keys if key in self.raw_data
         }
-

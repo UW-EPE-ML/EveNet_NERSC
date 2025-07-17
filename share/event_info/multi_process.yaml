@@ -393,6 +393,17 @@ PERMUTATIONS:
     - [ ]
   HWW_WpLepWmHad:
     - [ ]
+
+# -----------------------------------------------------------------------------
+# REQUIRED - SEGMENTATIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+SEGMENTATIONS:
+  regression: # log and uniform normalization not implemented yet
+    pt: normalize # log_normalize
+    eta: normalize
+    phi: normalize_uniform
+    mass: normalize # log_normalize
+
 # ------------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired features to regress from observables.
 # ------------------------------------------------------------------------------
