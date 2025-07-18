@@ -1,0 +1,149 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250625.2700M"
+  number_of_workers: 500
+#  number_of_workers: 32
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+#  batch_size: 512
+  batch_size: 1024
+  prefetch_batches: 2
+
+wandb:
+  project: "Pretrain"
+  entity: "ytchou97-university-of-washington"
+  name: "Pretrain"
+  run_name: "nominal"
+  tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla" ]
+
+options:
+  default: options/options.yaml
+
+  Training:
+    total_epochs: 50
+    epochs: 25
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.long"
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/epoch=10_train=3.2997_val=3.5993.ckpt"
+    pretrain_model_load_path: null
+
+    diffusion_every_n_epochs: 10 # how often to run diffusion
+    diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
+
+    learning_rate: &lr 0.000018
+    #    learning_rate: &lr 0.000045
+    learning_rate_warm_up_factor: 2.0
+    weight_decay: &wd 0.001
+    optimizer_type_base: &opt "lion"
+    Components:
+      GlobalEmbedding:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      PET:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      ObjectEncoder:
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Classification:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Regression:
+        include: false
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      Assignment:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      GlobalGeneration:
+        include: false
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      ReconGeneration:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+      TruthGeneration:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
+
+    ProgressiveTraining:
+      stages:
+        - name: "masking point prediction"
+          epoch_ratio: 0.5
+          transition_ratio: 0.5
+          loss_weights:
+            generation-truth: [ 0.0, 0.0 ]
+            generation-recon: [ 1.0, 1.0 ]
+            classification: [ 0.0, 0.0 ]
+            classification-noised: [ 0.0, 0.0 ]
+            assignment: [ 0.0, 0.0 ]
+          train_parameters:
+            noise_prob: [ 0.3, 1.0 ]
+            reco_attn_mask: [ 1.0, 0.45 ]
+            ema_decay: [ 0.5, 0.9 ]
+
+        - name: "full-training"
+          epoch_ratio: 0.5
+          transition_ratio: 0.2
+          loss_weights:
+            generation-truth: [ 0.0, 1.0 ]
+            generation-recon: [ 1.0, 1.0 ]
+            classification: [ 0.0, 1.0 ]
+            classification-noised: [ 0.0, 1.0 ]
+            assignment: [ 0.0, 1.0 ]
+          train_parameters:
+            noise_prob: [ 1.0, 1.0 ]
+            reco_attn_mask: [ 0.0, 0.0 ]
+            ema_decay: [ 0.9, 0.999 ]
+
+
+    FAMO:
+      turn_on: false
+
+    EMA:
+      update_every_n_steps: 10
+
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250625.2700M/normalization.pt"
+    val_split: [ 0.7, 1.0 ]
+
+  Metrics:
+    Generation-Binning:
+      "global-HT": [ 50, 2, 8 ]
+
+network:
+  default: pretrain-config/network.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info/multi_process.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance/standard_model.yaml
+
+  # overwrites
+  # ...
