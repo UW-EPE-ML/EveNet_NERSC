@@ -364,7 +364,7 @@ class EveNetEngine(L.LightningModule):
 
         loss = torch.zeros(1, device=self.device, requires_grad=True)
 
-        if self.global_rank == 0: print(f"[Step {self.current_step}] loss_1", flush=True)
+        # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_1", flush=True)
         for name, loss_val in loss_raw.items():
             weight = task_weights.get(name, 0.0)
             loss_raw[name] = loss_val * weight
@@ -374,23 +374,23 @@ class EveNetEngine(L.LightningModule):
                     if self.global_rank == 0:
                         self.log(f'progressive/loss_weight/{name}', weight, prog_bar=False, sync_dist=False)
 
-        if self.global_rank == 0: print(f"[Step {self.current_step}] loss_2", flush=True)
+        # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_2", flush=True)
         if self.training:
             if self.global_rank == 0:
                 self.log('progressive/loss-rank-0', loss, prog_bar=False, sync_dist=False)
 
-        if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3", flush=True)
+        # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3", flush=True)
         if self.training:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train")
         else:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val")
-        if self.global_rank == 0: print(f"[Step {self.current_step}] loss_4", flush=True)
+        # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_4", flush=True)
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
                                                                                   outputs["full_global_conditions"]]
 
     def log_loss(self, loss, loss_head, loss_dict, prefix: str):
         for name, val in loss_head.items():
-            if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
+            # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
             if not self.training: self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
 
         for name, val in loss_dict.items():
@@ -406,7 +406,7 @@ class EveNetEngine(L.LightningModule):
                 if not self.training: self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
-        if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.3", flush=True)
+        # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.3", flush=True)
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         # print(f"train batch end: {batch_idx}")
