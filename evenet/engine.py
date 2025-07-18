@@ -391,7 +391,7 @@ class EveNetEngine(L.LightningModule):
     def log_loss(self, loss, loss_head, loss_dict, prefix: str):
         for name, val in loss_head.items():
             if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
-            self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=False)
+            if not self.training: self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
 
         for name, val in loss_dict.items():
             for n, v in val.items():
@@ -403,7 +403,7 @@ class EveNetEngine(L.LightningModule):
                 if not torch.isfinite(v).all():
                     # print(f"[Rank {self.global_rank}] Non-finite value in {n}/{prefix}/{name}: {v}")
                     continue
-                self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=False)
+                if not self.training: self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
 
         if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.3", flush=True)
