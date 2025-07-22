@@ -140,10 +140,12 @@ class EveNetDataConverter:
             i += 1
 
         # assign the last segment to the rest of the events
-        output_dict['segmentation-class'][:, i, 0] = 1
-        output_dict['segmentation-mask'][:, i] = True
-        others_true = np.any(np.delete(output_dict['segmentation-data'], i, axis=1), axis=1)
-        output_dict['segmentation-data'][:, i, :] = ~others_true
+        # output_dict['segmentation-class'][:, i, 0] = 1
+        # output_dict['segmentation-mask'][:, i] = True
+        # others_true = np.any(np.delete(output_dict['segmentation-data'], i, axis=1), axis=1)
+        # output_dict['segmentation-data'][:, i, :] = ~others_true
+
+        output_dict['segmentation-class'][:, i:, 0] = True
 
         return output_dict
 
