@@ -86,6 +86,12 @@ class EveNetEngine(L.LightningModule):
         self.target_regression_mask_key = 'regression-mask'
         self.target_assignment_key = 'assignments-indices'
         self.target_assignment_mask_key = 'assignments-mask'
+        self.target_segmentation_cls_key = 'segmentation-class'
+        self.target_segmentation_reg_key = 'segmentation-momentum'
+        self.target_segmentation_data_mask_key = 'segmentation-data-mask'
+        self.target_segmentation_mask_key = 'segmentation-mask'
+
+
 
         ###### Initialize Model Components Configs #####
         self.component_cfg = global_config.options.Training.Components
@@ -96,6 +102,7 @@ class EveNetEngine(L.LightningModule):
         self.global_generation_cfg = self.component_cfg.GlobalGeneration
         self.recon_generation_cfg = self.component_cfg.ReconGeneration
         self.truth_generation_cfg = self.component_cfg.TruthGeneration
+        self.segementation_cfg = self.component_cfg.Segmentation
         self.generation_include = self.global_generation_cfg.include or self.recon_generation_cfg.include or self.truth_generation_cfg.include
 
         ###### Initialize Normalizations and Balance #####
@@ -107,6 +114,8 @@ class EveNetEngine(L.LightningModule):
         self.class_weight = self.balance_dict["class_balance"]
         self.assignment_weight = self.balance_dict["particle_balance"]
         self.subprocess_balance = self.balance_dict["subprocess_balance"]
+        self.segmentation_cls_balance = self.balance_dict["segment_class_balance"]
+
 
         self.l.info(f"normalization dicts initialized")
 
@@ -159,6 +168,12 @@ class EveNetEngine(L.LightningModule):
             )
             self.ass_loss = assignment_loss_partial
             self.l.info(f"assignment loss initialized")
+
+        self.seg_loss = None
+        if self.segmentation_cfg.include:
+            import evenet.network.loss.segmentation as seg_loss
+            self.seg_loss = seg_loss
+            print(f"{self.__class__.__name__} segmentation loss initialized")
 
         self.gen_loss = None
         if self.generation_include:
@@ -1093,6 +1108,7 @@ class EveNetEngine(L.LightningModule):
             point_cloud_generation=self.recon_generation_cfg.include,
             neutrino_generation=self.truth_generation_cfg.include,
             assignment=self.assignment_cfg.include,
+            segmentation=self.segementation_cfg.include,
             normalization_dict=self.normalization_dict,
         )
 
