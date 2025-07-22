@@ -110,6 +110,17 @@ class EventInfo:
         self.process_names = list(self.event_particles.keys())
         self.resonance_info = resonance_info
         self.resonance_particle_properties = resonance_particle_properties
+        self.segmentation_indices = []# 0: null class
+        for decay_mode in self.resonance_info:
+            for decay_channel in self.resonance_info[decay_mode]:
+                if 'segment_tag' in self.resonance_info[decay_mode][decay_channel]:
+                    segment_tag = self.resonance_info[decay_mode][decay_channel]['segment_tag']
+                    if segment_tag not in self.segmentation_indices:
+                        self.segmentation_indices.append(segment_tag)
+
+        print(f"Resonance)   Info: {self.resonance_info}")
+        print(f"Resonance Particle Properties: {self.resonance_particle_properties}")
+
         self.generations = generations
         self.invisible_input_features = invisible_input_features
 

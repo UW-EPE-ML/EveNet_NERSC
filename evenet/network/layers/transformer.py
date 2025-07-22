@@ -6,6 +6,7 @@ from evenet.network.layers.utils import TalkingHeadAttention, StochasticDepth, L
 from evenet.network.layers.linear_block import GRUGate, GRUBlock
 from evenet.network.layers.activation import create_residual_connection
 
+from typing import Optional
 
 class TransformerBlockModule(nn.Module):
     def __init__(self, projection_dim, num_heads, dropout, talking_head, layer_scale, layer_scale_init,
@@ -329,3 +330,68 @@ class GeneratorTransformerBlockModule(nn.Module):
         cond_token = x2 + x3
 
         return x, cond_token
+
+class SegmentationTransformerBlockModule(nn.Module):
+    def __init__(self,
+        projection_dim: int,
+        num_heads: int,
+        dropout: float,
+    ):
+
+        """
+        Transformer block for segmentation tasks. Adopt from DETR architecture. https://github.com/facebookresearch/detr/blob/main/models/transformer.py#L127
+        """
+        super().__init__()
+
+        self.projection_dim = projection_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+
+        self.norm1 = nn.LayerNorm(projection_dim)
+        self.norm2 = nn.LayerNorm(projection_dim)
+        self.norm3 = nn.LayerNorm(projection_dim)
+
+        self.self_attn = nn.MultiheadAttention(self.projection_dim, self.num_heads, self.dropout, batch_first=True)
+        self.dropout1 = nn.Dropout(self.dropout)
+
+        self.multihead_attn = nn.MultiheadAttention(self.projection_dim, self.num_heads, self.dropout, batch_first=True)
+        self.dropout2 = nn.Dropout(self.dropout)
+        self.mlp = nn.Sequential(
+            nn.Linear(projection_dim, 2 * projection_dim),
+            nn.GELU(approximate='none'),
+            nn.Dropout(self.dropout),
+            nn.Linear(2 * projection_dim, projection_dim),
+        )
+        self.dropout3 = nn.Dropout(self.dropout)
+
+    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
+        return tensor if pos is None else tensor + pos
+
+    def forward(self,
+                tgt, memory,
+                tgt_mask: Optional[Tensor] = None,
+                memory_mask: Optional[Tensor] = None,
+                tgt_key_padding_mask: Optional[Tensor] = None,
+                memory_key_padding_mask: Optional[Tensor] = None,
+                pos: Optional[Tensor] = None,
+                query_pos: Optional[Tensor] = None):
+        """
+        Forward pass of the transformer block.
+        """
+
+        q = k = self.with_pos_embed(tgt, query_pos)
+        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
+        tgt = tgt + self.dropout1(tgt2)
+        tgt = self.norm1(tgt)
+        tgt2 = self.multihead_attn(
+            query=self.with_pos_embed(tgt, query_pos),
+            key=self.with_pos_embed(memory, pos),
+            value=memory, attn_mask=memory_mask,
+            key_padding_mask=memory_key_padding_mask)[0]
+        tgt = tgt + self.dropout2(tgt2)
+        tgt = self.norm2(tgt)
+        tgt2 = self.mlp(tgt)
+        tgt = tgt + self.dropout3(tgt2)
+        tgt = self.norm3(tgt)
+        return tgt
+

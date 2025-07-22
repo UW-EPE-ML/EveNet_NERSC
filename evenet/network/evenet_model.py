@@ -10,6 +10,7 @@ from evenet.network.body.object_encoder import ObjectEncoder
 from evenet.network.heads.classification.classification_head import ClassificationHead, RegressionHead
 from evenet.network.heads.assignment.assignment_head import SharedAssignmentHead
 from evenet.network.heads.generation.generation_head import GlobalCondGenerationHead, EventGenerationHead
+from evenet.network.heads.segmentation.segmentation_head import SegmentationHead
 from evenet.utilities.diffusion_sampler import get_logsnr_alpha_sigma
 from evenet.network.layers.debug_layer import PointCloudTransformer
 from evenet.utilities.group_theory import complete_indices
@@ -33,6 +34,7 @@ class EveNetModel(nn.Module):
             point_cloud_generation: bool = False,
             neutrino_generation: bool = False,
             assignment: bool = False,
+            segmentation: bool = False,
             normalization_dict: dict = None,
     ):
         super().__init__()
@@ -47,6 +49,7 @@ class EveNetModel(nn.Module):
         self.include_point_cloud_generation = point_cloud_generation
         self.include_neutrino_generation = neutrino_generation
         self.include_assignment = assignment
+        self.include_segmentation = segmentation
         self.device = device
 
         # self.normalization_dict = normalization_dict
@@ -286,6 +289,19 @@ class EveNetModel(nn.Module):
                 max_position_length=self.network_cfg.TruthGeneration.max_position_length
             )
             self.neutrino_position_encode = self.network_cfg.TruthGeneration.neutrino_position_encode
+
+        # [7] Segmentation Head
+        if self.include_segmentation:
+            self.Segmentation = SegmentationHead(
+                projection_dim = self.network_cfg.Segmentation.projection_dim,
+                num_heads = self.network_cfg.Segmentation.num_heads,
+                num_layers = self.network_cfg.Segmentation.num_layers,
+                num_class = len(self.event_info.segmentation_indices), # TODO
+                num_queries = self.network_cfg.Segmentation.num_queries,
+                return_intermediate = self.network_cfg.Segmentation.return_intermediate,
+                dim_decay_rate = self.network_cfg.Segmentation.dim_decay_rate,
+                dropout= self.network_cfg.Segmentation.dropout
+            )
 
         self.schedule_flags = [
             ("generation", self.include_point_cloud_generation),
@@ -537,6 +553,14 @@ class EveNetModel(nn.Module):
                         return_type="process_base"
                     )
 
+                segmentation_cls = None
+                segmentation_mask = None
+                if self.include_segmentation:
+                    segmentation_cls, segmentation_mask = self.Segmentation(
+                        memory = embeddings,
+                        memory_mask = full_input_point_cloud_mask,
+                    )
+
                 # Classification head
                 classifications = None
                 if self.include_classification:
@@ -551,7 +575,9 @@ class EveNetModel(nn.Module):
                     "classification": classifications,
                     "regression": regressions,
                     "assignments": assignments,
-                    "detections": detections
+                    "detections": detections,
+                    "segmentation-cls": segmentation_cls,
+                    "segmentation_mask": segmentation_mask
                 }
 
             #######################################
@@ -604,7 +630,9 @@ class EveNetModel(nn.Module):
             "generations": generations,
             "full_input_point_cloud": full_input_point_cloud,
             "full_global_conditions": full_global_conditions,
-            "alpha": alpha
+            "alpha": alpha,
+            "segmentation-cls": outputs.get("deterministic", {}).get("segmentation-cls", None),
+            "segmentation_mask": outputs.get("deterministic", {}).get("segmentation_mask", None),
         }
 
     def predict_diffusion_vector(
