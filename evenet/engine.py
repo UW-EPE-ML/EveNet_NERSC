@@ -264,6 +264,8 @@ class EveNetEngine(L.LightningModule):
             schedules=[(key, value) for key, value in schedules.items()],
         )
 
+        print(outputs)
+
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
         if self.classification_cfg.include and outputs["classification"]:
