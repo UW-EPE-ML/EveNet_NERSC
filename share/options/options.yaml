@@ -177,6 +177,7 @@ Training:
           classification-noised: [ 1.0, 1.0 ]
           regression: [ 1.0, 1.0 ]
           assignment: [ 1.0, 1.0 ]
+          segmentation: [ 1.0, 1.0 ]
         train_parameters:
           noise_prob: [ 1.0, 1.0 ]
           reco_attn_mask: [ 0.0, 0.0 ]
@@ -192,6 +193,7 @@ Training:
           classification-noised: [ 1.0, 1.0 ]
           regression: [ 0.0, 0.0 ]
           assignment: [ 0.0, 0.0 ]
+          segmentation: [ 1.0, 1.0 ]
         train_parameters:
           noise_prob: [ 0.0, 0.0 ]
           reco_attn_mask: [ 0.0, 0.0 ]
