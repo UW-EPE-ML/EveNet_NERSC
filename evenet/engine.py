@@ -260,6 +260,7 @@ class EveNetEngine(L.LightningModule):
                                      task_weights.get("classification", 0)
                                      + task_weights.get("regression", 0)
                                      + task_weights.get("assignment", 0)
+                                     + task_weights.get("segmentation", 0)
                              ) > 0,
         }
 
@@ -290,8 +291,6 @@ class EveNetEngine(L.LightningModule):
             train_parameters=train_parameters,
             schedules=[(key, value) for key, value in schedules.items()],
         )
-
-        print(outputs)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
