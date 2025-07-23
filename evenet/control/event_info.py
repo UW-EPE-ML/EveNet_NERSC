@@ -118,9 +118,6 @@ class EventInfo:
                     if segment_tag not in self.segmentation_indices:
                         self.segmentation_indices.append(segment_tag)
 
-        print(f"Resonance)   Info: {self.resonance_info}")
-        print(f"Resonance Particle Properties: {self.resonance_particle_properties}")
-
         self.generations = generations
         self.invisible_input_features = invisible_input_features
 

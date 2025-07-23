@@ -104,6 +104,21 @@ Training:
         partial_freeze_components: [ ]
         random_freeze_fraction: 0.0
 
+    Segmentation:
+      learning_rate: *lr
+      optimizer_group: "assignment"
+      optimizer_type: "lion"
+      warm_up: true
+      segmentation_loss_scale: 1.0
+      focal_gamma: 1.0
+      include: false # whether to build in network
+      weight_decay: *wd
+      decoupled_weight_decay: *decouple_wd
+      freeze:
+        type: none # ['partial', 'full', 'none', 'random']
+        partial_freeze_components: [ ]
+        random_freeze_fraction: 0.0
+
     GlobalGeneration:
       learning_rate: *lr
       optimizer_group: "generation"
