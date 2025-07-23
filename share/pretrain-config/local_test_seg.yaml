@@ -5,7 +5,7 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 256
+  batch_size: 1024
   prefetch_batches: 2
 
 wandb:
@@ -45,7 +45,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
       Classification:
-        include: true
+        include: false
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -87,9 +87,9 @@ options:
           transition_ratio: 0.1
           loss_weights:
             generation: [ 0.0, 0.5 ]
-            classification: [ 0.0, 0.0 ]
-            classification-noised: [ 0.0, 0.0 ]
-            regression: [ 1.0, 1.0 ]
+            classification: [ 0.0, 1.0 ]
+            classification-noised: [ 0.0, 1.0 ]
+            regression: [ 0.0, 0.0 ]
             assignment: [ 1.0, 1.0 ]
           train_parameters:
             noise_prob: [1.0, 1.0]
@@ -110,7 +110,7 @@ options:
       lr: 0.025
 
   Dataset:
-    dataset_limit: 0.01
+    dataset_limit: 0.1
     normalization_file: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset//normalization.pt"
     val_split: [ 0.7, 1.0 ]
 
