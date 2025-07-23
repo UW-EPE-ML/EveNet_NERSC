@@ -102,7 +102,7 @@ class EveNetEngine(L.LightningModule):
         self.global_generation_cfg = self.component_cfg.GlobalGeneration
         self.recon_generation_cfg = self.component_cfg.ReconGeneration
         self.truth_generation_cfg = self.component_cfg.TruthGeneration
-        self.segementation_cfg = self.component_cfg.Segmentation
+        self.segmentation_cfg = self.component_cfg.Segmentation
         self.generation_include = self.global_generation_cfg.include or self.recon_generation_cfg.include or self.truth_generation_cfg.include
 
         ###### Initialize Normalizations and Balance #####
@@ -290,6 +290,8 @@ class EveNetEngine(L.LightningModule):
             train_parameters=train_parameters,
             schedules=[(key, value) for key, value in schedules.items()],
         )
+
+        print(outputs)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
@@ -1108,7 +1110,7 @@ class EveNetEngine(L.LightningModule):
             point_cloud_generation=self.recon_generation_cfg.include,
             neutrino_generation=self.truth_generation_cfg.include,
             assignment=self.assignment_cfg.include,
-            segmentation=self.segementation_cfg.include,
+            segmentation=self.segmentation_cfg.include,
             normalization_dict=self.normalization_dict,
         )
 
