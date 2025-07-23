@@ -36,6 +36,7 @@ def make_process_fn(base_dir: Path):
         "Assignment": "assignment-",
         # "TruthGeneration": "event_generation-",
         # "ReconGeneration": "event_generation-",
+        "Segmentation": "segmentation-",
     }
 
     for name, prefix in component_map.items():
