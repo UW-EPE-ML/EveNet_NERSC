@@ -15,7 +15,7 @@ wandb:
   tags: [ "Pretrain", "NERSC", "Multi-Node", "135M", "Diffusion", "Vanilla" ]
 
 options:
-  default: options.yaml
+  default: options-seg.yaml
 
   Training:
     total_epochs: 10
@@ -79,6 +79,12 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: *opt
+      Segmentation:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
 
     ProgressiveTraining:
       stages:
@@ -91,6 +97,7 @@ options:
             classification-noised: [ 0.0, 1.0 ]
             regression: [ 0.0, 0.0 ]
             assignment: [ 1.0, 1.0 ]
+            segmentation: [1.0, 1.0]
           train_parameters:
             noise_prob: [1.0, 1.0]
             reco_attn_mask: [0.0, 0.0]
