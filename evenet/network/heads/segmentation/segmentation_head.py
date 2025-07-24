@@ -195,6 +195,7 @@ class SegmentationHead(nn.Module):
             num_layers=num_layers,
             return_intermediate=return_intermediate,
         )
+        self.num_queries = num_queries
         self.query_embed = nn.Embedding(num_queries, projection_dim)
 
         self.mask_attention = MHAttentionMapPointCloud(
@@ -248,7 +249,10 @@ class SegmentationHead(nn.Module):
         pred_mask = self.mask_decoder(
             q = memory,
             bbox_mask = mask_attention
-        )
+        ) # (B, N, P)
+
+        memory_mask.squeeze(-1).unsqueeze(1).repeat(1, self.num_queries, 1)
+        pred_mask = pred_mask * memory_mask
 
         pred_class = self.class_embed(hs[-1])
 

@@ -26,6 +26,7 @@ from evenet.network.metrics.assignment import shared_step as ass_step, shared_ep
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
+from evenet.network.metrics.segmentation import shared_step as seg_step, shared_epoch_end as seg_end
 from evenet.network.loss.famo import FAMO
 from evenet.utilities.ema import EMA
 
@@ -406,6 +407,29 @@ class EveNetEngine(L.LightningModule):
                 loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
             if "generation-recon" in loss_head_dict:
                 loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
+
+        if self.segmentation_cfg.include and outputs["segmentation-cls"]:
+            seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
+            seg_target_mask = batch[self.target_segmentation_data_mask_key].to(device=device)
+            seg_mask = batch[self.target_segmentation_mask_key].to(device=device)
+            class_weight = batch[self.target_segmentation_cls_weight_key].to(device=device)
+            scaled_seg_loss = seg_step(
+                target_classification = seg_targets_cls,
+                target_mask = seg_target_mask,
+                predict_classification = outputs["segmentation-cls"],
+                predict_mask= outputs["segmentation-mask"],
+                segmentation_mask=seg_mask,
+                point_cloud_mask=inputs['x_mask'],
+                seg_loss_fn=self.seg_loss,
+                class_weight=class_weight,
+                loss_dict = loss_head_dict,
+                mask_loss_scale = self.segmentation_cfg.mask_loss_scale,
+                dice_loss_scale =  self.segmentation_cfg.dice_loss_scale,
+                cls_loss_scale = self.segmentation_cfg.cls_loss_scale,
+                loss_name = "segmentation"
+            )
+            loss_raw["segmentation"] = scaled_seg_loss
+
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)
 
@@ -1252,6 +1276,10 @@ class EveNetEngine(L.LightningModule):
                 f'assignment_{name}': torch.zeros(1, device=self.device, requires_grad=True)
                 for name in assignment_heads.keys()
             })
+
+        if self.segmentation_cfg.include:
+            gradient_heads["segmentation"] = self.model.Segmentation
+            loss_heads["segmentation"] = torch.zeros(1, device=self.device, requires_grad=True)
 
         return gradient_heads, loss_heads
 

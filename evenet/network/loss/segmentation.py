@@ -5,6 +5,24 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch_linear_assignment import batch_linear_assignment, assignment_to_indices
 
+
+def DICE_loss(inputs, targets, mask):
+    """
+    Compute the DICE loss, similar to generalized IOU for masks
+    Args:
+        inputs: A float tensor of arbitrary shape.
+                The predictions for each example.
+        targets: A float tensor with the same shape as inputs. Stores the binary
+                 classification label for each element in inputs
+                (0 for the negative class and 1 for the positive class).
+    """
+    inputs = inputs.sigmoid() # (B, *, P)
+    numerator = 2 * (inputs * targets).sum(-1) # (B, *)
+    denominator = inputs.sum(-1) + targets.sum(-1)
+    loss = 1 - (numerator + 1) / (denominator + 1)
+    loss = loss * mask.float() # (B, *)
+    return loss
+
 def sigmoid_focal_loss(inputs, targets, mask = None, alpha: float = 0.25, gamma: float = 2):
     """
     Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
@@ -24,16 +42,16 @@ def sigmoid_focal_loss(inputs, targets, mask = None, alpha: float = 0.25, gamma:
         Loss tensor (B, N) where B is the batch size and N is the number of elements in each example.
     """
     prob = inputs.sigmoid()
-    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none") # (B, N, P)
+    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none") # (B, *, P)
     p_t = prob * targets + (1 - prob) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
     if alpha >= 0:
         alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
-        loss = alpha_t * loss # (B, N, P)
+        loss = alpha_t * loss # (B, *, P)
 
     if mask is not None:
-        loss = loss * mask.float().unsqueeze(-1)  # (B, N, P)
+        loss = loss * (mask.float().unsqueeze(-1))  # (B, *, P)
 
     return loss
 
@@ -66,17 +84,30 @@ def hungarian_matching(
     target_mask_expanded = target_mask.unsqueeze(1).repeat(1, num_queries, 1, 1)  # (B, N_pred, N_tgt, P)
     segmentation_mask_expanded = segmentation_mask.unsqueeze(1).repeat(1, num_queries, 1) if segmentation_mask is not None else None # (B, N_pred, N_tgt)
 
+    predict_cls_expanded = predict_cls.softmax(-1).unsqueeze(2).repeat(1, 1, num_queries, 1)  # (B, N_pred, N_tgt, P)
+    target_cls_expanded = target_cls.unsqueeze(1).repeat(1, num_queries, 1, 1) # (B, N_pred, N_tgt, P)
+
+
+    # mask_cost = sum{c!=null}L_{mask}(pred, tgt)
     mask_cost = sigmoid_focal_loss(
         inputs = predict_mask_expanded,
         targets = target_mask_expanded,
-        mask = None,
-        alpha = 1,
-        gamma = 1
+        mask = segmentation_mask_expanded,
     ) # (B, N_pred, N_tgt, P)
+    mask_cost = mask_cost.sum(dim=-1)   # Sum over the last dimension (P) to get (B, N, N)
 
-    mask_cost = mask_cost.sum(dim=-1)  # Sum over the last dimension (P) to get (B, N, N)
 
-    src_indices, tgt_indices = assignment_to_indices(batch_linear_assignment(mask_cost))
+    dice_cost = DICE_loss(
+        inputs = predict_cls_expanded,
+        targets = target_cls_expanded,
+        mask = segmentation_mask_expanded,
+    ) # (B,  N_pred, N_tgt)
+
+    class_cost = -(predict_cls_expanded * target_cls_expanded) # (B, N, N)
+
+    total_cost = class_cost + mask_cost + dice_cost
+
+    src_indices, tgt_indices = assignment_to_indices(batch_linear_assignment(total_cost))
 
     return src_indices, tgt_indices
 
@@ -90,6 +121,7 @@ def loss(
         target_mask,
         class_weight=None,
         segmentation_mask=None,
+        point_cloud_mask = None,
         reduction='none'
     ):
     """
@@ -101,11 +133,13 @@ def loss(
         target_mask (Tensor): (B, N, P) mask labels
         class_weight (Tensor, optional): (C,) class weights
         segmentation_mask (Tensor, optional): (B, N) mask to ignore certain pixels
+        point_cloud_mask (Tensor, optional): (B, P, 1) mask to ignore certain pixels
         reduction (str): 'none', 'mean', or 'sum'
 
     Returns:
-        Tensor: (B,N) if reduction='none', else scalar
+        Tensor: (B,) if reduction is 'none' (i.e. no reduction applied),)
     """
+    bs, num_queries, num_patch = predict_mask.shape
 
     with torch.no_grad():
         pred_indices, tgt_indices = hungarian_matching(
@@ -122,15 +156,45 @@ def loss(
     target_mask_best = target_mask[tgt_indices]  # (B, N, P)
     predict_class_best = predict_cls[pred_indices]  # (B, N, C)
     target_class_best = target_cls[tgt_indices]  # (B, N, C)
-    target_mask_best = target_mask[tgt_indices]  # (B, N)
+    segmentation_mask_best = segmentation_mask[tgt_indices]  # (B, N)
+    point_cloud_mask = point_cloud_mask.squeeze(-1) if point_cloud_mask is not None else None
 
+    mask_loss = sigmoid_focal_loss(
+        inputs = predict_mask_best,
+        targets = target_mask_best,
+        mask = segmentation_mask_best,
+    ) # (B, N, P)
 
+    if point_cloud_mask is not None:
+        mask_loss = mask_loss.sum(-1) / (point_cloud_mask.sum(-1) + 1e-6) # (B, N)
+    else:
+        mask_loss = mask_loss.mean(-1) # (B, N)
 
+    if segmentation_mask is not None:
+        mask_loss = mask_loss.sum(-1) / (segmentation_mask.sum(-1) + 1e-6) # (B, )
+    else:
+        mask_loss = mask_loss.mean(-1)
 
-    return F.cross_entropy(
-        input=predict,
-        target=target,
+    dice_loss = DICE_loss(
+        inputs = predict_mask_best,
+        targets = target_mask_best,
+        mask = segmentation_mask_best,
+    ) # (B, N)
+
+    if segmentation_mask is not None:
+        dice_loss = dice_loss.sum(-1) / (segmentation_mask.sum(-1) + 1e-6)
+    else:
+        dice_loss = dice_loss.mean(-1) # (B,)
+
+    class_loss = F.cross_entropy(
+        input=predict_class_best,
+        target=torch.argmax(target_class_best, -1), # TODO: check
         weight=class_weight,
-        reduction=reduction,
+        reduction="none",
         ignore_index=-1,
-    )
+    ) # (B,)
+
+    if reduction == "none":
+        return mask_loss, dice_loss, class_loss
+    else:
+        return mask_loss.mean(), dice_loss.mean(), class_loss.mean()
