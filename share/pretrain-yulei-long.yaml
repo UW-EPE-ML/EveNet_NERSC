@@ -10,12 +10,17 @@ platform:
   batch_size: 1024
   prefetch_batches: 2
 
-wandb:
-  project: "Pretrain"
-  entity: "ytchou97-university-of-washington"
-  name: "Pretrain"
-  run_name: "nominal"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla" ]
+logger:
+  wandb:
+    project: "Pretrain"
+    entity: "ytchou97-university-of-washington"
+    name: "Pretrain"
+    run_name: &logger_name "nominal"
+    tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla" ]
+  local:
+    save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
+    name: *logger_name
+    version: "v0"
 
 options:
   default: options/options.yaml
