@@ -12,6 +12,7 @@ import matplotlib.colors as mcolors
 import torch.nn.functional as F
 
 from evenet.utilities.debug_tool import time_decorator
+import logging
 
 
 class ClassificationMetrics:
@@ -24,6 +25,7 @@ class ClassificationMetrics:
         self.matrix = np.zeros((num_classes, num_classes), dtype=np.int64)
         self.valid = 0
         self.total = 0
+        self.l = logging.getLogger("ClassificationMetrics")
 
         # for logits histogram
         self.bins = np.linspace(0, 1, num_bins + 1)
@@ -225,7 +227,6 @@ class ClassificationMetrics:
 
             results[true_cls] = fig
 
-
         # === 2. ROC Plot ===
         for target_cls in range(self.num_classes):
             fig_roc, ax_roc = plt.subplots(figsize=(8, 6))
@@ -254,7 +255,7 @@ class ClassificationMetrics:
                 weights_valid = np.concatenate([weights_valid, counts_valid])
 
             if weights.sum() == 0 or weights_valid.sum() == 0:
-                print(f"Warning: No data for target class {target_cls}. Skipping ROC plot.")
+                self.l.warning(f"Warning: No data for target class {target_cls}. Skipping ROC plot.")
                 continue
             fpr, tpr, _ = roc_curve(y_true_list, y_score_list, sample_weight=weights)
             roc_auc = auc(fpr, tpr)
@@ -303,9 +304,9 @@ def shared_step(
         reduction="none",
     )
     if event_weight is not None:
-        cls_loss  = cls_loss * event_weight
+        cls_loss = cls_loss * event_weight
         cls_loss = cls_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-    else:# Sum over classes if multi-class
+    else:  # Sum over classes if multi-class
         cls_loss = cls_loss.mean()
 
     loss = cls_loss * loss_scale
@@ -327,7 +328,7 @@ def shared_epoch_end(
         metrics_train: ClassificationMetrics,
         num_classes: list[str],
         logger,
-        module = None,
+        module=None,
         prefix: str = "",
 ):
     metrics_valid.reduce_across_gpus()

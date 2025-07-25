@@ -20,7 +20,7 @@ from ray.train import Checkpoint
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
 from preprocessing.preprocess import unflatten_dict
-
+import logging
 
 def make_process_fn(base_dir: Path):
     """Creates a partial function for batch preprocessing."""
@@ -43,7 +43,7 @@ def make_process_fn(base_dir: Path):
         if drop_column_prefix and not getattr(component, "include", False):
             drop_column_prefix.append(prefix)
 
-    print(f"Drop column prefixes: {drop_column_prefix}")
+    logging.warning(f"Dropping columns: {drop_column_prefix}")
 
     return partial(
         process_event_batch,

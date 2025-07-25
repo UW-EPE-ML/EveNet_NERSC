@@ -6,6 +6,7 @@ from torch import Tensor
 import torch
 import torch.nn as nn
 from collections import OrderedDict
+import logging
 
 
 def gather_index(x: Union[Dict, Tensor, List, None], index: Tensor):
@@ -104,13 +105,15 @@ def print_params_used_by_loss(loss, model, include_shapes=True, verbose=True):
 
 
 def safe_load_state(model: nn.Module, state_dict: dict, prefix_to_strip: str = "model.", verbose=True) -> None:
+    logger = logging.getLogger(f"{__name__}.safe_load_state")
+
     # Strip prefix (e.g., "model.")
     clean_sd = {k.replace(prefix_to_strip, ""): v for k, v in state_dict.items()}
 
     for k, v in clean_sd.items():
         if "_normalizer" in k:
             if verbose:
-                print(f"[safe_load_state] ⚠️ Ignored normalizer parameter: {k}")
+                logger.warning(f"[safe_load_state] ⚠️ Ignored normalizer parameter: {k}")
     clean_sd = {k: v for k, v in clean_sd.items() if "_normalizer" not in k}
 
     model_sd = model.state_dict()
@@ -120,12 +123,12 @@ def safe_load_state(model: nn.Module, state_dict: dict, prefix_to_strip: str = "
             if v.shape == model_sd[k].shape:
                 filtered_sd[k] = v
             elif verbose:
-                print(f"[safe_load_state] ⚠️ Shape mismatch: {k} (ckpt: {v.shape}, model: {model_sd[k].shape})")
+                logger.warning(f"[safe_load_state] ⚠️ Shape mismatch: {k} (ckpt: {v.shape}, model: {model_sd[k].shape})")
         elif verbose:
-            print(f"[safe_load_state] ⚠️ Unmatched key (ignored): {k}")
+            logger.warning(f"[safe_load_state] ⚠️ Unmatched key (ignored): {k}")
 
     missing, unexpected = model.load_state_dict(filtered_sd, strict=False)
     if verbose:
-        print(f"[safe_load_state] ✅ Loaded with {len(filtered_sd)} keys.")
-        print(f"[safe_load_state]   🔸 Missing keys: {missing}")
-        print(f"[safe_load_state]   🔸 Unexpected keys: {unexpected}")
+        logger.info(f"[safe_load_state] ✅ Loaded with {len(filtered_sd)} keys.")
+        logger.info(f"[safe_load_state]   🔸 Missing keys: {missing}")
+        logger.info(f"[safe_load_state]   🔸 Unexpected keys: {unexpected}")

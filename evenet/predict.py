@@ -164,8 +164,3 @@ if __name__ == '__main__':
 
     result = trainer.fit()
     print("Prediction finished.")
-
-    import time
-
-    print("Sleeping to allow Ray shutdown...")
-    time.sleep(2)

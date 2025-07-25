@@ -37,6 +37,7 @@ from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
 
 from evenet.utilities.logger import LocalLogger
+import logging
 
 
 def get_total_gradient(module, norm_type="l1"):
@@ -53,6 +54,9 @@ def get_total_gradient(module, norm_type="l1"):
 class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
+
+        self.l = logging.getLogger(__name__)
+
         self.aggregator = None
         self.sampler = None
         self.steps_per_epoch = None
@@ -104,12 +108,12 @@ class EveNetEngine(L.LightningModule):
         self.assignment_weight = self.balance_dict["particle_balance"]
         self.subprocess_balance = self.balance_dict["subprocess_balance"]
 
-        print(f"{self.__class__.__name__} normalization dicts initialized")
+        self.l.info(f"normalization dicts initialized")
 
         ###### Initialize Assignment Necessaries ######
         self.ass_args = None
         if self.assignment_cfg.include:
-            print("configure permutation indices")
+            self.l.info(f"permutation indices configured")
             self.permutation_indices = dict()
             self.num_targets = dict()
 
@@ -135,13 +139,13 @@ class EveNetEngine(L.LightningModule):
         if self.classification_cfg.include:
             import evenet.network.loss.classification as cls_loss
             self.cls_loss = cls_loss.loss
-            print(f"{self.__class__.__name__} classification loss initialized")
+            self.l.info(f"classification loss initialized")
 
         self.reg_loss = None
         if self.regression_cfg.include:
             import evenet.network.loss.regression as reg_loss
             self.reg_loss = reg_loss.loss
-            print(f"{self.__class__.__name__} regression loss initialized")
+            self.l.info(f"regression loss initialized")
 
         self.ass_loss = None
         if self.assignment_cfg.include:
@@ -154,13 +158,13 @@ class EveNetEngine(L.LightningModule):
                 **self.ass_args['loss']
             )
             self.ass_loss = assignment_loss_partial
-            print(f"{self.__class__.__name__} assignment loss initialized")
+            self.l.info(f"assignment loss initialized")
 
         self.gen_loss = None
         if self.generation_include:
             import evenet.network.loss.generation as gen_loss
             self.gen_loss = gen_loss.loss
-            print(f"{self.__class__.__name__} generation loss initialized")
+            self.l.info(f"generation loss initialized")
 
         ###### Initialize Optimizers ######
         self.hyper_par_cfg = {
@@ -202,8 +206,6 @@ class EveNetEngine(L.LightningModule):
             loss_head_dict: dict,
             update_metric: bool = True
     ):
-        print(
-            f"Training: {self.training}, Step: {self.current_step}, Epoch: {self.current_epoch}, Global: {self.global_step}, Batch: {batch_idx}")
 
         batch_size = batch["x"].shape[0]
         device = self.device
@@ -418,6 +420,10 @@ class EveNetEngine(L.LightningModule):
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train", batch_idx=batch_idx)
         else:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val", batch_idx=batch_idx)
+
+        self.l.info(
+            f"[Epoch {self.current_epoch:03d}][Step {batch_idx} / {self.steps_per_epoch}] loss: {loss.item():.5f}")
+
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_4", flush=True)
         # return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],outputs["full_global_conditions"]]
         return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw
@@ -773,9 +779,6 @@ class EveNetEngine(L.LightningModule):
     def on_fit_start(self) -> None:
         self.current_step = 0
 
-        print(
-            f"{self.__class__.__name__} on_fit_start [Rank: {self.global_rank}], simplified_log: {self.simplified_log}")
-
         if self.simplified_log:
             if len(self.loggers) < 2:
                 raise ValueError(
@@ -784,7 +787,7 @@ class EveNetEngine(L.LightningModule):
 
             self.local_logger = self.loggers[1]
 
-            print(f"{self.__class__.__name__} simplified logging enabled")
+            self.l.info(f"Simplified logging enabled")
 
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
@@ -849,7 +852,7 @@ class EveNetEngine(L.LightningModule):
         )
 
         if self.global_rank == 0:
-            print(f"{self.__class__.__name__} on_fit_end")
+            self.l.info(f"On fit end")
 
             figs = self.general_log.plot_all()
 
@@ -875,18 +878,20 @@ class EveNetEngine(L.LightningModule):
             )
 
             wandb.finish()  # ensure everything is flushed
-            print("W&B logging done and finished.")
+            self.l.info(f"W&B logging done and finished.")
 
-        print(f"{self.__class__.__name__} on_fit_end all end [Rank: {self.global_rank}]")
+        self.l.info(f"On fit end all end")
 
     def on_validation_start(self):
         self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
 
+        self.l.info(f"[Epoch {self.current_epoch:03d}] ▶️ Validation Start | eval_metrics: {self.eval_metrics}")
         pass
 
     def on_train_epoch_start(self) -> None:
         self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
 
+        self.l.info(f"[Epoch {self.current_epoch:03d}] ▶️ Training Start | eval_metrics: {self.eval_metrics}")
         pass
 
     @time_decorator()
@@ -936,6 +941,8 @@ class EveNetEngine(L.LightningModule):
             if isinstance(logger, LocalLogger):
                 logger.finalize(status="validation_end")
 
+        self.l.info(f"[Epoch {self.current_epoch:03d}] ✅ Validation Complete")
+
     @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
@@ -943,6 +950,8 @@ class EveNetEngine(L.LightningModule):
         for logger in self.loggers:
             if isinstance(logger, LocalLogger):
                 logger.finalize(status="train_end")
+
+        self.l.info(f"[Epoch {self.current_epoch:03d}] ✅ Training Complete")
 
     @time_decorator()
     def safe_manual_backward(self, loss, *args, **kwargs):
@@ -969,14 +978,14 @@ class EveNetEngine(L.LightningModule):
         self.total_steps = epochs * self.steps_per_epoch
 
         if self.global_rank == 0:
-            print(f"--> Optimizer Configuration:")
-            print("word_size: ", world_size)
-            print("dataset_size: ", dataset_size)
-            print("steps_per_epoch: ", self.steps_per_epoch)
-            print("warmup_steps: ", warmup_steps)
-            print("total_steps: ", self.total_steps)
-            print("batch_size: ", batch_size)
-            print("warm_up_factor: ", warm_up_factor)
+            self.l.info("--> Optimizer Configuration:")
+            self.l.info(f"  world_size     : {world_size}")
+            self.l.info(f"  dataset_size   : {dataset_size}")
+            self.l.info(f"  steps_per_epoch: {self.steps_per_epoch}")
+            self.l.info(f"  warmup_steps   : {warmup_steps}")
+            self.l.info(f"  total_steps    : {self.total_steps}")
+            self.l.info(f"  batch_size     : {batch_size}")
+            self.l.info(f"  warm_up_factor : {warm_up_factor}")
 
         betas = (0.95, 0.99)
 
@@ -1021,8 +1030,7 @@ class EveNetEngine(L.LightningModule):
 
         optimizers, schedulers = [], []
         for name, modules in self.model_parts.items():
-            if self.global_rank == 0:
-                print(f"Configuring optimizer/scheduler for {name} with modules: {modules['modules']}")
+            self.l.info(f"Configuring optimizer/scheduler for {name} with modules: {modules['modules']}")
 
             if not modules:
                 continue
@@ -1030,8 +1038,7 @@ class EveNetEngine(L.LightningModule):
             params = [p for m in valid_modules for p in m.parameters()]
 
             if len(params) == 0:
-                if self.global_rank == 0:
-                    print(f"Warning: No parameters found for {name}. Skipping optimizer/scheduler configuration.")
+                self.l.warning(f"No parameters found for {name}. Skipping optimizer/scheduler configuration.")
                 continue
 
             opt, sch = create_optim_schedule(
@@ -1052,8 +1059,7 @@ class EveNetEngine(L.LightningModule):
 
         # Add FAMO optimizer
         if hasattr(self.model, "famo") and hasattr(self.model.famo, "optimizer"):
-            if self.global_rank == 0:
-                print(f"[FAMO] --> Adding FAMO optimizer")
+            self.l.info(f"[FAMO] --> Adding FAMO optimizer")
             optimizers.append(self.model.famo.optimizer)
 
         # Add Scheduler
@@ -1068,7 +1074,7 @@ class EveNetEngine(L.LightningModule):
 
     # @time_decorator
     def configure_model(self) -> None:
-        print(f"{self.__class__.__name__} configure model on device {self.device}")
+        self.l.info(f"Configuring model on device {self.device}")
         if self.model is not None:
             return
 
@@ -1076,7 +1082,7 @@ class EveNetEngine(L.LightningModule):
             name = torch.cuda.get_device_name(torch.cuda.current_device())
             if "A100" in name:
                 torch.set_float32_matmul_precision("medium")
-                print("[Model] --> A100 detected, using medium precision for matmul")
+                self.l.info(" --> A100 detected, using medium precision for matmul")
 
         self.model = EveNetModel(
             config=self.config,
@@ -1094,12 +1100,11 @@ class EveNetEngine(L.LightningModule):
             ema_enable = self.ema_cfg.get("enable", False)
             ema_replace = self.ema_cfg.get("replace_model_after_load", False)
             if self.global_rank == 0:
-                print(f"[Model] --> EMA enabled: {ema_enable}")
-                print(f"[Model] --> EMA replace model after load: {ema_replace}")
+                self.l.info(f"[Model] --> EMA enabled: {ema_enable}")
+                self.l.warning(f"[Model] --> EMA replace model after load: {ema_replace}")
 
             if self.pretrain_ckpt_path is not None:
-                if self.global_rank == 0:
-                    print(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
+                self.l.warning(f"[Model] --> Loading pretrained weights from: {self.pretrain_ckpt_path}")
                 ckpt = torch.load(self.pretrain_ckpt_path, map_location=self.device)
 
                 if ema_enable and 'ema_state_dict' in ckpt and ema_replace:
@@ -1128,7 +1133,7 @@ class EveNetEngine(L.LightningModule):
 
             module_attr = getattr(self.model, key, None)
             if not module_attr:
-                print(f"⚠️ Warning: No module set for '{key}'. Skipping.")
+                self.l.warning(f"⚠️ Warning: No module set for '{key}'. Skipping.")
                 continue
 
             # Add to group
@@ -1143,8 +1148,7 @@ class EveNetEngine(L.LightningModule):
                 }
             self.model_parts[group]['modules'].append(key)
 
-        if self.global_rank == 0:
-            print("model parts: ", self.model_parts)
+        self.l.info(f"[Model] --> Model parts: {self.model_parts}")
 
         ### Initialize FAMO ###
         famo_task_list = ["classification", "regression", "assignment", "generation"]
@@ -1158,10 +1162,7 @@ class EveNetEngine(L.LightningModule):
             turn_on=self.include_famo,
             logits_bound=self.config.options.Training.FAMO.get("logits_bound", 1.0),
         ))
-        if self.global_rank == 0:
-            print(f"[FAMO] {self.__class__.__name__} FAMO Applied? --> {self.include_famo}")
-            print(f"[FAMO]  ✅FAMO✅ will be applied to {famo_task_list}!")
-            print(f"[FAMO]  ❌Transition❌ will turn off if FAMO applied!")
+        self.l.warning(f"FAMO Applied? --> {self.include_famo}")
 
         from evenet.utilities.diffusion_sampler import DDIMSampler
         self.sampler = DDIMSampler(device=self.device)
@@ -1179,8 +1180,7 @@ class EveNetEngine(L.LightningModule):
         if self.ema_model is not None and self.ema_cfg.get("replace_model_at_end", False):
             ema_sd = {f"model.{k}": v for k, v in self.ema_model.state_dict().items()}
             checkpoint["state_dict"] = ema_sd
-            if self.global_rank == 0:
-                print("[Model] --> Saved EMA weights instead of current model weights")
+            self.l.warning(f"[Model] --> Saved EMA weights instead of current model weights")
 
         # Always save EMA weights separately as well
         if self.ema_model is not None:
@@ -1189,12 +1189,10 @@ class EveNetEngine(L.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         if self.ema_model is not None and 'ema_state_dict' in checkpoint:
             self.ema_model.load_state_dict(checkpoint['ema_state_dict'], device=self.device)
-            if self.global_rank == 0:
-                print(f"[Model] --> Loading EMA model")
+            self.l.info(f"[Model] --> Loading EMA model")
             if self.ema_cfg.get("replace_model_after_load", False):
                 self.ema_model.copy_to(self.model)
-                if self.global_rank == 0:
-                    print(f"[Model] --> Replacing model with EMA model after loading checkpoint")
+                self.l.warning(f"[Model] --> Replacing model with EMA model after loading checkpoint")
 
     def prepare_heads_loss(self):
         gradient_heads = {}

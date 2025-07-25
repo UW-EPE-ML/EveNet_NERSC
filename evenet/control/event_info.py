@@ -51,8 +51,8 @@ def compute_head_weights_per_process(product_mappings, pairing_topology) -> dict
             if topology_key in pairing_topology:
                 category = pairing_topology[topology_key]["pairing_topology_category"]
                 head_count[category] += 1
-            else:
-                print(f"[warn] '{topology_key}' not found in pairing_topology")
+            # else:
+            #     print(f"[warn] '{topology_key}' not found in pairing_topology")
         total = sum(head_count.values())
         weights = {cat: count / total for cat, count in head_count.items()} if total > 0 else {}
         process_to_head_weights[process] = weights
@@ -66,8 +66,8 @@ def compute_segment_tags(product_mappings, pairing_topology, resonance_info) -> 
             topology_key = build_topology_key(resonance_name, child_map)
             if topology_key in pairing_topology:
                 process_to_segment_tags[process][resonance_name] = resonance_info[pairing_topology[topology_key]["pairing_topology_category"]][topology_key].get('segment_tag', 0)
-            else:
-                print(f"[warn] '{topology_key}' not found in pairing_topology")
+            # else:
+            #     print(f"[warn] '{topology_key}' not found in pairing_topology")
     return process_to_segment_tags
 
 

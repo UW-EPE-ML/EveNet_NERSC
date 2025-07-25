@@ -21,7 +21,7 @@ from lightning.pytorch.profilers import PyTorchProfiler
 from evenet.control.global_config import global_config
 from shared import make_process_fn, prepare_datasets, EveNetTrainCallback
 from evenet.engine import EveNetEngine
-from evenet.utilities.logger import LocalLogger
+from evenet.utilities.logger import LocalLogger, setup_logging
 
 
 def train_func(cfg):
@@ -43,13 +43,16 @@ def train_func(cfg):
     )
     loggers.append(wandb_logger)
 
+    local_logger = None
     if 'local' in log_cfg:
-        print(f"Initializing LocalLogger for rank {world_rank}")
         local_logger = LocalLogger(
             rank=world_rank,
             **log_cfg['local'],
         )
         loggers.append(local_logger)
+
+    tmp_log_dir = os.path.join(os.getcwd(), "logs")
+    setup_logging(rank=world_rank, log_dir=local_logger.log_dir if local_logger else tmp_log_dir)
 
     dataset_configs = {
         'batch_size': batch_size,
@@ -123,7 +126,7 @@ def train_func(cfg):
     ckpt_path = None
     if global_config.options.Training.model_checkpoint_load_path is not None:
         ckpt_path = global_config.options.Training.model_checkpoint_load_path
-        print(f"Loading checkpoint from {ckpt_path}")
+        # print(f"Loading checkpoint from {ckpt_path}")
 
     trainer.fit(
         model,
@@ -205,13 +208,9 @@ def main(args):
     )
 
     result = trainer.fit()
-
-    print('finished!')
-    print(result)
-
     import torch.distributed as dist
     if dist.is_initialized():
-      dist.destroy_process_group()
+        dist.destroy_process_group()
 
 
 if __name__ == '__main__':

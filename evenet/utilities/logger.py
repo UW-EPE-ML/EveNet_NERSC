@@ -5,6 +5,7 @@ from lightning.pytorch.loggers.logger import Logger, rank_zero_experiment
 from datetime import datetime
 from argparse import Namespace
 from typing import NamedTuple
+import logging
 
 
 class LogKey(NamedTuple):
@@ -12,7 +13,6 @@ class LogKey(NamedTuple):
     epoch: int
     training: int
     batch: int
-
 
 
 class LocalLogger(Logger):
@@ -34,8 +34,6 @@ class LocalLogger(Logger):
         self.log_file_path = os.path.join(self._log_dir, f"metrics_rank{self.rank}.csv")
         self.buffer: Dict[LogKey, Dict[str, Any]] = {}
         self.headers_written = os.path.exists(self.log_file_path)
-
-        print(f"Logger initialized at {self._log_dir} for rank {self.rank}")
 
     @property
     def name(self) -> str:
@@ -66,7 +64,7 @@ class LocalLogger(Logger):
             step: int,
             epoch: int,
             batch: Optional[int] = None,
-            training: Optional[bool]  = True,
+            training: Optional[bool] = True,
             prefix: Optional[str] = None,
     ) -> None:
         # print(f"[Real] Logging metrics {metrics} @ Step {step}, Epoch {epoch}, Prefix: {prefix}")
@@ -108,3 +106,21 @@ class LocalLogger(Logger):
 
     def finalize(self, status: str) -> None:
         self.flush_metrics()
+
+
+def setup_logging(log_level=logging.INFO, rank: int = 0, log_dir="logs"):
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f"rank_{rank}.log")
+
+    # Remove previous handlers if any
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    logging.basicConfig(
+        level=log_level,
+        format=f"%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+        handlers=[
+            logging.FileHandler(log_file, mode="a"),
+            # logging.StreamHandler() if rank == 0 else logging.NullHandler(),  # Only rank 0 logs to stdout
+        ]
+    )
