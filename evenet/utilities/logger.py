@@ -10,8 +10,9 @@ from typing import NamedTuple
 class LogKey(NamedTuple):
     step: int
     epoch: int
-    batch: int
     training: int
+    batch: int
+
 
 
 class LocalLogger(Logger):
@@ -56,7 +57,7 @@ class LocalLogger(Logger):
         pass
 
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None) -> None:
-        print(f"[Dummy] Logging metrics {metrics} @ Step {step}")
+        # print(f"[Dummy] Logging metrics {metrics} @ Step {step}")
         pass
 
     def log_real(
@@ -68,8 +69,7 @@ class LocalLogger(Logger):
             training: Optional[bool]  = True,
             prefix: Optional[str] = None,
     ) -> None:
-        print(
-            f"[Real] Logging metrics {metrics} @ Step {step}, Epoch {epoch}, Prefix: {prefix}")
+        # print(f"[Real] Logging metrics {metrics} @ Step {step}, Epoch {epoch}, Prefix: {prefix}")
 
         key = LogKey(step=step, epoch=epoch, batch=batch or -1, training=int(training))
         if key not in self.buffer:
@@ -90,7 +90,7 @@ class LocalLogger(Logger):
             return
 
         # Sort steps to preserve order
-        keys = sorted(self.buffer.keys())
+        keys = sorted(self.buffer.keys(), key=lambda k: (k.step, k.epoch, k.training, k.batch))
         records = [self.buffer[key] for key in keys]
 
         # Dynamically infer fieldnames from all merged records
