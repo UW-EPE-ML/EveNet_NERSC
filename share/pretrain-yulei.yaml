@@ -21,7 +21,7 @@ logger:
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
-    version: "v0"
+    version: "test"
 
 options:
   default: options/options.yaml
