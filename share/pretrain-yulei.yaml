@@ -1,7 +1,7 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250625.2700M"
-  number_of_workers: 500
-#  number_of_workers: 32
+#  number_of_workers: 500
+  number_of_workers: 56
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
@@ -17,6 +17,7 @@ logger:
     name: "Pretrain"
     run_name: &logger_name "nominal"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla" ]
+    simplified: true
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
@@ -34,6 +35,7 @@ options:
 
     diffusion_every_n_epochs: 5 # how often to run diffusion
     diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
+    eval_metrics_every_n_epochs: 5
 
     learning_rate: &lr 0.000018
     #    learning_rate: &lr 0.000045
@@ -91,6 +93,20 @@ options:
 
     ProgressiveTraining:
       stages:
+        - name: "full_training"
+          epoch_ratio: 0.85
+          transition_ratio: 0.2
+          loss_weights:
+            generation-truth: [ 1.0, 1.0 ]
+            generation-recon: [ 1.0, 1.0 ]
+            classification: [ 1.0, 1.0 ]
+            classification-noised: [ 1.0, 1.0 ]
+            assignment: [ 1.0, 1.0 ]
+          train_parameters:
+            noise_prob: [ 1.0, 1.0 ]
+            reco_attn_mask: [ 0.0, 0.0 ]
+            ema_decay: [ 0.99, 0.999 ]
+
         - name: "masking point prediction"
           epoch_ratio: 0.1
 #          epoch_ratio: 0.0

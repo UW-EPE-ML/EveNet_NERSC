@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #SBATCH -C gpu&hbm80g
-#SBATCH --time=12:00:00
-#SBATCH -q regular
+#SBATCH --time=1:00:00
+#SBATCH -q debug
 #SBATCH -A m5019_g
 
 ### This script works for any number of nodes, Ray will find and manage all resources
-#SBATCH --nodes=128
+#SBATCH --nodes=14
 
 ### Give all resources on each node to a single Ray task, ray can manage the resources internally
 #SBATCH --ntasks-per-node=1
@@ -51,8 +51,8 @@ cd ../ && source setup.sh
 
 export TORCH_NCCL_TIMEOUT=180
 
-#shifter python3 evenet/train.py share/pretrain-yulei.yaml
-shifter python3 evenet/train.py share/pretrain-yulei-long.yaml
+shifter python3 evenet/train.py share/pretrain-yulei.yaml
+#shifter python3 evenet/train.py share/pretrain-yulei-long.yaml
 #shifter python3 evenet/train.py share/pretrain-yulei-large.yaml
 
 #shifter python3 evenet/train.py downstreams/Quantum/train_TT2L.yaml --load_all
