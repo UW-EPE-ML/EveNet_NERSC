@@ -179,6 +179,8 @@ class EveNetEngine(L.LightningModule):
         self.simplified_log: bool = global_config.logger.get("wandb", {}).get("simplified", False)
         self.local_logger: Union[None, LocalLogger] = None
 
+        self.eval_metrics_every_n_epochs: int = global_config.options.Training.get("eval_metrics_every_n_epochs", 1)
+        self.eval_metrics: bool = False
 
         ###### Progressive Training ######
         self.task_scheduler: Union[ProgressiveTaskScheduler, None] = None
@@ -200,8 +202,8 @@ class EveNetEngine(L.LightningModule):
             loss_head_dict: dict,
             update_metric: bool = True
     ):
-        print(f"Training: {self.training}, Step: {self.current_step}, Epoch: {self.current_epoch}, Global: {self.global_step}, Batch: {batch_idx}")
-
+        print(
+            f"Training: {self.training}, Step: {self.current_step}, Epoch: {self.current_epoch}, Global: {self.global_step}, Batch: {batch_idx}")
 
         batch_size = batch["x"].shape[0]
         device = self.device
@@ -483,7 +485,7 @@ class EveNetEngine(L.LightningModule):
         loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
-            update_metric=True,
+            update_metric=self.eval_metrics,
         )
         # print(f"[Step {step}] share step end", flush=True)
         final_loss = loss
@@ -589,7 +591,7 @@ class EveNetEngine(L.LightningModule):
         loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
-            update_metric=True,
+            update_metric=self.eval_metrics,
         )
 
         return loss.mean()
@@ -771,7 +773,8 @@ class EveNetEngine(L.LightningModule):
     def on_fit_start(self) -> None:
         self.current_step = 0
 
-        print(f"{self.__class__.__name__} on_fit_start [Rank: {self.global_rank}], simplified_log: {self.simplified_log}")
+        print(
+            f"{self.__class__.__name__} on_fit_start [Rank: {self.global_rank}], simplified_log: {self.simplified_log}")
 
         if self.simplified_log:
             if len(self.loggers) < 2:
@@ -877,14 +880,18 @@ class EveNetEngine(L.LightningModule):
         print(f"{self.__class__.__name__} on_fit_end all end [Rank: {self.global_rank}]")
 
     def on_validation_start(self):
+        self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
+
         pass
 
     def on_train_epoch_start(self) -> None:
+        self.eval_metrics = (self.current_epoch + 1) % self.eval_metrics_every_n_epochs == 0
+
         pass
 
     @time_decorator()
     def on_validation_epoch_end(self) -> None:
-        if self.classification_cfg.include and self.current_schedule.get("deterministic", False):
+        if self.classification_cfg.include and self.current_schedule.get("deterministic", False) and self.eval_metrics:
             cls_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.classification_metrics_valid,
@@ -894,7 +901,8 @@ class EveNetEngine(L.LightningModule):
                 module=self
             )
 
-        if self.classification_cfg.include_cross_term and self.current_schedule.get("deterministic", False):
+        if self.classification_cfg.include_cross_term and self.current_schedule.get("deterministic",
+                                                                                    False) and self.eval_metrics:
             cls_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.classification_metrics_valid_cross_term,
@@ -904,7 +912,7 @@ class EveNetEngine(L.LightningModule):
                 prefix="cross-term-"
             )
 
-        if self.assignment_cfg.include and self.current_schedule.get("deterministic", False):
+        if self.assignment_cfg.include and self.current_schedule.get("deterministic", False) and self.eval_metrics:
             ass_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.assignment_metrics_valid,
@@ -914,7 +922,7 @@ class EveNetEngine(L.LightningModule):
 
         if self.generation_include and (
                 self.current_schedule.get("generation", False) or self.current_schedule.get("neutrino_generation",
-                                                                                            False)):
+                                                                                            False)) and self.eval_metrics:
             gen_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.generation_metrics_valid,
