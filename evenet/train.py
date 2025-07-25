@@ -21,6 +21,7 @@ from lightning.pytorch.profilers import PyTorchProfiler
 from evenet.control.global_config import global_config
 from shared import make_process_fn, prepare_datasets, EveNetTrainCallback
 from evenet.engine import EveNetEngine
+from evenet.utilities.logger import LocalLogger
 
 
 def train_func(cfg):
@@ -30,7 +31,9 @@ def train_func(cfg):
     total_events = cfg['total_events']
     world_rank = ray.train.get_context().get_world_rank()
 
-    wandb_config = cfg.get("wandb", {})
+    log_cfg = cfg.get('logger', {})
+    loggers = []
+    wandb_config = log_cfg.get("wandb", {})
     wandb_logger = WandbLogger(
         project=wandb_config.get("project", "EveNet"),
         name=wandb_config.get("run_name", None),
@@ -38,7 +41,15 @@ def train_func(cfg):
         entity=wandb_config.get("entity", None),
         config=global_config.to_logger()
     )
-    # wandb_logger.experiment.config.update()
+    loggers.append(wandb_logger)
+
+    if 'local' in log_cfg:
+        print(f"Initializing LocalLogger for rank {world_rank}")
+        local_logger = LocalLogger(
+            rank=world_rank,
+            **log_cfg['local'],
+        )
+        loggers.append(local_logger)
 
     dataset_configs = {
         'batch_size': batch_size,
@@ -96,7 +107,7 @@ def train_func(cfg):
             RichModelSummary(max_depth=3),
         ],
         enable_progress_bar=True,
-        logger=wandb_logger,
+        logger=loggers,
         # val_check_interval=10,
         num_sanity_val_steps=0,
         log_every_n_steps=1,
@@ -175,8 +186,8 @@ def main(args):
         "batch_size": platform_info.batch_size,
         "epochs": global_config.options.Training.epochs,
         "prefetch_batches": platform_info.prefetch_batches,
-        'wandb': {
-            **global_config.wandb,
+        'logger': {
+            **global_config.logger,
         },
         "total_events": total_events,
         "early_stopping": global_config.options.Training.EarlyStopping,

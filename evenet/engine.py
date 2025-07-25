@@ -36,6 +36,8 @@ from evenet.utilities.tool import get_transition, check_param_overlap, print_par
 from torchjd import mtl_backward
 from torchjd.aggregation import UPGrad
 
+from evenet.utilities.logger import LocalLogger
+
 
 def get_total_gradient(module, norm_type="l1"):
     total = 0.0
@@ -174,6 +176,9 @@ class EveNetEngine(L.LightningModule):
         ###### For general log ######
         self.general_log = GenericMetrics()
         self.log_gradient_step = global_config.options.Training.get("log_gradient_step", 100)
+        self.simplified_log: bool = global_config.logger.get("wandb", {}).get("simplified", False)
+        self.local_logger: Union[None, LocalLogger] = None
+
 
         ###### Progressive Training ######
         self.task_scheduler: Union[ProgressiveTaskScheduler, None] = None
@@ -195,6 +200,9 @@ class EveNetEngine(L.LightningModule):
             loss_head_dict: dict,
             update_metric: bool = True
     ):
+        print(f"Training: {self.training}, Step: {self.current_step}, Epoch: {self.current_epoch}, Global: {self.global_step}, Batch: {batch_idx}")
+
+
         batch_size = batch["x"].shape[0]
         device = self.device
         if self.apply_event_weight:
@@ -208,8 +216,16 @@ class EveNetEngine(L.LightningModule):
 
         # logging training parameters
         for name, val in train_parameters.items():
-            if self.global_rank == 0:
-                self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=False)
+            if not self.simplified_log:
+                self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=True)
+
+        if self.simplified_log:
+            self.local_logger.log_real(
+                train_parameters,
+                step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                training=self.training,
+                prefix="progressive"
+            )
 
         inputs = {
             key: value.to(device=device) for key, value in batch.items()
@@ -238,8 +254,16 @@ class EveNetEngine(L.LightningModule):
 
         # logging schedules
         for key, value in schedules.items():
-            if self.global_rank == 0:
-                self.log(f"progressive/schedule-{key}", int(value), prog_bar=False, sync_dist=False)
+            if not self.simplified_log:
+                self.log(f"progressive/schedule-{key}", int(value), prog_bar=False, sync_dist=True)
+
+        if self.simplified_log:
+            self.local_logger.log_real(
+                schedules,
+                step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                training=self.training,
+                prefix="progressive/schedule-"
+            )
 
         outputs = self.model.shared_step(
             batch=inputs,
@@ -272,7 +296,8 @@ class EveNetEngine(L.LightningModule):
                 cls_output=next(iter(outputs["classification-noised"].values())),
                 cls_loss_fn=self.cls_loss,
                 class_weight=self.class_weight.to(device=device),
-                event_weight=(outputs["alpha"] * outputs["alpha"] * event_weight) if event_weight is not None else (outputs["alpha"] * outputs["alpha"]),
+                event_weight=(outputs["alpha"] * outputs["alpha"] * event_weight) if event_weight is not None else (
+                        outputs["alpha"] * outputs["alpha"]),
                 loss_dict=loss_head_dict,
                 loss_scale=self.classification_cfg.loss_scale_cross_term,
                 metrics=self.classification_metrics_train_cross_term if self.training else self.classification_metrics_valid_cross_term,
@@ -376,22 +401,37 @@ class EveNetEngine(L.LightningModule):
 
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_2", flush=True)
         if self.training:
-            if self.global_rank == 0:
-                self.log('progressive/loss-rank-0', loss, prog_bar=False, sync_dist=False)
+            if not self.simplified_log:
+                self.log('progressive/loss', loss, prog_bar=False, sync_dist=True)
+            else:
+                self.local_logger.log_real(
+                    metrics={"loss": loss.item()},
+                    step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                    training=self.training,
+                    prefix="progressive"
+                )
 
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3", flush=True)
         if self.training:
-            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train")
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train", batch_idx=batch_idx)
         else:
-            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val")
+            self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val", batch_idx=batch_idx)
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_4", flush=True)
-        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],
-                                                                                  outputs["full_global_conditions"]]
+        # return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],outputs["full_global_conditions"]]
+        return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw
 
-    def log_loss(self, loss, loss_head, loss_dict, prefix: str):
+    def log_loss(self, loss, loss_head, loss_dict, prefix: str, batch_idx):
         for name, val in loss_head.items():
-            # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.1: {name}, {val}", flush=True)
-            if not self.training: self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
+            if not self.simplified_log:
+                self.log(f"{prefix}/{name}", val, prog_bar=False, sync_dist=True)
+
+        if self.simplified_log:
+            self.local_logger.log_real(
+                loss_head,
+                step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                training=self.training,
+                prefix=prefix
+            )
 
         for name, val in loss_dict.items():
             for n, v in val.items():
@@ -403,15 +443,29 @@ class EveNetEngine(L.LightningModule):
                 if not torch.isfinite(v).all():
                     # print(f"[Rank {self.global_rank}] Non-finite value in {n}/{prefix}/{name}: {v}")
                     continue
-                if not self.training: self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
+                if not self.simplified_log:
+                    self.log(f"{n}/{prefix}/{name}", v, prog_bar=False, sync_dist=True)
+                else:
+                    self.local_logger.log_real(
+                        {f"{n}/{prefix}/{name}": v.item()},
+                        step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                        training=self.training,
+                    )
+
         self.log(f"{prefix}/loss", loss, prog_bar=True, sync_dist=True)
+        if self.local_logger is not None:
+            self.local_logger.log_real(
+                {"loss": loss.item()},
+                step=self.current_step, epoch=self.current_epoch, batch=batch_idx,
+                training=self.training,
+                prefix=prefix
+            )
 
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3.3", flush=True)
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         # print(f"train batch end: {batch_idx}")
         pass
-
 
     @time_decorator()
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -426,7 +480,7 @@ class EveNetEngine(L.LightningModule):
 
         gradient_heads, loss_head = self.prepare_heads_loss()
         # print(f"[Step {step}] share step start", flush=True)
-        loss, loss_head, loss_dict, _, loss_raw, shared_output = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
             update_metric=True,
@@ -479,7 +533,6 @@ class EveNetEngine(L.LightningModule):
         # if gen_global_loss:
         #     gen_global_loss.mean().backward()
 
-
         # print(f"[Step {step}] Loss: {final_loss.item()}")
         self.safe_manual_backward(loss.mean())
         # print(f"[Step {step}] Backward done")
@@ -511,7 +564,7 @@ class EveNetEngine(L.LightningModule):
         # -------------------------------------
         if self.include_famo:
             with torch.no_grad():
-                loss, loss_head, loss_dict, _, loss_raw, _ = self.shared_step(
+                loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
                     batch=batch, batch_idx=batch_idx,
                     loss_head_dict=loss_head,
                     update_metric=False,
@@ -533,13 +586,11 @@ class EveNetEngine(L.LightningModule):
         epoch = self.current_epoch
 
         _, loss_head = self.prepare_heads_loss()
-        loss, loss_head, loss_dict, _, loss_raw, _ = self.shared_step(
+        loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
             update_metric=True,
         )
-
-        # self.log("val/loss", loss.mean(), prog_bar=True, sync_dist=True)
 
         return loss.mean()
 
@@ -720,6 +771,18 @@ class EveNetEngine(L.LightningModule):
     def on_fit_start(self) -> None:
         self.current_step = 0
 
+        print(f"{self.__class__.__name__} on_fit_start [Rank: {self.global_rank}], simplified_log: {self.simplified_log}")
+
+        if self.simplified_log:
+            if len(self.loggers) < 2:
+                raise ValueError(
+                    "Simplified logging requires at least two loggers: WandbLogger and LocalLogger."
+                )
+
+            self.local_logger = self.loggers[1]
+
+            print(f"{self.__class__.__name__} simplified logging enabled")
+
         if self.classification_cfg.include:
             self.classification_metrics_train = ClassificationMetrics(
                 num_classes=len(self.num_classes), normalize=True, device=self.device
@@ -828,7 +891,7 @@ class EveNetEngine(L.LightningModule):
                 metrics_train=self.classification_metrics_train,
                 num_classes=self.num_classes,
                 logger=self.logger.experiment,
-                module = self
+                module=self
             )
 
         if self.classification_cfg.include_cross_term and self.current_schedule.get("deterministic", False):
@@ -849,7 +912,9 @@ class EveNetEngine(L.LightningModule):
                 logger=self.logger.experiment,
             )
 
-        if self.generation_include and (self.current_schedule.get("generation", False) or self.current_schedule.get("neutrino_generation", False)):
+        if self.generation_include and (
+                self.current_schedule.get("generation", False) or self.current_schedule.get("neutrino_generation",
+                                                                                            False)):
             gen_end(
                 global_rank=self.global_rank,
                 metrics_valid=self.generation_metrics_valid,
@@ -859,9 +924,17 @@ class EveNetEngine(L.LightningModule):
 
         self.general_log.finalize_epoch(is_train=False)
 
+        for logger in self.loggers:
+            if isinstance(logger, LocalLogger):
+                logger.finalize(status="validation_end")
+
     @time_decorator()
     def on_train_epoch_end(self) -> None:
         self.general_log.finalize_epoch(is_train=True)
+
+        for logger in self.loggers:
+            if isinstance(logger, LocalLogger):
+                logger.finalize(status="train_end")
 
     @time_decorator()
     def safe_manual_backward(self, loss, *args, **kwargs):
