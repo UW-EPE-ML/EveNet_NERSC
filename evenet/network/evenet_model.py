@@ -602,8 +602,8 @@ class EveNetModel(nn.Module):
             "classification-noised": outputs.get("generation", {}).get("classification", None),
             "regression-noised": outputs.get("generation", {}).get("regression", None),
             "generations": generations,
-            "full_input_point_cloud": full_input_point_cloud,
-            "full_global_conditions": full_global_conditions,
+            # "full_input_point_cloud": full_input_point_cloud,
+            # "full_global_conditions": full_global_conditions,
             "alpha": alpha
         }
 
