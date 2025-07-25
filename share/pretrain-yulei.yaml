@@ -6,8 +6,8 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-#  batch_size: 512
-  batch_size: 1024
+  batch_size: 512
+#  batch_size: 1024
   prefetch_batches: 2
 
 logger:
