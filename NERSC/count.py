@@ -31,13 +31,14 @@ tags = [
     "Run_2.Dec22",
     "Run_2.Pretrain.20250505",
     "Run_2.Pretrain.20250507",
-    "Run_3.Pretrain.20250527.Run2Extra"
+    "Run_3.Pretrain.20250526",
+    "Run_3.Pretrain.20250527.Run2Extra",
 ]
 
 INPUT_ROOTS = [Path(data_prefix) / tag for tag in tags]
 OUTPUT_ROOT = Path(data_prefix) / "Combined_Balanced"
 
-NUM_RUNS = 500
+NUM_RUNS = 1000
 SEED = 42
 CPU_MAX = 50
 
