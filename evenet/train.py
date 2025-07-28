@@ -32,10 +32,6 @@ def train_func(cfg):
     world_rank = ray.train.get_context().get_world_rank()
 
     log_cfg = cfg.get('logger', {})
-
-    if 'logger' not in cfg:
-        raise ValueError("Logger configuration is missing in the training config.")
-
     loggers = []
     wandb_config = log_cfg.get("wandb", {})
     wandb_logger = WandbLogger(
