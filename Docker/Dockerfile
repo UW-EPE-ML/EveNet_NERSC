@@ -1,8 +1,19 @@
 # Stage 1: Build the environment
 FROM python:3.12-slim as builder
 
+# Install system build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    python3-dev \
+    git \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements.txt from host to the builder stage
 COPY requirements.txt /requirements.txt
+
+RUN pip install --no-cache-dir numpy
 
 # Install all dependencies from requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
