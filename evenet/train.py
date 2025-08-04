@@ -156,6 +156,9 @@ def main(args):
     global_config.load_yaml(args.config)
     global_config.display()
 
+    if "logger" not in global_config._global_config:
+        raise KeyError("Missing required config key: 'logger'")
+
     platform_info = global_config.platform
 
     ray.init(
