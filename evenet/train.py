@@ -39,7 +39,8 @@ def train_func(cfg):
         name=wandb_config.get("run_name", None),
         tags=wandb_config.get("tags", []),
         entity=wandb_config.get("entity", None),
-        config=global_config.to_logger()
+        config=global_config.to_logger(),
+        id=wandb_config.get("id", None),
     )
     loggers.append(wandb_logger)
 
