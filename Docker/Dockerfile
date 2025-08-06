@@ -1,26 +1,39 @@
 # Stage 1: Build environment with CUDA + Python 3.12
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
+FROM docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 
-# Install Python 3.12 and build tools
+# Install dependencies for building Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
     build-essential \
     g++ \
     git \
-    ninja-build \
     curl \
-    ca-certificates \
-    && add-apt-repository ppa:deadsnakes/ppa && apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3.12 python3.12-dev python3.12-venv python3-pip \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    wget \
+    llvm \
+    libncursesw5-dev \
+    xz-utils \
+    tk-dev \
+    libxml2-dev \
+    libxmlsec1-dev \
+    libffi-dev \
+    liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Python 3.12 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
-RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+# Download and install Python 3.12.3
+RUN curl -O https://www.python.org/ftp/python/3.12.3/Python-3.12.3.tgz && \
+    tar -xzf Python-3.12.3.tgz && \
+    cd Python-3.12.3 && \
+    ./configure --enable-optimizations --prefix=/usr/local && \
+    make -j$(nproc) && make install && \
+    cd .. && rm -rf Python-3.12.3*
 
-# Upgrade pip and install wheel
-RUN pip install --upgrade pip wheel setuptools
+# Symlink python and pip
+RUN ln -sf /usr/local/bin/python3.12 /usr/bin/python && \
+    ln -sf /usr/local/bin/pip3.12 /usr/bin/pip
 
 # Set CUDA paths
 ENV CUDA_HOME=/usr/local/cuda
@@ -31,34 +44,25 @@ ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 COPY requirements.txt /requirements.txt
 
 # Install Python packages
-RUN pip install --no-cache-dir -r /requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r /requirements.txt
 
 # Build torch-linear-assignment with CUDA
 ENV TLA_BUILD_CUDA=1
 RUN pip install --no-cache-dir torch_linear_assignment==0.0.4
 
-# Optional: clean cache
+# Optional: clean pip cache
 RUN rm -rf /root/.cache/pip/*
 
 # Stage 2: Minimal runtime image
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
+FROM docker.io/nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
 
-# Install Python 3.12 runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa && apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3.12 python3.12-venv python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+# Copy Python from builder stage
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /usr/bin/python /usr/bin/python
+COPY --from=builder /usr/bin/pip /usr/bin/pip
 
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
-RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
-
-# Copy installed Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# CUDA runtime env vars
+# CUDA env vars
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
