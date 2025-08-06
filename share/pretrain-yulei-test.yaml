@@ -56,7 +56,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
       Classification:
-        include: false
+        include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -87,7 +87,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
       TruthGeneration:
-        include: false
+        include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
