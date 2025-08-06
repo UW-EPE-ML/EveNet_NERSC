@@ -14,13 +14,13 @@ logger:
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
     run_name: &logger_name "nominal-test"
-    id: "pretrain-test-1"
+    id: "pretrain-test-2"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla", "test" ]
     simplified: true
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
-    version: "test-1"
+    version: "test-2"
 
 
 options:
