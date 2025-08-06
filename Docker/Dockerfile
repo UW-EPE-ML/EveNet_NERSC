@@ -13,10 +13,10 @@ FROM python:3.12-slim as builder
 # Copy requirements.txt from host to the builder stage
 COPY requirements.txt /requirements.txt
 
-RUN pip install --no-cache-dir numpy
-
 # Install all dependencies from requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
+
+RUN pip3 install --no-cache-dir torch_linear_assignment==0.0.3
 
 RUN rm -rf /root/.cache/pip/*
 

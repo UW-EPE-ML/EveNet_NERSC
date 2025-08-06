@@ -20,4 +20,3 @@ lion-pytorch==0.2.3
 transformers==4.50.3
 plotly==6.0.1
 torchJD==0.6.0
-torch_linear_assignment==0.0.3
