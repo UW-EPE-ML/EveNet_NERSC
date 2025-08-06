@@ -91,8 +91,8 @@ class EventInfo:
             resonance_info: Dict[str, Dict],
             resonance_particle_properties: List,
             generations: Dict[str, Dict],
-
             invisible_input_features: Tuple[FeatureInfo, ...],
+            resonance_label: List[str] = [],
     ):
 
         self.input_types = input_types
@@ -319,7 +319,10 @@ class EventInfo:
             self.product_mappings, self.pairing_topology, self.resonance_info
         )
         self.total_segment_tags = max(v for _, tags in self.process_to_segment_tags.items() for v in tags.values()) + 1
-
+        print(resonance_label)
+        self.segment_label = {
+            label: clsnum for clsnum, label in enumerate(resonance_label[0])
+        }
 
     # def normalized_features(self, input_name: str) -> NDArray[bool]:
     #     return np.array([feature.normalize for feature in self.input_features[input_name]])
@@ -517,6 +520,7 @@ class EventInfo:
         classifications = feynman_fill(classifications, event_particles, product_particles, constructor=list)
 
         class_label = key_with_default(config, SpecialKey.ClassLabel, default={})
+        resonance_label = key_with_default(config, "RESONANCE_LABEL", default = [])
 
         generations = key_with_default(config, SpecialKey.Generations, default={})
 
@@ -552,4 +556,5 @@ class EventInfo:
             resonance_particle_property,
             generations,
             invisible_input_features,
+            resonance_label
         )

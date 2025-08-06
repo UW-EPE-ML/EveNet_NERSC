@@ -26,6 +26,7 @@ from evenet.network.metrics.assignment import shared_step as ass_step, shared_ep
 from evenet.network.metrics.assignment import SingleProcessAssignmentMetrics
 from evenet.network.metrics.generation import GenerationMetrics
 from evenet.network.metrics.generation import shared_step as gen_step, shared_epoch_end as gen_end
+from evenet.network.metrics.segmentation import SegmentationMetrics
 from evenet.network.metrics.segmentation import shared_step as seg_step, shared_epoch_end as seg_end
 from evenet.network.loss.famo import FAMO
 from evenet.utilities.ema import EMA
@@ -71,6 +72,8 @@ class EveNetEngine(L.LightningModule):
         self.assignment_metrics_valid = None
         self.generation_metrics_train = None
         self.generation_metrics_valid = None
+        self.segmentation_metrics_train = None
+        self.segmentation_metrics_valid = None
         self.model_parts = {}
         self.model: Union[EveNetModel, None] = None
         self.config = global_config
@@ -89,7 +92,7 @@ class EveNetEngine(L.LightningModule):
         self.target_assignment_mask_key = 'assignments-mask'
         self.target_segmentation_cls_key = 'segmentation-class'
         self.target_segmentation_reg_key = 'segmentation-momentum'
-        self.target_segmentation_data_mask_key = 'segmentation-data-mask'
+        self.target_segmentation_data_mask_key = 'segmentation-data'
         self.target_segmentation_mask_key = 'segmentation-mask'
 
 
@@ -172,9 +175,9 @@ class EveNetEngine(L.LightningModule):
 
         self.seg_loss = None
         if self.segmentation_cfg.include:
-            import evenet.network.loss.segmentation as seg_loss
+            from evenet.network.loss.segmentation import loss as seg_loss
             self.seg_loss = seg_loss
-            print(f"{self.__class__.__name__} segmentation loss initialized")
+            self.l.info(f"segmentation loss initialized")
 
         self.gen_loss = None
         if self.generation_include:
@@ -293,7 +296,6 @@ class EveNetEngine(L.LightningModule):
             schedules=[(key, value) for key, value in schedules.items()],
         )
 
-        print(outputs)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
@@ -408,11 +410,11 @@ class EveNetEngine(L.LightningModule):
             if "generation-recon" in loss_head_dict:
                 loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
 
-        if self.segmentation_cfg.include and outputs["segmentation-cls"]:
+        if self.segmentation_cfg.include and outputs["segmentation-cls"] is not None:
             seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
             seg_target_mask = batch[self.target_segmentation_data_mask_key].to(device=device)
             seg_mask = batch[self.target_segmentation_mask_key].to(device=device)
-            class_weight = batch[self.target_segmentation_cls_weight_key].to(device=device)
+            class_weight = self.segmentation_cls_balance.to(device=device)
             scaled_seg_loss = seg_step(
                 target_classification = seg_targets_cls,
                 target_mask = seg_target_mask,
@@ -422,6 +424,7 @@ class EveNetEngine(L.LightningModule):
                 point_cloud_mask=inputs['x_mask'],
                 seg_loss_fn=self.seg_loss,
                 class_weight=class_weight,
+                metrics=self.segmentation_metrics_train if self.training else self.segmentation_metrics_valid,
                 loss_dict = loss_head_dict,
                 mask_loss_scale = self.segmentation_cfg.mask_loss_scale,
                 dice_loss_scale =  self.segmentation_cfg.dice_loss_scale,
@@ -883,6 +886,14 @@ class EveNetEngine(L.LightningModule):
             self.generation_metrics_train = GenerationMetrics(**generation_kwargs)
             self.generation_metrics_valid = GenerationMetrics(**generation_kwargs)
 
+        if self.segmentation_cfg.include:
+            segmentation_kwargs = {
+                "device": self.device,
+                "clusters_label": self.config.event_info.segment_label
+            }
+            self.segmentation_metrics_train = SegmentationMetrics(**segmentation_kwargs)
+            self.segmentation_metrics_valid = SegmentationMetrics(**segmentation_kwargs)
+
     def on_fit_end(self) -> None:
         if torch.cuda.is_available():
             device = torch.device("cuda")
@@ -976,6 +987,15 @@ class EveNetEngine(L.LightningModule):
                 metrics_train=self.generation_metrics_train,
                 logger=self.logger.experiment
             )
+
+        if self.segmentation_cfg.include and self.current_schedule.get("deterministic", False):
+            seg_end(
+                global_rank=self.global_rank,
+                metrics_valid=self.segmentation_metrics_valid,
+                metrics_train=self.segmentation_metrics_train,
+                logger=self.logger.experiment
+            )
+
 
         self.general_log.finalize_epoch(is_train=False)
 

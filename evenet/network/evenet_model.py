@@ -577,7 +577,7 @@ class EveNetModel(nn.Module):
                     "assignments": assignments,
                     "detections": detections,
                     "segmentation-cls": segmentation_cls,
-                    "segmentation_mask": segmentation_mask
+                    "segmentation-mask": segmentation_mask
                 }
 
             #######################################
@@ -629,10 +629,10 @@ class EveNetModel(nn.Module):
             "regression-noised": outputs.get("generation", {}).get("regression", None),
             "generations": generations,
             "segmentation-cls": outputs.get("deterministic", {}).get("segmentation-cls", None),
-            "segmentation_mask": outputs.get("deterministic", {}).get("segmentation_mask", None),
             # "full_input_point_cloud": full_input_point_cloud,
             # "full_global_conditions": full_global_conditions,
-            "alpha": alpha
+            "alpha": alpha,
+            "segmentation-mask": outputs.get("deterministic", {}).get("segmentation-mask", None),
         }
 
     def predict_diffusion_vector(
