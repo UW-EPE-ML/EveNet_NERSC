@@ -2,13 +2,13 @@
 FROM python:3.12-slim as builder
 
 # Install system build tools
-#RUN apt-get update && apt-get install -y --no-install-recommends \
-#    build-essential \
-#    g++ \
-#    python3-dev \
-#    git \
-#    ninja-build \
-#    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    python3-dev \
+    git \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements.txt from host to the builder stage
 COPY requirements.txt /requirements.txt
@@ -16,7 +16,7 @@ COPY requirements.txt /requirements.txt
 # Install all dependencies from requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
 
-RUN pip3 install --no-cache-dir torch_linear_assignment==0.0.3
+RUN pip3 install --no-cache-dir  --no-build-isolation torch_linear_assignment==0.0.3
 
 RUN rm -rf /root/.cache/pip/*
 
