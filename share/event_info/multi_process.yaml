@@ -522,6 +522,10 @@ CLASSLABEL:
     signal:
       - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]
 
+
+RESONANCE_LABEL:
+  - ["null", "t(had)", "t1l", "W(had)", "W(off-s)", "Z(had)", "Z(l)", "W(l)", "W(l,off-s)" ]
+
 PARTICLE_PROPERTIES:
   - Energy
   - Spin

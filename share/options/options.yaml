@@ -107,12 +107,13 @@ Training:
 
     Segmentation:
       learning_rate: *lr
-      optimizer_group: "assignment"
+      optimizer_group: "segmentation"
       optimizer_type: "lion"
       warm_up: true
-      segmentation_loss_scale: 1.0
-      focal_gamma: 1.0
       include: false # whether to build in network
+      mask_loss_scale: 1.0 # loss coefficient
+      dice_loss_scale: 1.0
+      cls_loss_scale: 1.0
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       freeze:
