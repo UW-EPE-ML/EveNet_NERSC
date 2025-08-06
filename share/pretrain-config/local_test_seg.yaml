@@ -2,7 +2,7 @@ platform:
   data_parquet_dir: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset/"
   number_of_workers: 1
   resources_per_worker: {
-    "CPU": 30,
+    "CPU": 16,
     "GPU": 1,
   }
   batch_size: 1024
@@ -15,11 +15,11 @@ wandb:
   tags: [ "Pretrain", "NERSC", "Multi-Node", "135M", "Diffusion", "Vanilla" ]
 
 options:
-  default: options.yaml
+  default: options-seg.yaml
 
   Training:
-    total_epochs: 10
-    epochs: 2
+    total_epochs: 100
+    epochs: 100
     model_checkpoint_save_path: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset/"
     model_checkpoint_load_path: null
     pretrain_model_load_path: null
@@ -45,7 +45,7 @@ options:
         weight_decay: *wd
         optimizer_type: *opt
       Classification:
-        include: false
+        include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -79,18 +79,25 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: *opt
+      Segmentation:
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: *opt
 
     ProgressiveTraining:
       stages:
         - name: "full_training"
-          epoch_ratio: 0.8
+          epoch_ratio: 1.0
           transition_ratio: 0.1
           loss_weights:
-            generation: [ 0.0, 0.5 ]
-            classification: [ 0.0, 1.0 ]
-            classification-noised: [ 0.0, 1.0 ]
+            generation: [ 0.0, 0.0 ]
+            classification: [ 1.0, 1.0 ]
+            classification-noised: [ 0.0, 0.0 ]
             regression: [ 0.0, 0.0 ]
             assignment: [ 1.0, 1.0 ]
+            segmentation: [1.0, 1.0]
           train_parameters:
             noise_prob: [1.0, 1.0]
             reco_attn_mask: [0.0, 0.0]
@@ -110,7 +117,7 @@ options:
       lr: 0.025
 
   Dataset:
-    dataset_limit: 0.1
+    dataset_limit: 0.05
     normalization_file: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset//normalization.pt"
     val_split: [ 0.7, 1.0 ]
 
@@ -125,7 +132,7 @@ network:
   # ...
 
 event_info:
-  default: multi_process.yaml
+  default: multi_process_seg.yaml
 
   # overwrites
   # ...

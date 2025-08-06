@@ -30,7 +30,7 @@ class MHAttentionMapPointCloud(nn.Module):
         """
         q: Tensor [B, Q, F]   # Q query vectors per batch (could be same as N)
         k: Tensor [B, N, F]   # N key vectors (e.g. same as input point cloud)
-        mask: Tensor [B, N] (optional) - masks out attention for certain points
+        mask: Tensor [B, N] (optional) - masks out attention for certain points, 1 means invalid, 0 means valid
         """
         B, Q, _ = q.shape
         N = k.shape[1]
@@ -48,7 +48,7 @@ class MHAttentionMapPointCloud(nn.Module):
             attn = attn.masked_fill(mask.unsqueeze(1).unsqueeze(-1), float("-inf"))
 
         attn = F.softmax(attn.flatten(2), dim=-1).view(attn.size())  # over N
-        attn = self.dropout(attn)  # [B, Q, Hn, N]
+        attn = self.dropout(attn)  # [B, Q, N, Hn]
 
         return attn
 
@@ -83,10 +83,13 @@ class MaskHead(nn.Module):
 
         while in_dim > 1:
             out_dim = max(1, int(in_dim / self.dim_decay_rate))
-            layers.append(nn.LayerNorm(in_dim))
-            layers.append(nn.GELU())
-            layers.append(nn.Dropout(self.dropout))
-            layers.append(nn.Linear(in_dim, out_dim))
+            if out_dim == 1:
+                layers.append(nn.Linear(in_dim, out_dim))
+            else:
+                layers.append(nn.Linear(in_dim, out_dim))
+                layers.append(nn.LayerNorm(out_dim))
+                layers.append(nn.GELU())
+                layers.append(nn.Dropout(self.dropout))
             in_dim = out_dim
             if in_dim == 1:
                 break
@@ -195,6 +198,7 @@ class SegmentationHead(nn.Module):
             num_layers=num_layers,
             return_intermediate=return_intermediate,
         )
+        self.num_queries = num_queries
         self.query_embed = nn.Embedding(num_queries, projection_dim)
 
         self.mask_attention = MHAttentionMapPointCloud(
@@ -248,7 +252,10 @@ class SegmentationHead(nn.Module):
         pred_mask = self.mask_decoder(
             q = memory,
             bbox_mask = mask_attention
-        )
+        ) # (B, N, P)
+
+        memory_mask = memory_mask.squeeze(-1).unsqueeze(1).repeat(1, self.num_queries, 1)
+        pred_mask = pred_mask.masked_fill(~(memory_mask.bool()), -99999)
 
         pred_class = self.class_embed(hs[-1])
 

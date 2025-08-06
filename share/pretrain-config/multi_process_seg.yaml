@@ -1,0 +1,441 @@
+# ---------------------------------------------------
+# REQUIRED - INPUTS - List all inputs to SPANet here.
+# ---------------------------------------------------
+INPUTS:
+  # -----------------------------------------------------------------------------
+  # REQUIRED - SEQUENTIAL - inputs which can have an arbitrary number of vectors.
+  # -----------------------------------------------------------------------------
+  SEQUENTIAL:
+    Source:
+#      mass: log_normalize
+      energy: log_normalize
+      pt: log_normalize
+      eta: normalize
+      phi: normalize_uniform
+      btag: none
+      isLepton: none
+      charge: none
+
+  # ---------------------------------------------------------------------
+  # REQUIRED - GLOBAL - inputs which will have a single vector per event.
+  # ---------------------------------------------------------------------
+  GLOBAL:
+    Conditions:
+      met: log_normalize
+      met_phi: normalize
+      nLepton: none
+      nbJet: none
+      nJet: none
+      HT: log_normalize
+      HT_lep: log_normalize
+      M_all: log_normalize
+      M_leps: log_normalize
+      M_bjets: log_normalize
+
+# ----------------------------------------------------------------------
+# REQUIRED - EVENT - Complete list of resonance particles and daughters.
+# ----------------------------------------------------------------------
+EVENT:
+
+  TTHadronics:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - q1
+      - q2
+
+  TT1L:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - l
+
+  TT2L:
+    t1:
+      - b
+      - l+
+    t2:
+      - b
+      - l-
+
+  WJetsToQQ:
+    W:
+      - q1
+      - q2
+
+  ZJetsToQQ:
+    Z:
+      - q1
+      - q2
+
+  ZJetsToLL:
+    Z:
+      - l1
+      - l2
+
+  ZZ_4L:
+    Z1:
+      - l1
+      - l2
+    Z2:
+      - l1
+      - l2
+
+  ZZ_2L:
+    Z1:
+      - l1
+      - l2
+    Z2:
+      - q1
+      - q2
+
+  WZ_1L:
+    Z:
+      - q1
+      - q2
+
+  WW_1L:
+    W2:
+      - q1
+      - q2
+  
+  WZ_2L:
+    W:
+      - q1
+      - q2
+    Z:
+      - l1
+      - l2
+
+  WZ_3L:
+    Z:
+      - l1
+      - l2
+
+
+  ttW_FullHadronics:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - q1
+      - q2
+    W:
+      - q1
+      - q2
+
+  ttZ_FullHadronics:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - q1
+      - q2
+    Z:
+      - q1
+      - q2
+
+  ttZ_Leptonic:
+    t1:
+      - b
+      - q1
+      - q2
+    t2:
+      - b
+      - q1
+      - q2
+    Z:
+      - l1
+      - l2
+
+  WJetsToLNu:
+    W:
+      - l
+
+# ---------------------------------------------------------
+# REQUIRED KEY - PERMUTATIONS - List of valid permutations.
+# ---------------------------------------------------------
+PERMUTATIONS:
+
+  TTHadronics:
+    EVENT:
+      - [ t1, t2 ]
+    t1:
+      - [ q1, q2 ]
+    t2:
+      - [ q1, q2 ]
+
+  TT1L:
+    t1:
+      - [ q1, q2 ]
+
+  TT2L:
+    - [ ]
+
+  WJetsToQQ:
+    W:
+      - [ q1, q2 ]
+
+  ZJetsToQQ:
+    Z:
+      - [ q1, q2 ]
+
+  ZJetsToLL:
+    Z:
+      - [ l1, l2 ]
+
+  ZZ_4L:
+    EVENT:
+      - [ Z1, Z2 ]
+    Z1:
+      - [ l1, l2 ]
+    Z2:
+      - [ l1, l2 ]
+
+  ZZ_2L:
+    Z1:
+      - [ l1, l2 ]
+    Z2:
+      - [ q1, q2 ]
+
+  WZ_1L:
+    Z:
+      - [ q1, q2 ]
+
+  WW_1L:
+    W2:
+      - [ q1, q2 ]
+
+  WZ_2L:
+    W:
+      - [ q1, q2 ]
+    Z:
+      - [ l1, l2 ]
+
+  WZ_3L:
+    Z:
+      - [ l1, l2 ]
+  
+  ttW_FullHadronics:
+    EVENT:
+      - [ t1, t2 ]
+    t1:
+      - [ q1, q2 ]
+    t2:
+      - [ q1, q2 ]
+    W:
+      - [ q1, q2 ]
+
+  ttZ_FullHadronics:
+    EVENT:
+      - [ t1, t2 ]
+    t1:
+      - [ q1, q2 ]
+    t2:
+      - [ q1, q2 ]
+    Z:
+      - [ q1, q2 ]
+
+  ttZ_Leptonic:
+    EVENT:
+      - [ t1, t2 ]
+    t1:
+      - [ q1, q2 ]
+    t2:
+      - [ q1, q2 ]
+    Z:
+      - [ l1, l2 ]
+
+  WJetsToLNu:
+    - [ ]
+
+
+# ------------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired features to regress from observables.
+# ------------------------------------------------------------------------------
+REGRESSIONS:
+
+  TTHadronics:
+    t1:
+      - pt
+      - eta
+      - phi
+    t2:
+      - pt
+      - eta
+      - phi
+
+  TT1L:
+    t1:
+      - pt
+      - eta
+      - phi
+    t2:
+      - pt
+      - eta
+      - phi
+    t2/v:
+      - pt
+      - eta
+      - phi
+
+  TT2L:
+    t1:
+      - pt
+      - eta
+      - phi
+    t1/v:
+      - pt
+      - eta
+      - phi
+    t2:
+      - pt
+      - eta
+      - phi
+    t2/v:
+      - pt
+      - eta
+      - phi
+
+  WJetsToQQ:
+    W:
+      - pt
+      - eta
+      - phi
+
+  ZJetsToQQ:
+    Z:
+      - pt
+      - eta
+      - phi
+
+  ZJetsToLL:
+    Z:
+      - pt
+      - eta
+      - phi
+
+  ZZ_2L:
+    Z1:
+      - pt
+      - eta
+      - phi
+    Z2:
+      - pt
+      - eta
+      - phi
+
+  WZ_1L:
+    W:
+      - pt
+      - eta
+      - phi
+    W/v:
+      - pt
+      - eta
+      - phi
+    Z:
+      - pt
+      - eta
+      - phi
+
+  WW_1L:
+    W1:
+      - pt
+      - eta
+      - phi
+    W1/v:
+      - pt
+      - eta
+      - phi
+    W2:
+      - pt
+      - eta
+      - phi
+
+  WZ_2L:
+    W:
+      - pt
+      - eta
+      - phi
+    Z:
+      - pt
+      - eta
+      - phi
+
+  WZ_3L:
+    W:
+      - pt
+      - eta
+      - phi
+    W/v:
+      - pt
+      - eta
+      - phi
+    Z:
+      - pt
+      - eta
+      - phi
+
+  WJetsToLNu:
+    W/v:
+      - pt
+      - eta
+      - phi
+
+# -----------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+CLASSIFICATIONS:
+  EVENT:
+    - signal
+
+
+CLASSLABEL:
+  EVENT:
+    signal:
+      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]
+
+
+RESONANCE_LABEL:
+  - ["null", "t(had)", "t1l", "W(had)", "W(off-s)", "Z(had)", "Z(l)", "W(l)", "W(l,off-s)" ]
+
+PARTICLE_PROPERTIES:
+  - Energy
+  - Spin
+  - nProduct_BJet
+  - nProduct_Jet
+  - nProduct_Lepton
+  - Product_LeptonCharge
+
+GENERATIONS:
+  Conditions:
+    - met
+    - met_phi
+    - M_all
+  GlobalTargets:
+    - HT
+
+  Events:
+    - energy
+    - pt
+    - eta
+    - phi
+    - btag
+    - isLepton
+    - charge
+
+  Neutrinos:
+    pt: log_normalize
+    eta: normalize
+    phi: normalize_uniform
