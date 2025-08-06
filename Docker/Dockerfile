@@ -37,8 +37,9 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r /requirements.txt
 
 # Build torch-linear-assignment with CUDA
-ENV TLA_BUILD_CUDA=1
-RUN pip install --no-cache-dir torch_linear_assignment==0.0.4
+RUN git clone https://github.com/AvencastF/torch-linear-assignment.git /workspace/torch-linear-assignment && \
+    cd /workspace/torch-linear-assignment && \
+    pip install --no-cache-dir --no-build-isolation .
 
 # Optional: clean pip cache
 RUN rm -rf /root/.cache/pip/*
