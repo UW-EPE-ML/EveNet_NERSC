@@ -4,23 +4,12 @@ FROM docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 # Install dependencies for building Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    g++ \
-    git \
     curl \
     libssl-dev \
     zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
     libsqlite3-dev \
-    wget \
-    llvm \
-    libncursesw5-dev \
-    xz-utils \
-    tk-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
     libffi-dev \
-    liblzma-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install Python 3.12.3
