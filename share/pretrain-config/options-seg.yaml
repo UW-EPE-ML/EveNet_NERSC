@@ -150,7 +150,7 @@ Training:
 
     Segmentation:
       learning_rate: *lr
-      optimizer_group: "generation"
+      optimizer_group: "segmentation"
       optimizer_type: "lion"
       warm_up: true
       include: false # whether to build in network
