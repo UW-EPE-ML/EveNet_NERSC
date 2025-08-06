@@ -217,7 +217,7 @@ def shared_step(
         mask_loss = mask_loss.mean()
         dice_loss = dice_loss.mean()
 
-    print("predict_mask", predict_mask, "predict_cls", predict_classification)
+    # print("predict_mask", predict_mask, "predict_cls", predict_classification)
 
     if update_metrics:
         metrics.update(

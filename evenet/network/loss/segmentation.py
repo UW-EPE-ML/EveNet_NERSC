@@ -111,7 +111,7 @@ def hungarian_matching(
         class_cost = -(predict_cls_expanded * target_cls_expanded)
         total_cost = total_cost + class_cost.sum(dim=-1)
 
-    src_indices, tgt_indices = assignment_to_indices(batch_linear_assignment(total_cost)) # (B, N)
+    src_indices, tgt_indices = assignment_to_indices(batch_linear_assignment(total_cost.detach())) # (B, N)
 
     return src_indices, tgt_indices
 
