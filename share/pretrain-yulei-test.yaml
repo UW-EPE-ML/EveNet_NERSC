@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250618.654M"
+  data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250725.2700M"
   number_of_workers: 32
   resources_per_worker: {
     "CPU": 30,
@@ -8,25 +8,34 @@ platform:
   batch_size: 512
   prefetch_batches: 2
 
-wandb:
-  project: "Pretrain"
-  entity: "ytchou97-university-of-washington"
-  name: "Pretrain"
-  run_name: "test-gen-head"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "654M", "Diffusion", "Vanilla" ]
+logger:
+  wandb:
+    project: "Pretrain"
+    entity: "ytchou97-university-of-washington"
+    name: "Pretrain"
+    run_name: &logger_name "nominal-test"
+    id: "pretrain-test-1"
+    tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla", "test" ]
+    simplified: true
+  local:
+    save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
+    name: *logger_name
+    version: "test-1"
+
 
 options:
   default: options/options.yaml
 
   Training:
-    total_epochs: 50
-    epochs: 50
-    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion"
+    total_epochs: 5
+    epochs: 5
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.test"
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/epoch=4_train=2.5971_val=2.7559.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 2 # how often to run diffusion
     diffusion_every_n_steps: 10 # how often to run diffusion inside the valid epoch
+    eval_metrics_every_n_epochs: 3 # how often to run evaluation metrics
 
     learning_rate: &lr 0.000018
     #    learning_rate: &lr 0.000045
@@ -59,6 +68,8 @@ options:
         optimizer_type: *opt
       Assignment:
         include: false
+      Segmentation:
+        include: true
         warm_up: true
         learning_rate: *lr
         weight_decay: *wd
@@ -91,13 +102,14 @@ options:
             generation-truth: [ 1.0, 1.0 ]
             generation-recon: [ 1.0, 1.0 ]
             classification: [ 1.0, 1.0 ]
-            classification-noised: [ 1.0, 1.0 ]
-            assignment: [ 1.0, 1.0 ]
+            classification-noised: [  1.0, 1.0 ]
+            regression: [ 0.0, 0.0 ]
+            assignment: [ 0.0, 0.0 ]
+            segmentation: [ 1.0, 1.0 ]
           train_parameters:
-            noise_prob: [ 1.0, 1.0 ]
+            noise_prob: [ 0.3, 0.0 ]
             reco_attn_mask: [ 0.0, 0.0 ]
             ema_decay: [ 0.99, 0.999 ]
-
     FAMO:
       turn_on: false
 
@@ -105,8 +117,8 @@ options:
       update_every_n_steps: 10
 
   Dataset:
-    dataset_limit: 0.1
-    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250618.654M/normalization.pt"
+    dataset_limit: 0.005
+    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250725.2700M/normalization.pt"
     val_split: [ 0.7, 1.0 ]
 
   Metrics:
