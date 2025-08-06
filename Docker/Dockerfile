@@ -2,13 +2,13 @@
 FROM python:3.12-slim as builder
 
 # Install system build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    g++ \
-    python3-dev \
-    git \
-    ninja-build \
-    && rm -rf /var/lib/apt/lists/*
+#RUN apt-get update && apt-get install -y --no-install-recommends \
+#    build-essential \
+#    g++ \
+#    python3-dev \
+#    git \
+#    ninja-build \
+#    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements.txt from host to the builder stage
 COPY requirements.txt /requirements.txt
