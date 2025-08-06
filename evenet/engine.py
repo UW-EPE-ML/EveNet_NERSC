@@ -179,6 +179,12 @@ class EveNetEngine(L.LightningModule):
             self.seg_loss = seg_loss
             self.l.info(f"segmentation loss initialized")
 
+        self.seg_loss = None
+        if self.segmentation_cfg.include:
+            from evenet.network.loss.segmentation import loss as seg_loss
+            self.seg_loss = seg_loss
+            print(f"{self.__class__.__name__} segmentation loss initialized")
+
         self.gen_loss = None
         if self.generation_include:
             import evenet.network.loss.generation as gen_loss
