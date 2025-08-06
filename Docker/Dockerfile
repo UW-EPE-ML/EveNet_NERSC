@@ -17,7 +17,7 @@ COPY requirements.txt /requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
 
 ENV TLA_BUILD_CUDA=1
-RUN pip3 install --no-cache-dir torch_linear_assignment==0.0.3
+RUN pip3 install --no-cache-dir torch_linear_assignment==0.0.4
 
 RUN rm -rf /root/.cache/pip/*
 
