@@ -15,7 +15,7 @@
 
 #SBATCH --reservation=_CAP_EveNet_PostEPS
 
-#SBATCH --image=registry.nersc.gov/m2616/avencast/evenet:1.1
+#SBATCH --image=registry.nersc.gov/m2616/avencast/evenet:1.3
 
 head_node=$(hostname)
 head_node_ip=$(hostname --ip-address)
@@ -51,7 +51,7 @@ cd ../ && source setup.sh
 
 export TORCH_NCCL_TIMEOUT=180
 
-shifter python3 evenet/train.py share/pretrain-yulei.yaml
+shifter python3 evenet/train.py share/pretrain-yulei-test.yaml
 #shifter python3 evenet/train.py share/pretrain-yulei-long.yaml
 #shifter python3 evenet/train.py share/pretrain-yulei-large.yaml
 

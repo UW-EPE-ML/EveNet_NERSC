@@ -20,12 +20,13 @@ class SegmentationMetrics:
     def __init__(
         self,
         device,
-        hist_xmin: float = -0.5,
-        hist_xmax: float = 5.5,
-        num_bins: int = 6,
+        hist_xmin: float = 0,
+        hist_xmax: float = 1.0,
+        num_bins: int = 100,
         mask_threshold: float = 0.5,
         process: int = "",
-        clusters_label = None
+        clusters_label = None,
+        num_queries: int = 5,
     ):
         self.device = device
         self.hist_xmin = hist_xmin
@@ -35,9 +36,42 @@ class SegmentationMetrics:
         self.process = process
         self.clusters_label = clusters_label
         self.num_classes = len(clusters_label)
+        self.num_queries = num_queries
         self.matrix = np.zeros((self.num_classes, self.num_classes), dtype=np.int64)
+        self.matrix_number = np.zeros((self.num_queries + 1, self.num_queries + 1), dtype=np.int64)  # +1 for null class
         self.train_matrix = None
+        self.train_matrix_number = None
         self.labels = np.arange(self.num_classes)
+        self.labels_num = np.arange(self.num_queries + 1)  # +1 for null class
+        self.labels_num_str = [str(i) for i in self.labels_num]
+
+        # For Histogram
+        self.bins = np.linspace(self.hist_xmin, self.hist_xmax, self.num_bins + 1)
+        self.bin_centers = 0.5 * (self.bins[:-1] + self.bins[1:])
+
+        self.score_distribution = {
+            cluster_name: {
+                "true-cls-true-mask": np.zeros(self.num_bins),
+                "false-cls-true-mask": np.zeros(self.num_bins),
+                "true-cls-false-mask": np.zeros(self.num_bins),
+                "false-cls-false-mask": np.zeros(self.num_bins),
+            }
+            for cluster_name in clusters_label.keys()
+        }
+
+        self.cluster_matching = {
+            cluster_name: {
+                "true-cluster": 0,
+                "pred-cls-correct-cluster": 0,
+                "pred-cls-wrong-cluster": 0,
+                "true-cluster-entries": 0,
+                "pred-cls-correct-cluster-entries": 0,
+                "pred-cls-wrong-cluster-entries": 0,
+            }
+            for cluster_name in clusters_label.keys()
+        }
+
+        self.train_score_distribution = None
 
     def update(
             self,
@@ -66,24 +100,123 @@ class SegmentationMetrics:
         B, N_match = pred_indices.shape
         batch_idx = torch.arange(B, device=pred_indices.device).unsqueeze(-1)  # (B, 1)
 
+        # print("y_pred_mask", y_pred_mask[0, 1])
+
         y_true_cls = y_true_cls[batch_idx, tgt_indices]
         y_pred_cls = y_pred_cls[batch_idx, pred_indices]
         y_true_mask = y_true_mask[batch_idx, tgt_indices]
         y_pred_mask = y_pred_mask[batch_idx, pred_indices]
-        segmentation_mask = segmentation_mask[batch_idx, tgt_indices] if segmentation_mask is not None else None
-
-        y_true_cls = y_true_cls.argmax(dim=-1).flatten().cpu().numpy()
-        y_pred_cls = y_pred_cls.argmax(dim=-1).flatten().cpu().numpy()
 
 
-        cm_partial = confusion_matrix(y_true_cls, y_pred_cls, labels=self.labels)
+        y_pred_mask = y_pred_mask.sigmoid()
+        y_true_mask = y_true_mask.float()
+
+        # print("before", "y_true_mask", y_true_mask[0,1], "y_pred_mask", y_pred_mask[0,1])
+
+
+
+        # Apply class zero mask and uniqueness to the predicted mask
+        # predict_class_label = y_pred_cls.argmax(dim=-1)
+        # class_zero_mask = ~(predict_class_label == 0)  # (B, N)
+        # class_zero_mask = class_zero_mask.unsqueeze(-1).float()
+        # y_pred_mask = y_pred_mask * class_zero_mask # Apply class zero mask to the predicted mask
+        # max_idx = y_pred_mask.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
+        # # Create a mask with 1 at max index, 0 elsewhere
+        # mask = torch.zeros_like(y_pred_mask)
+        # mask.scatter_(1, max_idx, 1.0)
+        # y_pred_mask = y_pred_mask * mask  # Apply the mask to y_pred_mask
+        # Find the max value in the masked prediction
+        # y_pred_mask shape: (B, N, P)
+        # Compute max over dim=(1, 2) → result shape: (B,)
+        # max_val = y_pred_mask.amax(dim=(1, 2))  # torch >=1.7, or use torch.max with reshape
+        #
+        # # To avoid division by zero, clamp min to a small positive number (or check)
+        # max_val_clamped = max_val.clamp(min=1e-8)  # prevent division by zero
+        #
+        # Reshape max_val to broadcast back to (B, N, P)
+        # max_val_reshaped = max_val_clamped[:, None, None]  # shape (B, 1, 1)
+
+        # # Scale
+        # y_pred_mask = y_pred_mask / max_val_reshaped
+        # segmentation_mask = segmentation_mask[batch_idx, tgt_indices] if segmentation_mask is not None else None
+
+        y_true_cls_np = y_true_cls.argmax(dim=-1).flatten().cpu().numpy()
+        y_pred_cls_np = y_pred_cls.argmax(dim=-1).flatten().cpu().numpy()
+        # Cluster confusion matrix
+        cm_partial = confusion_matrix(y_true_cls_np, y_pred_cls_np, labels=self.labels)
         for i, true_label in enumerate(self.labels):
             for j, pred_label in enumerate(self.labels):
                 if true_label < self.num_classes and pred_label < self.num_classes:
                     self.matrix[true_label, pred_label] += cm_partial[i, j]
 
+
+        # Number confusion matrix
+        y_true_num_np = (y_true_cls.argmax(dim=-1) > 0).sum(-1).flatten().cpu().numpy()
+        y_pred_num_np = (y_pred_cls.argmax(dim=-1) > 0).sum(-1).flatten().cpu().numpy()
+        cm_number = confusion_matrix(y_true_num_np, y_pred_num_np, labels=self.labels_num)
+        for i, true_label in enumerate(self.labels_num):
+            for j, pred_label in enumerate(self.labels_num):
+                if true_label < self.num_queries + 1 and pred_label < self.num_queries + 1:
+                    self.matrix_number[true_label, pred_label] += cm_number[i, j]
+
+        # Mask distribution
+        # Setup
+        cls_true_filter = (y_true_cls.argmax(dim=-1) == y_pred_cls.argmax(dim=-1))  # (B, N)
+        inside_filter = (y_true_mask.float() > 0)  # (B, N, P)
+        outside_filter = ~inside_filter  # (B, N, P)
+
+        correct_masking = ((y_pred_mask > self.mask_threshold).float()) == (y_true_mask.float()) # (B, N, P)
+        correct_masking_full_cluster = correct_masking.all(dim=-1) # (B, N)
+        # Loop over clusters
+        for i, cluster_name in enumerate(self.clusters_label.keys()):
+            cluster_filter = (y_true_cls.argmax(dim=-1) == i)  # (B, N)
+
+
+            # calculate metrics:
+            self.cluster_matching[cluster_name]["true-cluster"] += (cluster_filter.float()).sum().item()
+            self.cluster_matching[cluster_name]["true-cluster-entries"] += (inside_filter.float() * cluster_filter.unsqueeze(-1).float()).sum().item()
+            self.cluster_matching[cluster_name]["pred-cls-correct-cluster-entries"] += (correct_masking.float() * inside_filter.float() * cluster_filter.unsqueeze(-1).float() * cls_true_filter.unsqueeze(-1).float()).sum().item()
+            self.cluster_matching[cluster_name]["pred-cls-wrong-cluster-entries"] += (correct_masking.float() * inside_filter.float() * cluster_filter.unsqueeze(-1).float() * (~cls_true_filter).unsqueeze(-1).float()).sum().item()
+            self.cluster_matching[cluster_name]["pred-cls-correct-cluster"] += (correct_masking_full_cluster.float() * cluster_filter.float() * cls_true_filter.float()).sum().item()
+            self.cluster_matching[cluster_name]["pred-cls-wrong-cluster"] += (correct_masking_full_cluster.float() * cluster_filter.float() * (~cls_true_filter).float()).sum().item()
+
+
+            # Expand cluster and classification filters to (B, N, P) to match mask shape
+            cluster_filter_3d = cluster_filter.unsqueeze(-1).expand_as(y_pred_mask)
+            cls_true_filter_3d = cls_true_filter.unsqueeze(-1).expand_as(y_pred_mask)
+
+            # Final filters for each category (B, N, P)
+            true_cls_true_mask = cls_true_filter_3d & cluster_filter_3d & inside_filter
+            false_cls_true_mask = (~cls_true_filter_3d) & cluster_filter_3d & inside_filter
+            true_cls_false_mask = cls_true_filter_3d & cluster_filter_3d & outside_filter
+            false_cls_false_mask = (~cls_true_filter_3d) & cluster_filter_3d & outside_filter
+
+            for label, mask in zip(
+                    ["true-cls-true-mask", "false-cls-true-mask", "true-cls-false-mask", "false-cls-false-mask"],
+                    [true_cls_true_mask, false_cls_true_mask, true_cls_false_mask, false_cls_false_mask]
+            ):
+                # Extract values from y_pred_mask where the filter is True
+                values = y_pred_mask.flatten()[mask.flatten()]  # 1D tensor of selected predicted mask values
+                values = values[values > 1e-2]  # Apply threshold, 0 means no prediction
+                if values.numel() == 0:
+                    continue
+                # Histogram using numpy
+                hist, _ = np.histogram(values.detach().flatten().cpu().numpy(), bins=self.bins)
+
+                self.score_distribution[cluster_name][label] += hist
+
+
     def reset(self, cm: bool = True):
         self.matrix = np.zeros((self.num_classes, self.num_classes), dtype=np.int64)
+        self.matrix_number = np.zeros((self.num_queries + 1, self.num_queries + 1), dtype=np.int64)  # +1 for null class
+        for cluster_name in self.score_distribution.keys():
+            for label in self.score_distribution[cluster_name].keys():
+                self.score_distribution[cluster_name][label] = np.zeros(self.num_bins)
+
+        for cluster_name in self.cluster_matching.keys():
+            for key in self.cluster_matching[cluster_name].keys():
+                self.cluster_matching[cluster_name][key] = 0
+
 
     def reduce_across_gpus(self):
         """All-reduce across DDP workers"""
@@ -92,8 +225,36 @@ class SegmentationMetrics:
             torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
             self.matrix = tensor.cpu().numpy()
 
-    def assign_train_result(self, train_matrix=None):
+            tensor_number = torch.tensor(self.matrix_number, dtype=torch.long, device=self.device)
+            torch.distributed.all_reduce(tensor_number, op=torch.distributed.ReduceOp.SUM)
+            self.matrix_number = tensor_number.cpu().numpy()
+
+            # Reduce score distribution
+            for cluster_name in self.score_distribution.keys():
+                for label in self.score_distribution[cluster_name].keys():
+                    hist_tensor = torch.tensor(
+                        self.score_distribution[cluster_name][label],
+                        dtype=torch.long,
+                        device=self.device
+                    )
+                    torch.distributed.all_reduce(hist_tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.score_distribution[cluster_name][label] = hist_tensor.cpu().numpy()
+
+            for cluster_name in self.cluster_matching.keys():
+                for key in self.cluster_matching[cluster_name].keys():
+                    tensor = torch.tensor(
+                        self.cluster_matching[cluster_name][key],
+                        dtype=torch.long,
+                        device=self.device
+                    )
+                    torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                    self.cluster_matching[cluster_name][key] = tensor.item()
+
+    def assign_train_result(self, train_matrix=None, train_matrix_number=None, score_distribution=None):
         self.train_matrix = train_matrix
+        self.train_matrix_number = train_matrix_number
+        self.train_score_distribution = score_distribution
+
 
     def compute(self, matrix=None, normalize=False):
         """Return normalized or raw matrix"""
@@ -103,9 +264,10 @@ class SegmentationMetrics:
             cm = np.nan_to_num(cm / row_sums)
         return cm
 
-    def plot_cm(self, normalize=True):
+
+    def plot_cm_func(self, matrix, label, train_matrix=None, normalize=True):
         # --- Teal-Navy gradient colormap ---
-        class_names = self.clusters_label.keys()
+        class_names = label
         gradient_colors = ('#f0f9fa', "#4ca1af")
         cmap = mcolors.LinearSegmentedColormap.from_list("teal_navy", gradient_colors)
 
@@ -117,18 +279,19 @@ class SegmentationMetrics:
             "valid_dark": "#FFB4A2"
         }
 
-        cm_valid = self.compute(self.matrix, normalize=normalize) if normalize else self.matrix
+        cm_valid = self.compute(matrix, normalize=normalize) if normalize else matrix
 
         # Optional: Compute train confusion matrix
         cm_train = None
-        if self.train_matrix is not None:
-            cm_train = self.compute(self.matrix, normalize=normalize) if normalize else self.train_matrix
+        if train_matrix is not None:
+            cm_train = self.compute(train_matrix, normalize=normalize) if normalize else train_matrix
 
         fig, ax = plt.subplots(figsize=(10, 8))
         im = ax.imshow(cm_valid, interpolation="nearest", cmap=cmap)
         plt.colorbar(im, ax=ax)
 
-        tick_marks = np.arange(self.num_classes)
+        num_classes = len(class_names)
+        tick_marks = np.arange(num_classes)
         ax.set_xticks(tick_marks)
         ax.set_yticks(tick_marks)
         ax.set_xticklabels(class_names or tick_marks, rotation=45, ha="right")
@@ -136,8 +299,8 @@ class SegmentationMetrics:
 
         fmt = ".2f" if normalize else "d"
 
-        for i in range(self.num_classes):
-            for j in range(self.num_classes):
+        for i in range(num_classes):
+            for j in range(num_classes):
 
                 cell_val = cm_valid[i, j]
                 bg_val = cell_val / cm_valid.max()  # normalized background for contrast logic
@@ -159,10 +322,84 @@ class SegmentationMetrics:
 
         ax.set_xlabel("Predicted label")
         ax.set_ylabel("True label")
-        ax.set_title("Confusion Matrix (Train in Red, Valid in Black)")
+        ax.set_title("Confusion Matrix (Train in Black, Valid in Red)")
         fig.tight_layout()
         return fig
 
+    def plot_cm(self, normalize=True):
+
+        fig1 = self.plot_cm_func(
+            matrix=self.matrix,
+            label=self.clusters_label.keys(),
+            train_matrix=self.train_matrix,
+            normalize=normalize
+        )
+        fig2 = self.plot_cm_func(
+            matrix=self.matrix_number,
+            label=self.labels_num_str,
+            train_matrix=self.train_matrix_number,
+            normalize=normalize
+        )
+
+        return fig1, fig2
+
+    def plot_score_distributions(self, cluster_name, logy=False):
+        fig, ax = plt.subplots(figsize=(10, 8))
+        metrics = dict()
+
+        # Total points inside mask (used for ratio)
+        total_true = (
+            np.sum(self.score_distribution[cluster_name]["true-cls-true-mask"])
+            + np.sum(self.score_distribution[cluster_name]["false-cls-true-mask"])
+        ) + 1e-8  # avoid divide-by-zero
+
+        # print("total_true", total_true)
+
+        # Custom color palette (max 10 classes)
+        colors = [
+            "#40B0A6", "#6D8EF7", "#6E579A", "#A38E89", "#A5C8DD",
+            "#CD5582", "#E1BE6A", "#E1BE6A", "#E89A7A", "#EC6B2D"
+        ]
+
+        bin_centers = 0.5 * (self.bins[1:] + self.bins[:-1])
+        bin_widths = np.diff(self.bins)
+
+        for idx, label in enumerate(["true-cls-true-mask", "false-cls-true-mask", "true-cls-false-mask", "false-cls-false-mask"]):
+            hist = self.score_distribution[cluster_name][label]
+            # Plot training histogram (bars)
+            ratio = np.sum(hist) / total_true
+            if np.sum(hist) > 0:
+                density = hist / (np.sum(hist) * bin_widths)
+            else:
+                density = hist
+            color = colors[idx % len(colors)]
+            label_ratio = f"{label} (ratio={ratio:.2f})"
+            ax.bar(bin_centers, density, width=bin_widths, color=color, alpha=0.85, label=label_ratio, edgecolor = 'black')
+            metrics[label] = ratio
+        ax.set_xlabel("Predicted Mask Score")
+        ax.set_ylabel("Density")
+        ax.set_title(f"Score Distribution for Cluster: {cluster_name}")
+        ax.legend()
+        if logy:
+            ax.set_yscale("log")
+        ax.grid(True, linestyle="--", alpha=0.6)
+        fig.tight_layout()
+
+        return fig, metrics
+
+
+    def compute_metrics(self):
+        metrics = dict()
+        for cluster_name in self.cluster_matching.keys():
+            metrics[cluster_name] = dict()
+            print(cluster_name, self.cluster_matching[cluster_name])
+            metrics[cluster_name]["cluster-purity/true-class"] = self.cluster_matching[cluster_name]["pred-cls-correct-cluster"] / self.cluster_matching[cluster_name]["true-cluster"] if self.cluster_matching[cluster_name]["true-cluster"] > 0 else 0
+            metrics[cluster_name]["cluster-purity/false-class"] = self.cluster_matching[cluster_name]["pred-cls-wrong-cluster"] / self.cluster_matching[cluster_name]["true-cluster"] if self.cluster_matching[cluster_name]["true-cluster"] > 0 else 0
+            metrics[cluster_name]["cluster-purity/all"] = metrics[cluster_name]["cluster-purity/true-class"] + metrics[cluster_name]["cluster-purity/false-class"]
+            metrics[cluster_name]["cluster-entries-purity/true-class"] = self.cluster_matching[cluster_name]["pred-cls-correct-cluster-entries"] / self.cluster_matching[cluster_name]["true-cluster-entries"] if self.cluster_matching[cluster_name]["true-cluster-entries"] > 0 else 0
+            metrics[cluster_name]["cluster-entries-purity/false-class"] = self.cluster_matching[cluster_name]["pred-cls-wrong-cluster-entries"] / self.cluster_matching[cluster_name]["true-cluster-entries"] if self.cluster_matching[cluster_name]["true-cluster-entries"] > 0 else 0
+            metrics[cluster_name]["cluster-entries-purity/all"] = metrics[cluster_name]["cluster-entries-purity/true-class"] + metrics[cluster_name]["cluster-entries-purity/false-class"]
+        return metrics
 
 
 
@@ -186,6 +423,7 @@ def shared_step(
         update_metrics: bool = True,
 ):
 
+
     # Null class don't need to be predicted, so we mask it out
     # predict_class_label = predict_classification.argmax(dim=-1)
     # class_zero_mask = (predict_class_label == 0)  # (B, N)
@@ -193,6 +431,16 @@ def shared_step(
     # predict_mask = predict_mask.masked_fill(mask_expanded, -99999)  # Apply class zero mask to the predicted mask
 
     # print("class_zero_mask", mask_expanded.shape, "predict_class_label", predict_mask.shape)
+
+    # Make non-detectable points to be null class as well.
+
+    argmax_classes = target_classification.argmax(dim=-1)  # (B, N)
+    argmax_classes = argmax_classes * segmentation_mask.float()  # (B, N)
+    target_classification = F.one_hot(argmax_classes.long(), num_classes=target_classification.shape[-1])  # (B, N, C)
+
+    target_mask = (target_mask.float() * segmentation_mask.float().unsqueeze(-1)).bool()  # (B, N, P)
+
+
 
     mask_loss, dice_loss, cls_loss = seg_loss_fn(
         predict_cls = predict_classification,
@@ -249,11 +497,31 @@ def shared_epoch_end(
     if metrics_train is not None:
         metrics_train.reduce_across_gpus()
     if global_rank == 0:
-        metrics_valid.assign_train_result(metrics_train.matrix if metrics_train is not None else None)
-        fig_cm = metrics_valid.plot_cm(normalize=True)
+        metrics_valid.assign_train_result(
+            metrics_train.matrix if metrics_train is not None else None,
+            metrics_train.matrix_number if metrics_train is not None else None,
+            metrics_train.score_distribution if metrics_train is not None else None
+        )
+        fig_cm, fig_cm_num = metrics_valid.plot_cm(normalize=True)
         logger.log({
             f"{prefix}segmentation/CM": wandb.Image(fig_cm),
+            f"{prefix}segmentation/CM-number": wandb.Image(fig_cm_num),
+
         })
+        fig_cm.clear()
+        fig_cm_num.clear()
+
+        for cluster_name in metrics_valid.clusters_label.keys():
+            fig_score, metrics_score = metrics_valid.plot_score_distributions(cluster_name, logy=True)
+            logger.log({f"{prefix}{cluster_name}-segmentation/distribution": wandb.Image(fig_score)})
+            logger.log({f"{prefix}{cluster_name}-segmentation/{label}": value for label, value in metrics_score.items()})
+            fig_score.clear()
+
+        metrics = metrics_valid.compute_metrics()
+        for cluster_name in metrics:
+            for log, value in metrics[cluster_name].items():
+                logger.log({f"{prefix}{cluster_name}-segmentation/{log}": value})
+
 
     metrics_valid.reset()
     if metrics_train is not None:

@@ -255,7 +255,7 @@ class SegmentationHead(nn.Module):
         ) # (B, N, P)
 
         memory_mask = memory_mask.squeeze(-1).unsqueeze(1).repeat(1, self.num_queries, 1)
-        pred_mask = pred_mask.masked_fill(~(memory_mask.bool()), -99999)
+        pred_mask = pred_mask.masked_fill(~(memory_mask.bool()), -9e8)  # Apply memory mask
 
         pred_class = self.class_embed(hs[-1])
 

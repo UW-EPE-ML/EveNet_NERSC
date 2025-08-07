@@ -1,18 +1,28 @@
 platform:
-  data_parquet_dir: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset/"
-  number_of_workers: 1
+#  data_parquet_dir: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset/"
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-segInput/"
+  number_of_workers: 16
   resources_per_worker: {
-    "CPU": 16,
+    "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 1024
+  batch_size: 2048
   prefetch_batches: 2
 
-wandb:
-  project: "debug"
-  entity: "ytchou97-university-of-washington"
-  name: "seg-test"
-  tags: [ "Pretrain", "NERSC", "Multi-Node", "135M", "Diffusion", "Vanilla" ]
+
+logger:
+  wandb:
+    project: "debug"
+    entity: "ytchou97-university-of-washington"
+    name: "seg-test"
+    run_name: &logger_name "nominal-test"
+    tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla", "test" ]
+    simplified: false
+  local:
+    save_dir: "/pscratch/sd/t/tihsu/log"
+    name: *logger_name
+    version: "test-2"
+
 
 options:
   default: options-seg.yaml
@@ -93,7 +103,7 @@ options:
           transition_ratio: 0.1
           loss_weights:
             generation: [ 0.0, 0.0 ]
-            classification: [ 1.0, 1.0 ]
+            classification: [ 0.001, 0.001 ]
             classification-noised: [ 0.0, 0.0 ]
             regression: [ 0.0, 0.0 ]
             assignment: [ 1.0, 1.0 ]
@@ -117,7 +127,7 @@ options:
       lr: 0.025
 
   Dataset:
-    dataset_limit: 0.05
+    dataset_limit: 0.02
     normalization_file: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset//normalization.pt"
     val_split: [ 0.7, 1.0 ]
 

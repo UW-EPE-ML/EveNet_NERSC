@@ -100,8 +100,8 @@ def hungarian_matching(
 
 
     dice_cost = DICE_loss(
-        inputs = predict_cls_expanded,
-        targets = target_cls_expanded,
+        inputs = predict_mask_expanded,
+        targets = target_mask_expanded,
         # mask = segmentation_mask_expanded,
     ) # (B,  N_pred, N_tgt)
 
@@ -191,6 +191,9 @@ def loss(
         targets = target_mask_best,
         # mask = segmentation_mask_best,
     ) # (B, N)
+
+    # print("predict_mask", predict_mask_best[0,1], "target_mask", target_mask_best[0,1])
+
 
     # if segmentation_mask is not None:
     #     dice_loss = dice_loss.sum(-1) / (segmentation_mask.sum(-1) + 1e-6)
