@@ -306,7 +306,7 @@ class EveNetModel(nn.Module):
         self.schedule_flags = [
             ("generation", self.include_point_cloud_generation),
             ("neutrino_generation", self.include_neutrino_generation),
-            ("deterministic", self.include_classification or self.include_assignment or self.include_regression),
+            ("deterministic", self.include_classification or self.include_assignment or self.include_regression or self.include_segmentation),
         ]
 
     def forward(
