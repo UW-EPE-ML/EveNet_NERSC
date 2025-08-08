@@ -173,6 +173,7 @@ def merge_stats(stats_list):
     total['class_counts'] = np.sum([s["class_counts"] for s in stats_list], axis=0)
     total['subprocess_counts'] = np.sum([s["subprocess_counts"] for s in stats_list], axis=0)
     total['segment_class_counts'] = np.sum([s["segment_class_counts"] for s in stats_list], axis=0)
+    total['segment_full_class_counts'] = np.sum([s["segment_full_class_counts"] for s in stats_list], axis=0)
 
     # Final result
     result = {
@@ -187,6 +188,8 @@ def merge_stats(stats_list):
 
         "segment_class_counts": total["segment_class_counts"],
         "segment_class_balance": compute_classification_balance(total["segment_class_counts"]),
+        "segment_full_class_counts": total["segment_full_class_counts"],
+        "segment_full_class_balance": compute_classification_balance(total["segment_full_class_counts"]),
         "segment_regression": compute_mean_std(total["segment_regression"]),
 
         "invisible": compute_mean_std(total["invisible"]),
@@ -302,7 +305,7 @@ class PostProcessor:
 
     def add(
             self, x, conditions, regression, num_vectors, class_counts, subprocess_counts, invisible,
-            segment_class_counts, segment_regression,
+            segment_class_counts,segment_full_class_counts, segment_regression,
             event_weight=None
     ):
         x_stats = masked_stats(x.reshape(-1, x.shape[-1]), None)
@@ -325,6 +328,7 @@ class PostProcessor:
             "class_counts": class_counts,
             "subprocess_counts": subprocess_counts,
             "segment_class_counts": segment_class_counts,
+            "segment_full_class_counts": segment_full_class_counts,
             "segment_regression": segment_regression_stats,
 
             "invisible": invisible_stats,
@@ -381,6 +385,9 @@ class PostProcessor:
 
             'segment_class_counts': torch.tensor(merged_stats["segment_class_counts"], dtype=torch.float32),
             'segment_class_balance': torch.tensor(merged_stats["segment_class_balance"], dtype=torch.float32),
+
+            'segment_full_class_counts': torch.tensor(merged_stats["segment_full_class_counts"], dtype=torch.float32),
+            'segment_full_class_balance': torch.tensor(merged_stats["segment_full_class_balance"], dtype=torch.float32),
 
             'segment_regression_mean': torch.tensor(merged_stats["segment_regression"]["mean"], dtype=torch.float32),
             'segment_regression_std': torch.tensor(merged_stats["segment_regression"]["std"], dtype=torch.float32),

@@ -79,6 +79,11 @@ def store_valid_components(data_dict, base_name, momentum, mask, components):
 
 
 def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, return_data: bool = True):
+    mother_status = 21
+    if diagram['category'] == 'HWW':
+        mother_status = 22
+
+
     v4 = dict()
     for obj in ["els", "jets", "mus", "tas", "genpart"]:
         v4[obj] = lorentz_vector(objects[obj], obj)
@@ -163,7 +168,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
             symmetry_map = None
 
         candidate_array = select_by_pdgId(parton, product)
-        candidate_array = select_by_mother_status(parton, candidate_array, 21)
+        candidate_array = select_by_mother_status(parton, candidate_array, mother_status)
         product_name = 'EVENT/{}'.format(product)
         ranking = None if ((symmetry_map is None) or (product not in symmetry_map)) else symmetry_map[product]
         candidate_array, event_dict = select_by_products(

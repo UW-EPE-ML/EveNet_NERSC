@@ -120,25 +120,37 @@ class EveNetDataConverter:
             'segmentation-data': np.zeros((num_events, max_event_seg, self.point_cloud_dim), dtype=bool),
             'segmentation-momentum': np.zeros((num_events, max_event_seg, 4), dtype=np.float32),
             'segmentation-mask': np.zeros((num_events, max_event_seg), dtype=bool),
+
+            'segmentation-full-class': np.zeros((num_events, max_event_seg, max_seg), dtype=int),
+            'segmentation-full-mask': np.zeros((num_events, max_event_seg), dtype=bool),
         }
 
         i = 0
         for resonance, seg_tag in segment_tag_map.get(current_process, {}).items():
-            # one-hot encode the segmentation class
-            output_dict['segmentation-class'][:, i, seg_tag] = 1
             # fill the momentum if available
             if f"{gen_momentum_label}/{resonance}" in self.raw_data:
                 output_dict['segmentation-momentum'][:, i, :] = self.raw_data[f"{gen_momentum_label}/{resonance}"]
             # fill the assignment mask
-            # output_dict['segmentation-mask'][:, i, seg_tag] = 1
             label = f"TARGETS/{current_process}/{resonance}/"
-            for children in [c for c in self.raw_data.keys() if c.startswith(label)]:
+            daughters = [c for c in self.raw_data.keys() if c.startswith(label) and not c.endswith('/v')]
+            for children in daughters:
                 valid_mask = self.raw_data[children] >= 0
                 output_dict['segmentation-data'][
                     np.arange(num_events)[valid_mask], i, self.raw_data[children][valid_mask]] = True
 
             # if at least one daughter is present, set the mask to True
             output_dict['segmentation-mask'][:, i] = np.any(output_dict['segmentation-data'][:, i, :], axis=1)
+            # if all daughters are present, set the full mask to True
+            output_dict['segmentation-full-mask'][:, i] = np.sum(output_dict['segmentation-data'][:, i, :], axis=1) == len(daughters)
+
+            # if at least one daughter is present, set the class to True, else, set 0 to be true
+            output_dict['segmentation-class'][:, i, seg_tag] = output_dict['segmentation-mask'][:, i]
+            output_dict['segmentation-class'][:, i, 0] = ~output_dict['segmentation-mask'][:, i]
+
+            output_dict['segmentation-full-class'][:, i, seg_tag] = output_dict['segmentation-full-mask'][:, i]
+            output_dict['segmentation-full-class'][:, i, 0] = ~output_dict['segmentation-full-mask'][:, i]
+
+            print(f"[INFO] SEGMENTATION Loaded {current_process}/{resonance} with tag {seg_tag}: daughters {len(daughters)} -> {sum(output_dict['segmentation-mask'][:, i])} / {sum(output_dict['segmentation-full-mask'][:, i])} events")
 
             i += 1
 
@@ -149,8 +161,9 @@ class EveNetDataConverter:
         # output_dict['segmentation-data'][:, i, :] = ~others_true
 
         output_dict['segmentation-class'][:, i:, 0] = True
+        output_dict['segmentation-full-class'][:, i:, 0] = True
 
-        return output_dict
+        return {k: v for k, v in output_dict.items() if '-mask' not in k}
 
     def load_regressions(self, regression_keys, regression_key_map, direct_from_spanet=False):
         label = "REGRESSIONS"

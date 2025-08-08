@@ -194,7 +194,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
 
     cutflows = {}
     for process in global_config.process_info:
-    # for process in ["TT2L"]:
+    # for process in ["HWW_WpLepWmLep"]:
         # print("Processing ", process)
         matched_data = monitor_gen_matching(
             in_dir=in_dir,
@@ -318,6 +318,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             subprocess_counts[list(total_subprocess.keys()).index(process)] = sum(process_data['event_weight'])
 
         segment_class_counts = np.sum(np.sum(process_data['segmentation-class'], axis=1) * process_data['event_weight'].reshape(-1, 1), axis=0)
+        segment_full_class_counts = np.sum(np.sum(process_data['segmentation-full-class'], axis=1) * process_data['event_weight'].reshape(-1, 1), axis=0)
 
         assignment_mask_per_process = {}
         assignment_idx = {key: i for i, key in enumerate(assignment_keys) if f'TARGETS/{process}/' in key}
@@ -347,6 +348,7 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             event_weight=process_data['event_weight'],
 
             segment_class_counts=segment_class_counts,
+            segment_full_class_counts=segment_full_class_counts,
             segment_regression=process_data['segmentation-momentum'],
         )
         # Add assignment mask

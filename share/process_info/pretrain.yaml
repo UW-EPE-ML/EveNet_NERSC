@@ -203,9 +203,8 @@ WW_2L:
   category: WW
   process_id: 6
   diagram:
-    W1: *W_lep
-    W2: *W_lep
-    SYMMETRY: [ W1, W2 ]
+    W+: *W_lep_plus
+    W-: *W_lep_minus
 
 ZZ_4L:
   category: ZZ
