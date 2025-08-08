@@ -126,7 +126,6 @@ class EveNetDataConverter:
         for resonance, seg_tag in segment_tag_map.get(current_process, {}).items():
             # one-hot encode the segmentation class
             output_dict['segmentation-class'][:, i, seg_tag] = 1
-            output_dict['segmentation-mask'][:, i] = True
             # fill the momentum if available
             if f"{gen_momentum_label}/{resonance}" in self.raw_data:
                 output_dict['segmentation-momentum'][:, i, :] = self.raw_data[f"{gen_momentum_label}/{resonance}"]
@@ -137,6 +136,10 @@ class EveNetDataConverter:
                 valid_mask = self.raw_data[children] >= 0
                 output_dict['segmentation-data'][
                     np.arange(num_events)[valid_mask], i, self.raw_data[children][valid_mask]] = True
+
+            # if at least one daughter is present, set the mask to True
+            output_dict['segmentation-mask'][:, i] = np.any(output_dict['segmentation-data'][:, i, :], axis=1)
+
             i += 1
 
         # assign the last segment to the rest of the events
