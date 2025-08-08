@@ -150,7 +150,7 @@ class EveNetDataConverter:
             output_dict['segmentation-full-class'][:, i, seg_tag] = output_dict['segmentation-full-mask'][:, i]
             output_dict['segmentation-full-class'][:, i, 0] = ~output_dict['segmentation-full-mask'][:, i]
 
-            print(f"[INFO] SEGMENTATION Loaded {current_process}/{resonance} with tag {seg_tag}: daughters {len(daughters)} -> {sum(output_dict['segmentation-mask'][:, i])} / {sum(output_dict['segmentation-full-mask'][:, i])} events")
+            # print(f"[INFO] SEGMENTATION Loaded {current_process}/{resonance} with tag {seg_tag}: daughters {len(daughters)} -> {sum(output_dict['segmentation-mask'][:, i])} / {sum(output_dict['segmentation-full-mask'][:, i])} events")
 
             i += 1
 
