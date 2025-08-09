@@ -90,11 +90,6 @@ class EveNetEngine(L.LightningModule):
         self.target_regression_mask_key = 'regression-mask'
         self.target_assignment_key = 'assignments-indices'
         self.target_assignment_mask_key = 'assignments-mask'
-        self.target_segmentation_cls_key = 'segmentation-class'
-        self.target_segmentation_reg_key = 'segmentation-momentum'
-        self.target_segmentation_data_mask_key = 'segmentation-data'
-        self.target_segmentation_mask_key = 'segmentation-mask'
-
 
 
         ###### Initialize Model Components Configs #####
@@ -109,6 +104,11 @@ class EveNetEngine(L.LightningModule):
         self.segmentation_cfg = self.component_cfg.Segmentation
         self.generation_include = self.global_generation_cfg.include or self.recon_generation_cfg.include or self.truth_generation_cfg.include
 
+        self.target_segmentation_cls_key = 'segmentation-full-class' if self.segmentation_cfg.use_full_mask else 'segmentation-class'
+        self.target_segmentation_reg_key = 'segmentation-momentum'
+        self.target_segmentation_data_mask_key = 'segmentation-data'
+
+
         ###### Initialize Normalizations and Balance #####
         self.normalization_dict: dict = torch.load(self.config.options.Dataset.normalization_file)
         self.balance_dict: dict = self.normalization_dict
@@ -118,7 +118,7 @@ class EveNetEngine(L.LightningModule):
         self.class_weight = self.balance_dict["class_balance"]
         self.assignment_weight = self.balance_dict["particle_balance"]
         self.subprocess_balance = self.balance_dict["subprocess_balance"]
-        self.segmentation_cls_balance = self.balance_dict["segment_class_balance"]
+        self.segmentation_cls_balance = self.balance_dict["segment_full_class_balance"] if self.segmentation_cfg.use_full_mask else self.balance_dict["segment_class_balance"]
 
 
         self.l.info(f"normalization dicts initialized")
@@ -419,17 +419,16 @@ class EveNetEngine(L.LightningModule):
         if self.segmentation_cfg.include and outputs["segmentation-cls"] is not None:
             seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
             seg_target_mask = batch[self.target_segmentation_data_mask_key].to(device=device)
-            seg_mask = batch[self.target_segmentation_mask_key].to(device=device)
             class_weight = self.segmentation_cls_balance.to(device=device)
             scaled_seg_loss = seg_step(
                 target_classification = seg_targets_cls,
                 target_mask = seg_target_mask,
                 predict_classification = outputs["segmentation-cls"],
                 predict_mask= outputs["segmentation-mask"],
-                segmentation_mask=seg_mask,
                 point_cloud_mask=inputs['x_mask'],
                 seg_loss_fn=self.seg_loss,
                 class_weight=class_weight,
+                class_label=inputs["subprocess_id"],
                 metrics=self.segmentation_metrics_train if self.training else self.segmentation_metrics_valid,
                 loss_dict = loss_head_dict,
                 mask_loss_scale = self.segmentation_cfg.mask_loss_scale,
@@ -895,7 +894,8 @@ class EveNetEngine(L.LightningModule):
         if self.segmentation_cfg.include:
             segmentation_kwargs = {
                 "device": self.device,
-                "clusters_label": self.config.event_info.segment_label
+                "clusters_label": self.config.event_info.segment_label,
+                "processes_labels": self.config.event_info.process_names,
             }
             self.segmentation_metrics_train = SegmentationMetrics(**segmentation_kwargs)
             self.segmentation_metrics_valid = SegmentationMetrics(**segmentation_kwargs)

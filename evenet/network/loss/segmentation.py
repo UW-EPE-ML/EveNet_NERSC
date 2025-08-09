@@ -62,7 +62,6 @@ def hungarian_matching(
     target_cls: Tensor,
     target_mask: Tensor,
     class_weight: Tensor = None,
-    segmentation_mask: Tensor = None,
     include_cls_cost: bool = True,
 ):
     """
@@ -84,7 +83,6 @@ def hungarian_matching(
     num_queries = predict_cls.shape[1]
     predict_mask_expanded = predict_mask.unsqueeze(2).repeat(1, 1, num_queries, 1)  # (B, N_pred, N_tgt, P)
     target_mask_expanded = target_mask.unsqueeze(1).repeat(1, num_queries, 1, 1)  # (B, N_pred, N_tgt, P)
-    segmentation_mask_expanded = segmentation_mask.unsqueeze(1).repeat(1, num_queries, 1) if segmentation_mask is not None else None # (B, N_pred, N_tgt)
 
     predict_cls_expanded = predict_cls.softmax(-1).unsqueeze(2).repeat(1, 1, num_queries, 1)  # (B, N_pred, N_tgt, C)
     target_cls_expanded = target_cls.unsqueeze(1).repeat(1, num_queries, 1, 1) # (B, N_pred, N_tgt, C)
@@ -94,7 +92,6 @@ def hungarian_matching(
     mask_cost = sigmoid_focal_loss(
         inputs = predict_mask_expanded,
         targets = target_mask_expanded,
-        # mask = segmentation_mask_expanded,
     ) # (B, N_pred, N_tgt, P)
     mask_cost = mask_cost.sum(dim=-1)   # Sum over the last dimension (P) to get (B, N, N)
 
@@ -102,7 +99,6 @@ def hungarian_matching(
     dice_cost = DICE_loss(
         inputs = predict_mask_expanded,
         targets = target_mask_expanded,
-        # mask = segmentation_mask_expanded,
     ) # (B,  N_pred, N_tgt)
 
     total_cost = mask_cost + dice_cost
@@ -121,7 +117,6 @@ def loss(
         target_cls,
         target_mask,
         class_weight=None,
-        segmentation_mask=None,
         point_cloud_mask = None,
         reduction='none'
     ):
@@ -152,7 +147,6 @@ def loss(
             target_cls=target_cls,
             target_mask=target_mask,
             class_weight=class_weight,
-            segmentation_mask=segmentation_mask
         ) # (B, N) indices of matched predictions and targets
 
     # print("pred_indices", pred_indices.shape, "tgt_indices", tgt_indices.shape)
@@ -164,7 +158,6 @@ def loss(
     target_mask_best = target_mask[batch_idx, tgt_indices]  # (B, N, P)
     predict_class_best = predict_cls[batch_idx, pred_indices]  # (B, N, C)
     target_class_best = target_cls[batch_idx, tgt_indices]  # (B, N, C)
-    segmentation_mask_best = segmentation_mask[batch_idx, tgt_indices]  # (B, N)
     point_cloud_mask = point_cloud_mask.squeeze(-1) if point_cloud_mask is not None else None
 
     # print("predict_mask_best", predict_mask_best.shape, "target_mask_best", target_mask_best.shape, "predict_class_best", predict_class_best.shape, "target_class_best", target_class_best.shape, "segmentation_mask_best", segmentation_mask_best.shape)
@@ -172,7 +165,6 @@ def loss(
     mask_loss = sigmoid_focal_loss(
         inputs = predict_mask_best,
         targets = target_mask_best,
-        # mask = segmentation_mask_best,
     ) # (B, N, P)
 
     if point_cloud_mask is not None:
@@ -189,7 +181,6 @@ def loss(
     dice_loss = DICE_loss(
         inputs = predict_mask_best,
         targets = target_mask_best,
-        # mask = segmentation_mask_best,
     ) # (B, N)
 
     # print("predict_mask", predict_mask_best[0,1], "target_mask", target_mask_best[0,1])

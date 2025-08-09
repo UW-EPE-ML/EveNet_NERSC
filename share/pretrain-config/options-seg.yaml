@@ -159,6 +159,7 @@ Training:
       cls_loss_scale: 1.0
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
+      use_full_mask: true # whether to use full mask for training
       diffusion_steps: 100
       freeze:
         type: none # ['partial', 'full', 'none', 'random']

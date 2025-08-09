@@ -27,6 +27,7 @@ class SegmentationMetrics:
         process: int = "",
         clusters_label = None,
         num_queries: int = 5,
+        processes_labels = None
     ):
         self.device = device
         self.hist_xmin = hist_xmin
@@ -67,8 +68,23 @@ class SegmentationMetrics:
                 "true-cluster-entries": 0,
                 "pred-cls-correct-cluster-entries": 0,
                 "pred-cls-wrong-cluster-entries": 0,
+                "pred-cluster-sub-num": 0
             }
             for cluster_name in clusters_label.keys()
+        }
+
+        self.processes_labels = processes_labels if processes_labels is not None else []
+        self.process_matching = {
+            process_label: { num_q:
+                {
+                    "total-event": 0,
+                    "total-cluster": 0,
+                    "matched-event": 0,
+                    "matched-cluster": 0,
+                }
+                for num_q in range(self.num_queries)
+            }
+            for process_label in self.processes_labels
         }
 
         self.train_score_distribution = None
@@ -79,7 +95,7 @@ class SegmentationMetrics:
             y_true_cls: torch.Tensor,
             y_pred_mask: torch.Tensor,
             y_pred_cls: torch.Tensor,
-            segmentation_mask: torch.Tensor = None,
+            process_cls: torch.Tensor,
     ):
         # y_pred_mask = (y_pred_mask.sigmoid() > self.mask_threshold).float() # (B, N, P)
         # max_idx = y_pred_mask.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
@@ -93,8 +109,7 @@ class SegmentationMetrics:
             predict_mask = y_pred_mask,
             target_cls = y_true_cls,
             target_mask = y_true_mask.float(),
-            # segmentation_mask = segmentation_mask,
-            include_cls_cost = False,
+            include_cls_cost = True, # Use best combination
         )
 
         B, N_match = pred_indices.shape
@@ -109,22 +124,18 @@ class SegmentationMetrics:
 
 
         y_pred_mask = y_pred_mask.sigmoid()
-        y_true_mask = y_true_mask.float()
-
-        # print("before", "y_true_mask", y_true_mask[0,1], "y_pred_mask", y_pred_mask[0,1])
-
-
+        y_true_mask = y_true_mask
 
         # Apply class zero mask and uniqueness to the predicted mask
-        # predict_class_label = y_pred_cls.argmax(dim=-1)
-        # class_zero_mask = ~(predict_class_label == 0)  # (B, N)
-        # class_zero_mask = class_zero_mask.unsqueeze(-1).float()
-        # y_pred_mask = y_pred_mask * class_zero_mask # Apply class zero mask to the predicted mask
-        # max_idx = y_pred_mask.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
+        predict_class_label = y_pred_cls.argmax(dim=-1)
+        class_zero_mask = ~(predict_class_label == 0)  # (B, N)
+        class_zero_mask = class_zero_mask.unsqueeze(-1).float()
+        y_pred_mask = y_pred_mask * class_zero_mask # Apply class zero mask to the predicted mask
+        max_idx = y_pred_mask.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
         # # Create a mask with 1 at max index, 0 elsewhere
-        # mask = torch.zeros_like(y_pred_mask)
-        # mask.scatter_(1, max_idx, 1.0)
-        # y_pred_mask = y_pred_mask * mask  # Apply the mask to y_pred_mask
+        mask = torch.zeros_like(y_pred_mask)
+        mask.scatter_(1, max_idx, 1.0)
+        y_pred_mask = y_pred_mask * mask  # Apply the mask to y_pred_mask
         # Find the max value in the masked prediction
         # y_pred_mask shape: (B, N, P)
         # Compute max over dim=(1, 2) → result shape: (B,)
@@ -138,7 +149,6 @@ class SegmentationMetrics:
 
         # # Scale
         # y_pred_mask = y_pred_mask / max_val_reshaped
-        # segmentation_mask = segmentation_mask[batch_idx, tgt_indices] if segmentation_mask is not None else None
 
         y_true_cls_np = y_true_cls.argmax(dim=-1).flatten().cpu().numpy()
         y_pred_cls_np = y_pred_cls.argmax(dim=-1).flatten().cpu().numpy()
@@ -165,8 +175,25 @@ class SegmentationMetrics:
         inside_filter = (y_true_mask.float() > 0)  # (B, N, P)
         outside_filter = ~inside_filter  # (B, N, P)
 
-        correct_masking = ((y_pred_mask > self.mask_threshold).float()) == (y_true_mask.float()) # (B, N, P)
+        correct_masking = ((y_pred_mask > self.mask_threshold).long()) == (y_true_mask.long()) # (B, N, P)
+        predict_sub_num = (y_pred_mask > self.mask_threshold).float().sum(-1) # (B, N, P)
+        num_q_tensor = y_true_mask.any(dim=-1).float().sum(dim=-1)  # (B, N) → (B)
         correct_masking_full_cluster = correct_masking.all(dim=-1) # (B, N)
+        correct_masking_full_cluster = correct_masking_full_cluster.float() *  y_true_mask.any(dim=-1).float() # (B, N) → (B, N)
+        correct_masking_full_cluster_num = correct_masking_full_cluster.float().sum(dim=-1)  # (B)
+        correct_masking_full_event = (correct_masking_full_cluster_num.long() == num_q_tensor.long()).float()
+
+        # Loop over processes
+        for i, process_label in enumerate(self.processes_labels):
+            process_filter = (process_cls == i) # (B)
+            # Update process matching
+            for num_q in range(self.num_queries):
+                num_q_filter = (num_q_tensor == num_q) # (B)
+                self.process_matching[process_label][num_q]["total-event"] += (process_filter.float() * num_q_filter.float()).sum().item()
+                self.process_matching[process_label][num_q]["total-cluster"] += (num_q_tensor * process_filter.float() * num_q_filter.float()).sum().item()
+                self.process_matching[process_label][num_q]["matched-event"] += (process_filter.float() * num_q_filter.float() * correct_masking_full_event.float()).sum().item()
+                self.process_matching[process_label][num_q]["matched-cluster"] += (process_filter.float() * num_q_filter.float() * correct_masking_full_cluster_num.float()).sum().item()
+
         # Loop over clusters
         for i, cluster_name in enumerate(self.clusters_label.keys()):
             cluster_filter = (y_true_cls.argmax(dim=-1) == i)  # (B, N)
@@ -179,7 +206,7 @@ class SegmentationMetrics:
             self.cluster_matching[cluster_name]["pred-cls-wrong-cluster-entries"] += (correct_masking.float() * inside_filter.float() * cluster_filter.unsqueeze(-1).float() * (~cls_true_filter).unsqueeze(-1).float()).sum().item()
             self.cluster_matching[cluster_name]["pred-cls-correct-cluster"] += (correct_masking_full_cluster.float() * cluster_filter.float() * cls_true_filter.float()).sum().item()
             self.cluster_matching[cluster_name]["pred-cls-wrong-cluster"] += (correct_masking_full_cluster.float() * cluster_filter.float() * (~cls_true_filter).float()).sum().item()
-
+            self.cluster_matching[cluster_name]["pred-cluster-sub-num"] += (predict_sub_num * cluster_filter.float()).sum().item()
 
             # Expand cluster and classification filters to (B, N, P) to match mask shape
             cluster_filter_3d = cluster_filter.unsqueeze(-1).expand_as(y_pred_mask)
@@ -217,6 +244,13 @@ class SegmentationMetrics:
             for key in self.cluster_matching[cluster_name].keys():
                 self.cluster_matching[cluster_name][key] = 0
 
+        for process_label in self.process_matching.keys():
+            for num_q in self.process_matching[process_label].keys():
+                self.process_matching[process_label][num_q]["total-event"] = 0
+                self.process_matching[process_label][num_q]["total-cluster"] = 0
+                self.process_matching[process_label][num_q]["matched-event"] = 0
+                self.process_matching[process_label][num_q]["matched-cluster"] = 0
+
 
     def reduce_across_gpus(self):
         """All-reduce across DDP workers"""
@@ -249,6 +283,17 @@ class SegmentationMetrics:
                     )
                     torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
                     self.cluster_matching[cluster_name][key] = tensor.item()
+
+            for process_label in self.process_matching.keys():
+                for num_q in self.process_matching[process_label].keys():
+                    for key in self.process_matching[process_label][num_q].keys():
+                        tensor = torch.tensor(
+                            self.process_matching[process_label][num_q][key],
+                            dtype=torch.long,
+                            device=self.device
+                        )
+                        torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
+                        self.process_matching[process_label][num_q][key] = tensor.item()
 
     def assign_train_result(self, train_matrix=None, train_matrix_number=None, score_distribution=None):
         self.train_matrix = train_matrix
@@ -375,7 +420,24 @@ class SegmentationMetrics:
             color = colors[idx % len(colors)]
             label_ratio = f"{label} (ratio={ratio:.2f})"
             ax.bar(bin_centers, density, width=bin_widths, color=color, alpha=0.85, label=label_ratio, edgecolor = 'black')
-            metrics[label] = ratio
+            # metrics[label] = ratio
+
+            hist_train = self.train_score_distribution[cluster_name][label] if self.train_score_distribution is not None else None
+
+            if hist_train is not None:
+                train_density = hist_train / (np.sum(hist_train) * bin_widths) if np.sum(hist_train) > 0 else hist_train
+                color = colors[idx % len(colors)]
+                label_train = f"{label} (Train)"
+                ax.plot(
+                    bin_centers, train_density,
+                    color=color,
+                    label=label_train,
+                    linestyle='-',
+                    marker='o',
+                    linewidth=3,
+                    markersize=6,
+                )
+
         ax.set_xlabel("Predicted Mask Score")
         ax.set_ylabel("Density")
         ax.set_title(f"Score Distribution for Cluster: {cluster_name}")
@@ -399,7 +461,31 @@ class SegmentationMetrics:
             metrics[cluster_name]["cluster-entries-purity/true-class"] = self.cluster_matching[cluster_name]["pred-cls-correct-cluster-entries"] / self.cluster_matching[cluster_name]["true-cluster-entries"] if self.cluster_matching[cluster_name]["true-cluster-entries"] > 0 else 0
             metrics[cluster_name]["cluster-entries-purity/false-class"] = self.cluster_matching[cluster_name]["pred-cls-wrong-cluster-entries"] / self.cluster_matching[cluster_name]["true-cluster-entries"] if self.cluster_matching[cluster_name]["true-cluster-entries"] > 0 else 0
             metrics[cluster_name]["cluster-entries-purity/all"] = metrics[cluster_name]["cluster-entries-purity/true-class"] + metrics[cluster_name]["cluster-entries-purity/false-class"]
-        return metrics
+            metrics[cluster_name]["cluster-num"] =  self.cluster_matching[cluster_name]["pred-cluster-sub-num"] / self.cluster_matching[cluster_name]["true-cluster"] if self.cluster_matching[cluster_name]["true-cluster"] > 0 else 0
+
+        metrics_process = dict()
+        for process_label in self.process_matching.keys():
+            metrics_process[process_label] = dict()
+            total_event = 0
+            total_matched_event = 0
+            total_cluster = 0
+            total_matched_cluster = 0
+            for num_q in self.process_matching[process_label].keys():
+                if num_q > 0:
+                    total_event += self.process_matching[process_label][num_q]["total-event"]
+                    total_matched_event += self.process_matching[process_label][num_q]["matched-event"]
+                    total_cluster += self.process_matching[process_label][num_q]["total-cluster"]
+                    total_matched_cluster += self.process_matching[process_label][num_q]["matched-cluster"]
+                metrics_process[process_label][num_q] = {
+                    "event-purity": self.process_matching[process_label][num_q]["matched-event"] / self.process_matching[process_label][num_q]["total-event"] if self.process_matching[process_label][num_q]["total-event"] > 0 else 0,
+                    "cluster-purity": self.process_matching[process_label][num_q]["matched-cluster"] / self.process_matching[process_label][num_q]["total-cluster"] if self.process_matching[process_label][num_q]["total-cluster"] > 0 else 0,
+                }
+            metrics_process[process_label]["*"] = {
+                    "event-purity": total_matched_event / total_event if total_event > 0 else 0,
+                    "cluster-purity": total_matched_cluster / total_cluster if total_cluster > 0 else 0,
+            }
+
+        return metrics, metrics_process
 
 
 
@@ -409,9 +495,9 @@ def shared_step(
         target_mask: torch.Tensor,
         predict_classification: torch.Tensor,
         predict_mask: torch.Tensor,
-        segmentation_mask: torch.Tensor,
         point_cloud_mask: torch.Tensor,
         seg_loss_fn: Callable,
+        class_label: torch.Tensor,
         class_weight: torch.Tensor,
         metrics: SegmentationMetrics,
         loss_dict: dict,
@@ -434,13 +520,6 @@ def shared_step(
 
     # Make non-detectable points to be null class as well.
 
-    argmax_classes = target_classification.argmax(dim=-1)  # (B, N)
-    argmax_classes = argmax_classes * segmentation_mask.float()  # (B, N)
-    target_classification = F.one_hot(argmax_classes.long(), num_classes=target_classification.shape[-1])  # (B, N, C)
-
-    target_mask = (target_mask.float() * segmentation_mask.float().unsqueeze(-1)).bool()  # (B, N, P)
-
-
 
     mask_loss, dice_loss, cls_loss = seg_loss_fn(
         predict_cls = predict_classification,
@@ -448,7 +527,6 @@ def shared_step(
         target_cls = target_classification,
         target_mask = target_mask,
         class_weight = class_weight,
-        segmentation_mask = segmentation_mask,
         point_cloud_mask = point_cloud_mask,
         reduction='none'
     )
@@ -473,7 +551,7 @@ def shared_step(
             y_true_cls=target_classification,
             y_pred_mask=predict_mask,
             y_pred_cls=predict_classification,
-            segmentation_mask=segmentation_mask
+            process_cls=class_label
         )
 
     loss_dict[f"{loss_name}-cls"] = cls_loss
@@ -517,10 +595,16 @@ def shared_epoch_end(
             logger.log({f"{prefix}{cluster_name}-segmentation/{label}": value for label, value in metrics_score.items()})
             fig_score.clear()
 
-        metrics = metrics_valid.compute_metrics()
+        metrics, metrics_process = metrics_valid.compute_metrics()
         for cluster_name in metrics:
             for log, value in metrics[cluster_name].items():
                 logger.log({f"{prefix}{cluster_name}-segmentation/{log}": value})
+
+        for process_label in metrics_process.keys():
+            for num_q in metrics_process[process_label].keys():
+                for log, value in metrics_process[process_label][num_q].items():
+                    if value > 0:
+                        logger.log({f"{prefix}{process_label}-segmentation/{num_q}obj/{log}": value})
 
 
     metrics_valid.reset()
