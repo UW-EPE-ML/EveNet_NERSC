@@ -116,6 +116,7 @@ Training:
       cls_loss_scale: 1.0
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
+      use_full_mask: true # whether to use full mask for training
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]
@@ -242,7 +243,7 @@ Metrics:
   Generation-Binning:
     num_vectors: [ 21, -1, 20 ]
 
-    "point cloud-log_mass": [ 50, -1, 10 ]
+    "point cloud-log_energy": [ 50, -1, 10 ]
     "point cloud-log_pt": [ 50, -1, 10 ]
     "point cloud-eta": [ 50, -4, 4 ]
     "point cloud-phi": [ 50, -4, 4 ]

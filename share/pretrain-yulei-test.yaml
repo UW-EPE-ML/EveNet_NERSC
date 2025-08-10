@@ -74,6 +74,7 @@ options:
         learning_rate: *lr
         weight_decay: *wd
         optimizer_type: *opt
+        use_full_mask: true
       GlobalGeneration:
         include: false
         warm_up: true
@@ -107,8 +108,8 @@ options:
             assignment: [ 0.0, 0.0 ]
             segmentation: [ 1.0, 1.0 ]
           train_parameters:
-            noise_prob: [ 0.3, 0.0 ]
-            reco_attn_mask: [ 0.0, 0.0 ]
+            noise_prob: [ 0.3, 1.0 ]
+            reco_attn_mask: [ 1.0, 0.45 ]
             ema_decay: [ 0.99, 0.999 ]
     FAMO:
       turn_on: false
@@ -126,7 +127,7 @@ options:
       "global-HT": [ 50, 2, 8 ]
 
 network:
-  default: pretrain-config/network.yaml
+  default: pretrain-config/network-20M.yaml
 
   # overwrites
   # ...
