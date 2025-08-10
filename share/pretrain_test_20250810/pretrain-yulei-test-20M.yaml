@@ -24,7 +24,7 @@ logger:
 
 
 options:
-  default: options/options.yaml
+  default: ../options/options.yaml
 
   Training:
     total_epochs: 20
@@ -144,19 +144,19 @@ options:
       "global-HT": [ 50, 2, 8 ]
 
 network:
-  default: pretrain-config/network-20M.yaml
+  default: ../pretrain-config/network-20M.yaml
 
   # overwrites
   # ...
 
 event_info:
-  default: event_info/multi_process.yaml
+  default: ../event_info/multi_process.yaml
 
   # overwrites
   # ...
 
 resonance:
-  default: resonance/standard_model.yaml
+  default: ../resonance/standard_model.yaml
 
   # overwrites
   # ...
