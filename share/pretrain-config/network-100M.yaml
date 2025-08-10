@@ -25,7 +25,7 @@ Body:
       - 2
       - 3
     num_local_layer: 10
-    num_layers: 16
+    num_layers: 20
     drop_probability: 0.1
     talking_head: false
     layer_scale: true
