@@ -57,6 +57,7 @@ class EveNetEngine(L.LightningModule):
     def __init__(self, global_config, world_size=1, total_events=1024):
         super().__init__()
 
+        self.current_stage = None
         self.l = logging.getLogger(__name__)
 
         self.aggregator = None
@@ -239,6 +240,7 @@ class EveNetEngine(L.LightningModule):
         else:
             event_weight = None
 
+        self.current_stage = self.task_scheduler.get_current_stage(self.current_epoch).get("name", "default")
         current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
         task_weights = current_parameters["loss_weights"]
         train_parameters = current_parameters["train_parameters"]
@@ -1007,7 +1009,8 @@ class EveNetEngine(L.LightningModule):
 
         for logger in self.loggers:
             if isinstance(logger, LocalLogger):
-                logger.finalize(status="validation_end")
+                print("val current stage:", self.current_stage)
+                logger.flush_metrics(stage=self.current_stage)
 
         self.l.info(f"[Epoch {self.current_epoch:03d}] ✅ Validation Complete")
 
@@ -1017,7 +1020,8 @@ class EveNetEngine(L.LightningModule):
 
         for logger in self.loggers:
             if isinstance(logger, LocalLogger):
-                logger.finalize(status="train_end")
+                print("train current stage:", self.current_stage)
+                logger.flush_metrics(stage=self.current_stage)
 
         self.l.info(f"[Epoch {self.current_epoch:03d}] ✅ Training Complete")
 

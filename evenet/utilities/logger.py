@@ -31,9 +31,7 @@ class LocalLogger(Logger):
         self._log_dir = os.path.join(self.save_dirs, self.name_, str(self.version_))
         os.makedirs(self._log_dir, exist_ok=True)
 
-        self.log_file_path = os.path.join(self._log_dir, f"metrics_rank{self.rank}.csv")
         self.buffer: Dict[LogKey, Dict[str, Any]] = {}
-        self.headers_written = os.path.exists(self.log_file_path)
 
     @property
     def name(self) -> str:
@@ -83,7 +81,9 @@ class LocalLogger(Logger):
             keyname = f"{prefix}/{k}" if prefix else k
             self.buffer[key][keyname] = float(v)
 
-    def flush_metrics(self) -> None:
+    def flush_metrics(self, stage: str) -> None:
+        print(f"Flushing metrics for stage {stage}")
+
         if not self.buffer:
             return
 
@@ -94,18 +94,21 @@ class LocalLogger(Logger):
         # Dynamically infer fieldnames from all merged records
         fieldnames = sorted(set().union(*(record.keys() for record in records)))
 
-        write_header = not self.headers_written
-        with open(self.log_file_path, "a", newline="") as f:
+        os.makedirs(os.path.join(self._log_dir, stage), exist_ok=True)
+        log_file_path = os.path.join(self._log_dir, stage, f"metrics_rank{self.rank}.csv")
+        write_header = not os.path.exists(log_file_path)
+        with open(log_file_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             if write_header:
                 writer.writeheader()
-                self.headers_written = True
             writer.writerows(records)
+
+        logging.info(f"Flushed {len(records)} records to {log_file_path} for stage '{stage}'")
 
         self.buffer.clear()
 
     def finalize(self, status: str) -> None:
-        self.flush_metrics()
+        pass
 
 
 def setup_logging(log_level=logging.INFO, rank: int = 0, log_dir="logs"):
