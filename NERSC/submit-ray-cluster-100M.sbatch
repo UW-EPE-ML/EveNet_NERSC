@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #SBATCH -C gpu&hbm80g
-#SBATCH --time=12:00:00
+#SBATCH --time=10:00:00
 #SBATCH -q regular
 #SBATCH -A m5019_g
 
 ### This script works for any number of nodes, Ray will find and manage all resources
-#SBATCH --nodes=64
+#SBATCH --nodes=63
 
 ### Give all resources on each node to a single Ray task, ray can manage the resources internally
 #SBATCH --ntasks-per-node=1
