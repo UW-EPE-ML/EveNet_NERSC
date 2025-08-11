@@ -461,7 +461,16 @@ class EveNetEngine(L.LightningModule):
             weight = task_weights.get(name, 0.0)
             loss_raw[name] = loss_val * weight
             if weight > 0:
+                # if loss and loss_raw is not nan, else give it 0
+                if not torch.isfinite(loss_raw[name]).all():
+                    self.l.warning(
+                        f"[Step {self.current_step}] Non-finite loss detected: {name} - "
+                        f"loss: {loss}, loss_raw: {loss_raw[name]}"
+                    )
+                    continue
+
                 loss = loss + loss_raw[name]
+
                 if self.training:
                     if self.global_rank == 0:
                         self.log(f'progressive/loss_weight/{name}', weight, prog_bar=False, sync_dist=False)
