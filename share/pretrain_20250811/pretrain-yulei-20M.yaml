@@ -15,7 +15,7 @@ logger:
     name: "Pretrain"
     run_name: &logger_name "nominal-20M"
     id: "pretrain-20M-20250811"
-    tags: [ "Pretrain", "NERSC", "Multi-Node", "2700M", "SmallModel", "Vanilla"]
+    tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "20M", "Vanilla"]
     simplified: true
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
