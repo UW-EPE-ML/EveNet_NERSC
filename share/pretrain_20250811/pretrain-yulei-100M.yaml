@@ -13,8 +13,8 @@ logger:
     project: "Pretrain"
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
-    run_name: &logger_name "nominal-100M"
-    id: "pretrain-100M-20250811"
+    run_name: &logger_name "nominal-100M-cont"
+    id: "pretrain-100M-20250811-cont"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "100M", "Vanilla"]
     simplified: true
   local:
@@ -30,7 +30,7 @@ options:
     total_epochs: 50
     epochs: 20
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.test/epoch=15_train=2.8871_val=2.8826.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M/epoch=13_train=0.4884_val=0.4818.ckpt"
     pretrain_model_load_path: null
 
     diffusion_every_n_epochs: 5 # how often to run diffusion
@@ -117,13 +117,13 @@ options:
           epoch_ratio: 0.7
           transition_ratio: 0.2
           loss_weights:
-            generation-truth: [ 1.0, 1.0 ]
+            generation-truth: [ 0.0, 1.0 ]
             generation-recon: [ 1.0, 1.0 ]
-            classification: [ 1.0, 1.0 ]
-            classification-noised: [  1.0, 1.0 ]
+            classification: [ 0.0, 1.0 ]
+            classification-noised: [  0.0, 1.0 ]
             regression: [ 0.0, 0.0 ]
             assignment: [ 0.0, 0.0 ]
-            segmentation: [ 1.0, 1.0 ]
+            segmentation: [ 0.0, 1.0 ]
           train_parameters:
             noise_prob: [ 1.0, 1.0 ]
             reco_attn_mask: [ 0.0, 0.0 ]
