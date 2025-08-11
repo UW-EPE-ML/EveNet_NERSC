@@ -446,7 +446,8 @@ class EveNetEngine(L.LightningModule):
                 mask_loss_scale = self.segmentation_cfg.mask_loss_scale,
                 dice_loss_scale =  self.segmentation_cfg.dice_loss_scale,
                 cls_loss_scale = self.segmentation_cfg.cls_loss_scale,
-                loss_name = "segmentation"
+                loss_name = "segmentation",
+                update_metrics=update_metric,
             )
             loss_raw["segmentation"] = scaled_seg_loss
 

@@ -121,7 +121,7 @@ class ProgressiveTaskScheduler:
         for task, (start, end) in stage["train_parameters"].items():
             train_parameters[task] = (1 - t) * start + t * end
 
-        print(f"Epoch {epoch}, Batch {batch_idx}/{batches_per_epoch} -> Stage: {stage['name']}, ep: {ep:.3f}")
+        # print(f"Epoch {epoch}, Batch {batch_idx}/{batches_per_epoch} -> Stage: {stage['name']}, ep: {ep:.3f}")
 
         return {
             "loss_weights": weights,
