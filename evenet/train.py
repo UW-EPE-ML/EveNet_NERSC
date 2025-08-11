@@ -29,6 +29,7 @@ def train_func(cfg):
     max_epochs = cfg['epochs']
     prefetch_batches = cfg['prefetch_batches']
     total_events = cfg['total_events']
+    total_val_events = cfg['total_val_events']
     world_rank = ray.train.get_context().get_world_rank()
 
     log_cfg = cfg.get('logger', {})
@@ -73,6 +74,7 @@ def train_func(cfg):
         global_config=global_config,
         world_size=ray.train.get_context().get_world_size(),
         total_events=total_events,
+        total_val_events=total_val_events,
     )
 
     # callbacks
@@ -169,7 +171,7 @@ def main(args):
     base_dir = Path(platform_info.data_parquet_dir)
 
     process_fn = make_process_fn(base_dir)
-    train_ds, valid_ds, total_events, val_count = prepare_datasets(
+    train_ds, valid_ds, total_events, total_val_events = prepare_datasets(
         base_dir,
         process_fn,
         platform_info,
@@ -197,6 +199,7 @@ def main(args):
             **global_config.logger,
         },
         "total_events": total_events,
+        "total_val_events": total_val_events,
         "early_stopping": global_config.options.Training.EarlyStopping,
     }
 

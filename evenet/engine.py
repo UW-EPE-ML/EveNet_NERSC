@@ -54,7 +54,7 @@ def get_total_gradient(module, norm_type="l1"):
 
 
 class EveNetEngine(L.LightningModule):
-    def __init__(self, global_config, world_size=1, total_events=1024):
+    def __init__(self, global_config, world_size=1, total_events=1024, total_val_events=1024):
         super().__init__()
 
         self.current_stage = None
@@ -63,6 +63,7 @@ class EveNetEngine(L.LightningModule):
         self.aggregator = None
         self.sampler = None
         self.steps_per_epoch = None
+        self.steps_per_epoch_val = None
         self.total_steps = None
         self.current_step = None  # hack global_step due to incorrect behavior in lightning for multiple optimizers
         self.classification_metrics_train = None
@@ -80,6 +81,7 @@ class EveNetEngine(L.LightningModule):
         self.config = global_config
         self.world_size = world_size
         self.total_events = total_events
+        self.total_val_events = total_val_events
         self.pretrain_ckpt_path: str = global_config.options.Training.pretrain_model_load_path
 
         self.num_classes: list[str] = global_config.event_info.class_label.get('EVENT', {}).get('signal', [0])[0]
@@ -241,14 +243,22 @@ class EveNetEngine(L.LightningModule):
             event_weight = None
 
         self.current_stage = self.task_scheduler.get_current_stage(self.current_epoch).get("name", "default")
-        current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
+        current_parameters = self.task_scheduler.get_current_parameters(
+            epoch=self.current_epoch,
+            batch_idx=batch_idx,
+            batches_per_epoch=self.steps_per_epoch if self.training else self.steps_per_epoch_val,
+        )
         task_weights = current_parameters["loss_weights"]
         train_parameters = current_parameters["train_parameters"]
 
         # logging training parameters
         for name, val in train_parameters.items():
             if not self.simplified_log:
-                self.log(f"progressive/{name}", val, prog_bar=False, sync_dist=True)
+                if self.global_rank == 0:
+                    if self.training:
+                        self.log(f"progressive/train/{name}", val, prog_bar=False, sync_dist=False)
+                    else:
+                        self.log(f"progressive/val/{name}", val, prog_bar=False, sync_dist=False)
 
         if self.simplified_log:
             self.local_logger.log_real(
@@ -470,11 +480,12 @@ class EveNetEngine(L.LightningModule):
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_3", flush=True)
         if self.training:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="train", batch_idx=batch_idx)
+            self.l.info(
+                f"[Epoch {self.current_epoch:03d}][Step {batch_idx} / {self.steps_per_epoch}] loss: {loss.item():.5f}")
         else:
             self.log_loss(loss, loss_head_dict, loss_detailed_dict, prefix="val", batch_idx=batch_idx)
-
-        self.l.info(
-            f"[Epoch {self.current_epoch:03d}][Step {batch_idx} / {self.steps_per_epoch}] loss: {loss.item():.5f}")
+            self.l.info(
+                f"[Epoch {self.current_epoch:03d}][Step {batch_idx} / {self.steps_per_epoch_val}] loss: {loss.item():.5f}")
 
         # if self.global_rank == 0: print(f"[Step {self.current_step}] loss_4", flush=True)
         # return loss, loss_head_dict, loss_detailed_dict, ass_predicts, loss_raw, [outputs["full_input_point_cloud"],outputs["full_global_conditions"]]
@@ -535,6 +546,7 @@ class EveNetEngine(L.LightningModule):
 
         self.current_step = int(schedulers[0].state_dict().get("last_epoch", self.current_step))
         step = self.current_step
+        batch_size = batch["x"].shape[0]
 
         # print(f"[Step {step}] train step start", flush=True)
 
@@ -614,7 +626,12 @@ class EveNetEngine(L.LightningModule):
             update_epoch = self.current_epoch >= self.ema_cfg.get("start_epoch", 0)
             update_step = self.current_step % self.ema_cfg.get("update_step", 1) == 0
 
-            current_parameters = self.task_scheduler.get_current_parameters(self.current_epoch, self.current_step)
+            current_parameters = self.task_scheduler.get_current_parameters(
+                epoch=self.current_epoch,
+                batch_idx=batch_idx,
+                batches_per_epoch=self.steps_per_epoch,
+            )
+
             train_parameters = current_parameters["train_parameters"]
             if update_epoch and update_step:
                 self.ema_model.update(self.model, decay_=train_parameters.get("ema_decay", None))
@@ -1046,6 +1063,7 @@ class EveNetEngine(L.LightningModule):
         world_size = self.world_size
         dataset_size = self.total_events
         self.steps_per_epoch = math.ceil(dataset_size / (batch_size * world_size))
+        self.steps_per_epoch_val = math.ceil(self.total_val_events / (batch_size * world_size))
         warmup_steps = warm_up_factor * self.steps_per_epoch
         self.total_steps = epochs * self.steps_per_epoch
 
