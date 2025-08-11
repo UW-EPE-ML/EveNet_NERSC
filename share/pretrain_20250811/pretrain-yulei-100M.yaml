@@ -28,14 +28,14 @@ options:
 
   Training:
     total_epochs: 50
-    epochs: 20
+    epochs: 17
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M/epoch=13_train=0.4884_val=0.4818.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M/epoch=15_train=0.6222_val=0.5237.ckpt"
     pretrain_model_load_path: null
 
-    diffusion_every_n_epochs: 5 # how often to run diffusion
+    diffusion_every_n_epochs: 1 # how often to run diffusion
     diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
-    eval_metrics_every_n_epochs: 5 # how often to run evaluation metrics
+    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
     learning_rate: &lr 0.00003
     #    learning_rate: &lr 0.000045
