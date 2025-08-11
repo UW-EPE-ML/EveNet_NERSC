@@ -109,6 +109,7 @@ def log_data_to_wandb(raw_log_dir: Path, run, stage: str):
     merged_df["epoch"] = merged_df["epoch"].astype(int)
     merged_df["step"] = merged_df["step"].astype(int)
     merged_df.sort_values(by=["step", "epoch"], inplace=True)
+    merged_df.reset_index(drop=True, inplace=True)
 
     run.define_metric("*", step_metric='trainer/global_step')
 
