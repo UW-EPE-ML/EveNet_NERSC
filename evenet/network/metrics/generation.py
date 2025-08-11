@@ -12,7 +12,10 @@ from typing import Dict
 import wandb
 import copy
 from scipy.spatial.distance import jensenshannon
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 class GenerationMetrics:
     def __init__(
@@ -483,21 +486,23 @@ def shared_step(
             event_weight=event_weight
         )
 
+        # if generation loss is nan, then print all details
+        if torch.isnan(generation_loss[generation_target]):
+            logger.warning(
+                f"NaN in generation loss for batch: {batch}, "
+                f"masking: {masking}, feature_dim: {feature_dim}, "
+                f"predict: {generation_result['vector']}, truth: {generation_result['truth']}, "
+                f"event_weight: {event_weight}, schedules: {schedules}"
+            )
+
+            generation_loss[generation_target] = 0.0
+
         if generation_target == "global":
             global_gen_loss = global_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-global"] = global_gen_loss
         elif generation_target == "neutrino":
             truth_gen_loss = truth_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-truth"] = truth_gen_loss
-
-            # if generation loss is nan, then print all details
-            if torch.isnan(truth_gen_loss):
-                print(f"NaN in truth generation loss for batch: {batch}")
-                print(f"Generation loss: {generation_loss[generation_target]}")
-                print(f"Masking: {masking}")
-                print(f"Feature dim: {feature_dim}")
-                print(f"Predict Output: {generation_result["vector"]}")
-                print(f"Truth Output: {generation_result["truth"]}")
 
         elif generation_target == "point_cloud":
             recon_gen_loss = recon_gen_loss + generation_loss[generation_target]
