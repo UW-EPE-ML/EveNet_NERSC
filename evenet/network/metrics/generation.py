@@ -490,6 +490,15 @@ def shared_step(
             truth_gen_loss = truth_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-truth"] = truth_gen_loss
 
+            # if generation loss is nan, then print all details
+            if torch.isnan(truth_gen_loss):
+                print(f"NaN in truth generation loss for batch: {batch}")
+                print(f"Generation loss: {generation_loss[generation_target]}")
+                print(f"Masking: {masking}")
+                print(f"Feature dim: {feature_dim}")
+                print(f"Predict Output: {generation_result["vector"]}")
+                print(f"Truth Output: {generation_result["truth"]}")
+
         elif generation_target == "point_cloud":
             recon_gen_loss = recon_gen_loss + generation_loss[generation_target]
             loss_head_dict["generation-recon"] = recon_gen_loss
