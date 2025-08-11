@@ -14,7 +14,7 @@ logger:
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
     run_name: &logger_name "nominal-20M"
-    id: "pretrain-20M-20250811"
+    id: "pretrain-20M-20250811-cont"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "20M", "Vanilla"]
     simplified: true
   local:
