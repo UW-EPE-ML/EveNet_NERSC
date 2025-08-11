@@ -98,14 +98,13 @@ options:
       stages:
         - name: "full_training"
           epoch_ratio: 1.0
-          transition_ratio: 0.2
+          transition_ratio: 0.1
           loss_weights:
             generation-truth: [ 1.0, 1.0 ]
             generation-recon: [ 1.0, 1.0 ]
             classification: [ 1.0, 1.0 ]
             classification-noised: [  1.0, 1.0 ]
             regression: [ 0.0, 0.0 ]
-            assignment: [ 0.0, 0.0 ]
             segmentation: [ 1.0, 1.0 ]
           train_parameters:
             noise_prob: [ 1.0, 1.0 ]
@@ -116,6 +115,9 @@ options:
 
     EMA:
       update_every_n_steps: 10
+      enable: true               # Enable or disable EMA
+      decay: 0.999               # EMA decay rate
+      replace_model_after_load: True    # After loading checkpoint, copy EMA weights into model
 
   Dataset:
     dataset_limit: 1.0
