@@ -28,34 +28,9 @@ def count_rows(filepath: Path):
         return sum(1 for _ in f) - 1  # exclude header
 
 
-def main(args):
-    assert "WANDB_API_KEY" in os.environ, 'Please set WANDB_API_KEY="abcde" before running.'
+def log_data_to_wandb(raw_log_dir: Path, run, stage: str):
 
-    config_path = Path(args.config)
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file {config_path} does not exist.")
-
-    with open(config_path, "r") as f:
-        config_data = yaml.safe_load(f)
-    if "logger" not in config_data:
-        raise KeyError("Missing required config key: 'logger'")
-    log_config = config_data["logger"]
-
-    # WandB setup
-    wandb_config = log_config["wandb"]
-    run = wandb.init(
-        project=wandb_config["project"],
-        name=wandb_config["run_name"],
-        entity=wandb_config.get("entity", None),
-        id=wandb_config.get("id", None),
-        resume="allow",
-    )
-
-    # Path to metric files
-    local_config = log_config["local"]
-    log_dir = Path(local_config["save_dir"]) / local_config["name"] / str(local_config["version"])
-    if not log_dir.exists():
-        raise FileNotFoundError(f"Log directory {log_dir} does not exist: {log_dir}")
+    log_dir = raw_log_dir / stage
 
     csv_files = sorted(log_dir.glob("metrics_rank*.csv"))
     if not csv_files:
@@ -156,8 +131,48 @@ def main(args):
     # Update checkpoint
     checkpoint["processed_rows"] = min_rows
     save_checkpoint(checkpoint_path, checkpoint)
-    wandb.finish()
     print(f"Logged {len(averaged_df)} averaged rows to WandB.")
+
+
+def main(args):
+    assert "WANDB_API_KEY" in os.environ, 'Please set WANDB_API_KEY="abcde" before running.'
+
+    config_path = Path(args.config)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file {config_path} does not exist.")
+
+    with open(config_path, "r") as f:
+        config_data = yaml.safe_load(f)
+    if "logger" not in config_data:
+        raise KeyError("Missing required config key: 'logger'")
+    log_config = config_data["logger"]
+
+    # WandB setup
+    wandb_config = log_config["wandb"]
+    run = wandb.init(
+        project=wandb_config["project"],
+        name=wandb_config["run_name"],
+        entity=wandb_config.get("entity", None),
+        id=wandb_config.get("id", None),
+        resume="allow",
+    )
+
+    # Path to metric files
+    local_config = log_config["local"]
+    log_dir = Path(local_config["save_dir"]) / local_config["name"] / str(local_config["version"])
+    if not log_dir.exists():
+        raise FileNotFoundError(f"Log directory {log_dir} does not exist: {log_dir}")
+
+    for stage in os.listdir(log_dir):
+        stage_path = log_dir / stage
+        if stage_path.is_dir():
+            print(f"Processing stage: {stage}")
+            try:
+                log_data_to_wandb(raw_log_dir=log_dir, run=run, stage=stage)
+            except Exception as e:
+                print(f"Error processing stage {stage}: {e}")
+
+    wandb.finish()
 
 
 if __name__ == "__main__":
