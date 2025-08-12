@@ -106,7 +106,7 @@ network:
   TruthGeneration:
     feature_drop: 0.0
     hidden_dim: 256
-    num_layers: 3
+    num_layers: 4
     num_heads: 4
     dropout: 0.1
     layer_scale: true
