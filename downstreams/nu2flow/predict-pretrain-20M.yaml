@@ -10,14 +10,14 @@ platform:
   use_gpu: true
 
 options:
-  default: configs/options.yaml
+  default: ../../share/options/options.yaml
 
   # For prediction Only
   prediction:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
     # The filename of the prediction data
-    filename: "prediction-mg5-300.large.pt"
+    filename: "prediction-mg5-20250812.pt"
 
     extra_save:
       - EXTRA/num_bjet
@@ -62,21 +62,20 @@ options:
       - EXTRA/truth_t2/l/phi
       - EXTRA/truth_t2/l/mass
 
-
   Training:
     total_epochs: 500
-    epochs: 500
+    epochs: 250
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/pretrain.large.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/epoch=246_train=0.5459_val=0.5564.ckpt"
     pretrain_model_load_path: null
-#    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full.diffusion/vanilla.1.ckpt"
+    # pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
-    diffusion_every_n_epochs: 50 # how often to run diffusion
+    diffusion_every_n_epochs: 10 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
 
-    learning_rate: &lr 0.0005
-    learning_rate_body: &lr_body 0.00005
-    weight_decay: &wd 0.01
+    learning_rate: &lr 0.00075
+    learning_rate_body: &lr_body 0.00075
+    weight_decay: &wd 0.001
     Components:
       GlobalEmbedding:
         learning_rate: *lr_body
@@ -92,24 +91,16 @@ options:
         optimizer_type: "AdamW"
       Classification:
         include: false
-        include_cross_term: false
       Regression:
         include: false
       Assignment:
         include: false
-        warm_up: true
-        learning_rate: *lr
-        weight_decay: *wd
-        optimizer_type: "AdamW"
+      Segmentation:
+        include: false
       GlobalGeneration:
         include: false
       ReconGeneration:
         include: false
-        warm_up: true
-        learning_rate: *lr
-        weight_decay: *wd
-        optimizer_type: "AdamW"
-        diffusion_steps: 100
       TruthGeneration:
         include: true
         warm_up: true
@@ -118,45 +109,31 @@ options:
         optimizer_type: "AdamW"
         diffusion_steps: 300
 
-    EarlyStopping:
-      patience: 100
-      min_delta: 0.0
-      monitor: "val/generation-truth"
-      mode: "min"
-      verbose: true
-
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
-#    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250505.135M/normalization.pt"
-    #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
-    val_split: [ 0.75, 1.0 ]
+    train_validation_split: 0.75
+
+#  Metrics:
+#    Generation-Binning:
+#      "neutrino-log_pt": [ 50, -4, 4 ]
+#      "neutrino-eta": [ 50, -4, 4 ]
+#      "neutrino-phi": [ 50, -4, 4 ]
 
 
 network:
-#  default: configs/model.yaml
-  #  default: configs/model_large.yaml
-  default: configs/pretrain.yaml
+  default: ../../share/pretrain-config/network-20M.yaml
 
   Body:
     PET:
-#      local_Krank: 2
       feature_drop: 0.0
   ReconGeneration:
     feature_drop: 0.0
   TruthGeneration:
     feature_drop: 0.0
-  # overwrites
-  # ...
 
 event_info:
   default: configs/event_info.yaml
 
-  # overwrites
-  # ...
-
 resonance:
-  default: configs/resonance.yaml
-
-  # overwrites
-  # ...
+  default: ../../share/resonance/standard_model.yaml

@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
     # The filename of the prediction data
-    filename: "prediction-mg5-20250812.pt"
+    filename: "prediction-mg5-20250812-ema.pt"
 
     extra_save:
       - EXTRA/num_bjet
@@ -109,10 +109,21 @@ options:
         optimizer_type: "AdamW"
         diffusion_steps: 300
 
+    EMA:
+      enable: true               # Enable or disable EMA
+      decay: 0.999               # EMA decay rate
+      start_epoch: 0             # Start updating EMA after this epoch
+      update_every_n_steps: 1    # Update EMA every N steps
+
+      replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
+      replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
+
+
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
     train_validation_split: 0.75
+
 
 #  Metrics:
 #    Generation-Binning:
