@@ -73,7 +73,7 @@ options:
         diffusion_steps: 200
 
     EarlyStopping:
-      patience: 200
+      patience: 300
       min_delta: 0.0
       monitor: "val/generation-truth"
       mode: "min"
