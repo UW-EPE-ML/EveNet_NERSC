@@ -208,7 +208,7 @@ class EveNetEngine(L.LightningModule):
         ###### For general log ######
         self.general_log = GenericMetrics()
         self.log_gradient_step = global_config.options.Training.get("log_gradient_step", 100)
-        self.simplified_log: bool = global_config.logger.get("wandb", {}).get("simplified", False)
+        self.simplified_log: bool = global_config.get('logger', {}).get("wandb", {}).get("simplified", False)
         self.local_logger: Union[None, LocalLogger] = None
 
         self.eval_metrics_every_n_epochs: int = global_config.options.Training.get("eval_metrics_every_n_epochs", 1)
@@ -698,8 +698,6 @@ class EveNetEngine(L.LightningModule):
         outputs["generations"] = None
         outputs["classification-noised"] = None
         outputs['regression-noised'] = None
-        outputs.pop('full_input_point_cloud')
-        outputs.pop('full_global_conditions')
         outputs.pop('alpha')
 
         if self.config.options.prediction.get('save_point_cloud', False):
@@ -727,6 +725,12 @@ class EveNetEngine(L.LightningModule):
                     product_symbolic_groups=self.ass_args['step']['product_symbolic_groups'][process],
                     event_permutations=self.ass_args['step']['event_permutations'][process],
                 )
+
+        if self.segmentation_cfg.include:
+            outputs['truth_segmentation-full-class'] = inputs['segmentation-full-class']
+            outputs['truth_segmentation-class'] = inputs['segmentation-class']
+            outputs['truth_segmentation-mask'] = inputs[self.target_segmentation_data_mask_key]
+
 
         if self.truth_generation_cfg.include:
             outputs["neutrinos"] = {

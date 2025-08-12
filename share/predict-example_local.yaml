@@ -1,5 +1,5 @@
 platform:
-  data_parquet_dir: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
+  data_parquet_dir: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/Run3_output"
   number_of_workers: 1
   resources_per_worker: {
     "CPU": 1,
@@ -15,7 +15,7 @@ options:
   # For prediction Only
   prediction:
     # The directory where the prediction data is saved
-    output_dir: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output"
+    output_dir: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/Run3_output_predict"
     # The filename of the prediction data
     filename: "prediction.pt"
 
@@ -23,8 +23,7 @@ options:
       - num_sequential_vectors
 
   Training:
-#    model_checkpoint_load_path: "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_a103a_00000_0_2025-05-17_21-53-40/checkpoint_000009/checkpoint.ckpt"
-    pretrain_model_load_path:  "/Users/avencastmini/ray_results/EveNet-Training/TorchTrainer_a103a_00000_0_2025-05-17_21-53-40/checkpoint_000009/checkpoint.ckpt"
+    pretrain_model_load_path:  "/Users/avencastmini/PycharmProjects/EveNet/workspace/checkpoints/EveNet-20M-20250811-train=2.6601_val=2.6352.ckpt"
 
     # Should follow the same components as your finetune model
     Components:
@@ -35,14 +34,18 @@ options:
         include: false
 
       Assignment:
+        include: false
+
+      Segmentation:
         include: true
+#        use_full_mask: true
 
   Dataset:
     dataset_limit: 0.0001
-    normalization_file: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/test_output/normalization.pt"
+    normalization_file: "/Users/avencastmini/PycharmProjects/EveNet/workspace/test_data/Run3_output/normalization.pt"
 
 network:
-  default: network/pretrain.yaml
+  default: pretrain-config/network-20M.yaml
 
 event_info:
   default: event_info/multi_process.yaml
