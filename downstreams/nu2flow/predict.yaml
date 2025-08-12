@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
     # The filename of the prediction data
-    filename: "prediction-mg5-20250812-ema-epoch154.pt"
+    filename: "scratch-mg5-20250812-ema-epoch230.pt"
 
     extra_save:
       - EXTRA/num_bjet
@@ -66,7 +66,8 @@ options:
     total_epochs: 500
     epochs: 250
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/epoch=154_train=0.5737_val=0.5551.ckpt"
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/epoch=154_train=0.5737_val=0.5551.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/epoch=230_train=0.6098_val=0.5819.ckpt"
     pretrain_model_load_path: null
     # pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
