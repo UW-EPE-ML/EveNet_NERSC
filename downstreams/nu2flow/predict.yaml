@@ -17,7 +17,7 @@ options:
     # The directory where the prediction data is saved
     output_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/predicts.nu2flow/"
     # The filename of the prediction data
-    filename: "prediction-mg5-300.pt"
+    filename: "prediction-mg5-20250812.pt"
 
     extra_save:
       - EXTRA/num_bjet
@@ -66,9 +66,9 @@ options:
     total_epochs: 500
     epochs: 250
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/best_epoch=468.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.nu2flow/mg5/epoch=246_train=0.5459_val=0.5564.ckpt
     pretrain_model_load_path: null
-    #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
+    # pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.full/best_epoch=3.ckpt"
 
     diffusion_every_n_epochs: 10 # how often to run diffusion
     diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
@@ -125,8 +125,6 @@ options:
   Dataset:
     dataset_limit: 1.0
     normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/nu2flow/mg5_train/normalization.pt"
-    #    normalization_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250420.full/normalization.pt"
-    #    balance_file: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/SPANet/ttbar_semi_leptonic/train/normalization.pt"
     train_validation_split: 0.75
 
 #  Metrics:
@@ -137,21 +135,18 @@ options:
 
 
 network:
-  default: configs/model.yaml
-  #  default: configs/model_large.yaml
-  #  default: configs/pretrain.yaml
+  default: ../../share/pretrain-config/network-20M.yaml
 
-  # overwrites
-  # ...
+  Body:
+    PET:
+      feature_drop: 0.0
+  ReconGeneration:
+    feature_drop: 0.0
+  TruthGeneration:
+    feature_drop: 0.0
 
 event_info:
   default: configs/event_info.yaml
 
-  # overwrites
-  # ...
-
 resonance:
-  default: configs/resonance.yaml
-
-  # overwrites
-  # ...
+  default: ../../share/resonance/standard_model.yaml

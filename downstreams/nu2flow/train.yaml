@@ -96,8 +96,6 @@ options:
 
 
 network:
-#  default: configs/model.yaml
-  #  default: configs/model_large.yaml
   default: ../../share/pretrain-config/network-20M.yaml
 
   Body:
@@ -108,17 +106,8 @@ network:
   TruthGeneration:
     feature_drop: 0.0
 
-  # overwrites
-  # ...
-
 event_info:
   default: configs/event_info.yaml
 
-  # overwrites
-  # ...
-
 resonance:
   default: ../../share/resonance/standard_model.yaml
-
-  # overwrites
-  # ...
