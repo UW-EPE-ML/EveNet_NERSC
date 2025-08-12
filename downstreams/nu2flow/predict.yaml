@@ -10,7 +10,7 @@ platform:
   use_gpu: true
 
 options:
-  default: configs/options.yaml
+  default: ../../share/options/options.yaml
 
   # For prediction Only
   prediction:
