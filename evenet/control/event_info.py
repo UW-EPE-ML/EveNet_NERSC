@@ -92,9 +92,11 @@ class EventInfo:
             resonance_particle_properties: List,
             generations: Dict[str, Dict],
             invisible_input_features: Tuple[FeatureInfo, ...],
-            resonance_label: List[str] = [],
+            resonance_label=None,
     ):
 
+        if resonance_label is None:
+            resonance_label = []
         self.input_types = input_types
         self.input_names = list(input_types.keys())
         self.input_features = input_features
@@ -319,10 +321,9 @@ class EventInfo:
             self.product_mappings, self.pairing_topology, self.resonance_info
         )
         self.total_segment_tags = max(v for _, tags in self.process_to_segment_tags.items() for v in tags.values()) + 1
-        print(resonance_label)
         self.segment_label = {
             label: clsnum for clsnum, label in enumerate(resonance_label[0])
-        }
+        } if len(resonance_label) > 0 else {}
 
     # def normalized_features(self, input_name: str) -> NDArray[bool]:
     #     return np.array([feature.normalize for feature in self.input_features[input_name]])

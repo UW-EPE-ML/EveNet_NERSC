@@ -121,8 +121,10 @@ class EveNetEngine(L.LightningModule):
         self.class_weight = self.balance_dict["class_balance"]
         self.assignment_weight = self.balance_dict["particle_balance"]
         self.subprocess_balance = self.balance_dict["subprocess_balance"]
-        self.segmentation_cls_balance = self.balance_dict["segment_full_class_balance"] if self.segmentation_cfg.use_full_mask else self.balance_dict["segment_class_balance"]
 
+        self.segmentation_cls_balance = None
+        if self.segmentation_cfg.include:
+            self.segmentation_cls_balance = self.balance_dict["segment_full_class_balance"] if self.segmentation_cfg.use_full_mask else self.balance_dict["segment_class_balance"]
 
         self.l.info(f"normalization dicts initialized")
 
