@@ -13,13 +13,13 @@ logger:
   wandb:
     project: "nu2flow-tt2l"
     entity: "ytchou97-university-of-washington"
-    run_name: &logger_name "tt2l-20M-new-head-8"
+    run_name: &logger_name "tt2l-20M-new-head-w.generation"
     tags: [ "NERSC", "TT2L", "Neutrinos" ]
     simplified: false
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
-    version: "2025-08-12-new-head-8"
+    version: "2025-08-12-new-head-w.generation"
 
 
 options:
@@ -63,7 +63,12 @@ options:
       GlobalGeneration:
         include: false
       ReconGeneration:
-        include: false
+        include: true
+        warm_up: true
+        learning_rate: *lr
+        weight_decay: *wd
+        optimizer_type: "AdamW"
+        diffusion_steps: 200
       TruthGeneration:
         include: true
         warm_up: true
@@ -105,16 +110,6 @@ network:
     feature_drop: 0.0
   TruthGeneration:
     feature_drop: 0.0
-    hidden_dim: 256
-    num_layers: 8
-    num_heads: 8
-    dropout: 0.1
-    layer_scale: true
-    layer_scale_init: 1.0e-05
-    drop_probability: 0.1
-    extend_batch: true
-    neutrino_position_encode: true
-    max_position_length: 36 # Must be larger than max object number
 
 
 event_info:
