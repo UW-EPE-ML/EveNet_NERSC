@@ -158,7 +158,7 @@ def main(df: pd.DataFrame, plot_path: Path = None):
             )
 
             unfold = ROOT.RooUnfoldSvd(response, h_measure, 7)
-            hUnfold = unfold.Hunfold()
+            hUnfold = unfold.Hunfold(2)
 
             # unfold.PrintTable(ROOT.cout, h_truth)
             # plot_histograms(h_truth, h_measure, hUnfold, save_path=plot_path / f"{var}_{category}.pdf")
