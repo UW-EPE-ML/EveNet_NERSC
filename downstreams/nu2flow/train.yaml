@@ -13,7 +13,7 @@ logger:
   wandb:
     project: "nu2flow-tt2l"
     entity: "ytchou97-university-of-washington"
-    name: &logger_name "tt2l-scratch"
+    run_name: &logger_name "tt2l-scratch"
     tags: [ "NERSC", "TT2L", "Neutrinos" ]
     simplified: false
   local:
