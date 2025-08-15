@@ -1,19 +1,17 @@
 #!/bin/bash
 
 #SBATCH -C gpu&hbm80g
-#SBATCH --time=10:00:00
+#SBATCH --time=4:00:00
 #SBATCH -q regular
 #SBATCH -A m5019_g
 
 ### This script works for any number of nodes, Ray will find and manage all resources
-#SBATCH --nodes=64
+#SBATCH --nodes=128
 
 ### Give all resources on each node to a single Ray task, ray can manage the resources internally
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=128
-
-#SBATCH --reservation=EveNet_ML4Jet_2
 
 #SBATCH --image=registry.nersc.gov/m2616/avencast/evenet:1.3
 
@@ -51,6 +49,6 @@ cd ../ && source setup.sh
 
 export TORCH_NCCL_TIMEOUT=180
 
-shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-100M-cont-2.yaml
+shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-100M-cont.yaml
 
 exit
