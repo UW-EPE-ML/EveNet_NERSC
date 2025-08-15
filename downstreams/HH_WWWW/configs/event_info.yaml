@@ -1,0 +1,133 @@
+# ---------------------------------------------------
+# REQUIRED - INPUTS - List all inputs to SPANet here.
+# ---------------------------------------------------
+INPUTS:
+  # -----------------------------------------------------------------------------
+  # REQUIRED - SEQUENTIAL - inputs which can have an arbitrary number of vectors.
+  # -----------------------------------------------------------------------------
+  SEQUENTIAL:
+    Source:
+#      mass: log_normalize
+      energy: log_normalize
+      pt: log_normalize
+      eta: normalize
+      phi: normalize_uniform
+      btag: none
+      isLepton: none
+      charge: none
+
+#      mass: log_normalize
+#      pt: log_normalize
+#      eta: normalize
+#      phi: normalize_uniform
+#      btag: none
+#      isLepton: none
+#      charge: none
+
+  # ---------------------------------------------------------------------
+  # REQUIRED - GLOBAL - inputs which will have a single vector per event.
+  # ---------------------------------------------------------------------
+  GLOBAL:
+    Conditions:
+#      met: log_normalize
+#      met_phi: normalize
+
+      met: log_normalize
+      met_phi: normalize
+      nLepton: none
+      nbJet: none
+      nJet: none
+      HT: log_normalize
+      HT_lep: log_normalize
+      M_all: log_normalize
+      M_leps: log_normalize
+      M_bjets: log_normalize
+
+
+# ----------------------------------------------------------------------
+# REQUIRED - EVENT - Complete list of resonance particles and daughters.
+# ----------------------------------------------------------------------
+EVENT:
+#  HHWWWW_2l:
+#    H1:
+#      - l1
+#      - q1
+#      - q2
+#    H2:
+#      - l
+#      - q1
+#      - q2
+
+  HHWWWW_3l:
+    H1:
+      - l+
+      - l-
+    H2:
+      - l
+      - q1
+      - q2
+
+
+# ---------------------------------------------------------
+# REQUIRED KEY - PERMUTATIONS - List of valid permutations.
+# ---------------------------------------------------------
+PERMUTATIONS:
+  HHWWWW_3l:
+#    - []
+    H2:
+      - [ q1, q2 ]
+# ------------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired features to regress from observables.
+# ------------------------------------------------------------------------------
+REGRESSIONS:
+  EVENT: []
+
+
+# -----------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+CLASSIFICATIONS:
+  EVENT:
+    - signal
+
+CLASSLABEL:
+  EVENT:
+    signal:
+      - [ HH ]
+
+RESONANCE_LABEL:
+  - ["null", "H(lep_had)", "H(lep_lep)" ]
+
+
+PARTICLE_PROPERTIES:
+#  - Mass
+  - Energy
+  - Spin
+  - nProduct_BJet
+  - nProduct_Jet
+  - nProduct_Lepton
+  - Product_LeptonCharge
+
+GENERATIONS:
+  Conditions:
+    - met
+    - met_phi
+  GlobalTargets: []
+
+  Events:
+    - energy
+    - pt
+    - eta
+    - phi
+    - btag
+    - isLepton
+    - charge
+
+  Neutrinos:
+#    mass: empty
+    pt: log_normalize
+    eta: normalize
+    phi: normalize_uniform
+#    btag: empty
+#    isLepton: empty
+#    charge: empty

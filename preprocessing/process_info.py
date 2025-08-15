@@ -10,6 +10,8 @@ PDG_Dict = {
     "l": [11, 13, -11, -13],
     "l+": [-11, -13],
     "l-": [11, 13],
+    "v+": [12, 14, 16],
+    "v-": [-12, -14, -16],
     "t": [6, -6],
     "v": [12, 14, 16, -12, -14, -16],
     "q": [1, 2, 3, 4, -1, -2, -3, -4],
@@ -35,7 +37,6 @@ for pdg_ in PDG_Dict:
         if not abs(pdgid) in [23, 24, 6]: is_resonance_particle = False
     if is_full_neutrino: neutrino_representation.append(pdg_)
     if is_resonance_particle: resonance_representation.append(pdg_)
-
 
 def return_last_product(process_diagram, last_product=None):
     if last_product is None:
@@ -88,7 +89,9 @@ def select_by_rank(Daughter, Mother, rank=0):
     return Daughter, Mother
 
 
-def select_by_products(parton, candidate_array, products, candidate_name, process_summary=None, rank=None):
+def select_by_products(parton, candidate_array, products, candidate_name, process_summary=None, rank=None,remove_find=False):
+    raw_candidate_array = deepcopy(candidate_array)
+
     if process_summary is None:
         process_summary = dict()
     if products is None:
@@ -104,6 +107,11 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
         if (product == "SYMMETRY"): continue
         product_name = '{}/{}'.format(candidate_name, product)
         product_array = select_by_pdgId(parton, product)
+
+        if remove_find:
+            eq = product_array.M1[:, :, None] == raw_candidate_array.index[:, None, :]
+            product_array = product_array[ak.any(eq, axis=2)]
+
         cartesian = ak.argcartesian([product_array.M1, candidate_array.index], axis=1)
         matches = cartesian[(product_array.M1[cartesian["0"]] == candidate_array.index[cartesian["1"]])]
 
@@ -112,8 +120,11 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
 
         candidate_array[product_name] = product_from_mother.index
 
-        # print('---product decay---')
+        # print(f'1. ---{product} product decay---')
         # for i in product_from_mother[0]:
+        #     print(candidate_name, i)
+        #
+        # for i in candidate_array[0]:
         #     print(candidate_name, i)
 
         if products[product] is not None:
@@ -122,12 +133,19 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
             product_decay_array, process_summary = select_by_products(
                 parton, product_from_mother, products[product], product_name, rank=ranking
             )
-            # print('---product decay---')
-            # for i in product_decay_array[1]:
+
+            # print(f'2. ---{product} product decay---')
+            # for i in product_from_mother[0]:
             #     print(candidate_name, i)
-            cartesian_selection = ak.argcartesian([product_decay_array.M1, candidate_array.index], axis=1)
-            matches_selection = cartesian_selection[
-                (product_decay_array.M1[cartesian_selection["0"]] == candidate_array.index[cartesian_selection["1"]])]
+
+            if remove_find:
+                cartesian_selection = ak.argcartesian([product_decay_array.index, candidate_array[product_name]], axis=1)
+                matches_selection = cartesian_selection[
+                    (product_decay_array.index[cartesian_selection["0"]] == candidate_array[product_name][cartesian_selection["1"]])]
+            else:
+                cartesian_selection = ak.argcartesian([product_decay_array.M1, candidate_array.index], axis=1)
+                matches_selection = cartesian_selection[
+                    (product_decay_array.M1[cartesian_selection["0"]] == candidate_array.index[cartesian_selection["1"]])]
             product_from_mother = product_decay_array[matches_selection["0"]]
             candidate_array = candidate_array[matches_selection["1"]]
             for sub_product in product_from_mother.fields:

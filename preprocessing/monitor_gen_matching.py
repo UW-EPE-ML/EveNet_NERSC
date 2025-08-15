@@ -5,11 +5,13 @@ import glob
 import numpy as np
 import vector
 from preprocessing.dqm_util import get_hist, draw_hist, find_dataset_name, valid_components_mask
+from preprocessing.offshell_patch import offshell_patch
 from tqdm import tqdm
 
 vector.register_awkward()
 from preprocessing.process_info import *
 import re
+
 
 
 def pad_object(obj, nMax):
@@ -80,9 +82,11 @@ def store_valid_components(data_dict, base_name, momentum, mask, components):
 
 def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, return_data: bool = True):
     mother_status = 21
+    remove_find = False
     if diagram['category'] == 'HWW':
         mother_status = 22
-
+    if diagram['category'] == 'HH':
+        remove_find = True
 
     v4 = dict()
     for obj in ["els", "jets", "mus", "tas", "genpart"]:
@@ -159,6 +163,8 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
 
     event_dict = dict()
     candidate_dict = dict()
+
+    found_list = []
     for product in diagram['diagram']:
         if product == "SYMMETRY": continue
         if "SYMMETRY" in diagram['diagram']:
@@ -169,13 +175,21 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
 
         candidate_array = select_by_pdgId(parton, product)
         candidate_array = select_by_mother_status(parton, candidate_array, mother_status)
+
+        if remove_find and len(found_list) > 0:
+            all_found = ak.concatenate(found_list, axis=1)
+            mask = ~ak.any(candidate_array.index[:, :, None] == all_found[:, None, :], axis=2)
+            candidate_array = candidate_array[mask]
+
         product_name = 'EVENT/{}'.format(product)
         ranking = None if ((symmetry_map is None) or (product not in symmetry_map)) else symmetry_map[product]
         candidate_array, event_dict = select_by_products(
             parton, candidate_array, diagram['diagram'][product],
-            product_name, event_dict, rank=ranking
+            product_name, event_dict, rank=ranking,remove_find=remove_find
         )
         candidate_dict[product] = candidate_array
+
+        found_list.append(candidate_array.index)
 
     event_dict = dict()
     for product in diagram['diagram']:

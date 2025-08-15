@@ -288,7 +288,7 @@ class EveNetDataConverter:
             # REGRESSIONS/v/MASK path
             i_raw = 0
             for keys in self.raw_data.keys():
-                if keys.startswith("REGRESSIONS") and "/v/MASK" in keys:
+                if keys.startswith("REGRESSIONS") and any(f"/{v}/MASK" in keys for v in ("v+", "v-", "v")):
                     # x_inv_mask[:, i_raw] = self.raw_data[keys]
 
                     for idx, (key, norm) in enumerate(self.event_info.generations['Neutrinos'].items()):
@@ -342,7 +342,7 @@ class EveNetDataConverter:
                 paths.append(f"{prefix}/{d}")
             return paths
 
-        keys = flatten_dict_paths(extra_keys, prefix="EXTRA")
+        keys = flatten_dict_paths(extra_keys, prefix="")
 
         return {
             key: self.raw_data[key] for key in keys if key in self.raw_data

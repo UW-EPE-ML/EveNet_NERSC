@@ -262,7 +262,6 @@ def preprocess(in_dir, store_dir, process_info, unique_id, cfg_dir=None, save: b
             extra = converter.load_extra(extra_keys=global_config.EXTRA)
             process_data.update(extra)
 
-
         # Apply Selections
         sel_config = global_config.get("selections", {})
         if "selections" in sel_config and "aliases" in sel_config and process in sel_config["selections"]:

@@ -1,0 +1,44 @@
+EXCLUDE:
+  W_had: &W_had
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  W_lep: &W_lep
+    l: null
+    v: null
+
+  W_lep_plus: &W_lep_plus
+    l+: null
+    v+: null
+
+  W_lep_minus: &W_lep_minus
+    l-: null
+    v-: null
+
+#HHWWWW_2l:
+#  category: HH
+#  process_id: 0
+#  diagram:
+#    H1:
+#      W1: *W_had
+#      W2: *W_lep
+#    H2:
+#      W1: *W_had
+#      W2: *W_lep
+#    SYMMETRY: [ H1, H2 ]
+##  total_entries: 10000
+##  xsec: 13033.42 # pb
+
+HHWWWW_3l:
+  category: HH
+  process_id: 0
+  diagram:
+    H1:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+    H2:
+      W1: *W_had
+      W2: *W_lep
+#  total_entries: 10000
+#  xsec: 13033.42 # pb

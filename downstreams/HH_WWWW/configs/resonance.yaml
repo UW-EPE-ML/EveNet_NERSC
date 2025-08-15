@@ -1,0 +1,22 @@
+# --------------------
+# Resonance Type - List of valid resonance particle (w. different decay topology)
+# --------------------
+
+TriObjectDecay:
+  H/lqq:
+    Mass: 125.09
+    Spin: 0
+    nProduct_BJet: 0
+    nProduct_Jet: 2
+    nProduct_Lepton: 1
+    Product_LeptonCharge: 0
+    segment_tag: 1
+
+  H/l+l-:
+    Mass: 125.09
+    Spin: 0
+    nProduct_BJet: 0
+    nProduct_Jet: 0
+    nProduct_Lepton: 2
+    Product_LeptonCharge: 0
+    segment_tag: 2
