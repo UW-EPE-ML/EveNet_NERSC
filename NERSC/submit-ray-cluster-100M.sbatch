@@ -51,6 +51,6 @@ cd ../ && source setup.sh
 
 export TORCH_NCCL_TIMEOUT=180
 
-shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-100M.yaml
+shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-100M-cont.yaml
 
 exit
