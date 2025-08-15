@@ -84,7 +84,7 @@ def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, retur
     remove_find = False
     if diagram['category'] == 'HWW':
         mother_status = 22
-    if diagram['category'] == 'HH':
+    if diagram['category'] in ['HHML_3L']:
         remove_find = True
 
     v4 = dict()

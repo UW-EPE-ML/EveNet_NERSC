@@ -326,6 +326,7 @@ class EveNetDataConverter:
         }
 
     def load_extra(self, extra_keys: dict):
+
         def flatten_dict_paths(d, prefix=""):
             paths = []
             if isinstance(d, dict):
@@ -345,5 +346,6 @@ class EveNetDataConverter:
         keys = flatten_dict_paths(extra_keys, prefix="")
 
         return {
-            key: self.raw_data[key] for key in keys if key in self.raw_data
+            key: self.raw_data[key] if key in self.raw_data else np.zeros((self.total_length, 4), dtype=np.float32)
+            for key in keys
         }

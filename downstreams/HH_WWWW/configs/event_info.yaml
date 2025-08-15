@@ -67,6 +67,14 @@ EVENT:
       - q1
       - q2
 
+  HHWWWW_4l:
+    H1:
+      - l+
+      - l-
+    H2:
+      - l+
+      - l-
+
 
 # ---------------------------------------------------------
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
@@ -76,6 +84,11 @@ PERMUTATIONS:
 #    - []
     H2:
       - [ q1, q2 ]
+
+  HHWWWW_4l:
+    EVENT:
+      - [H1, H2]
+
 # ------------------------------------------------------------------------------
 # REQUIRED - REGRESSIONS - List of desired features to regress from observables.
 # ------------------------------------------------------------------------------

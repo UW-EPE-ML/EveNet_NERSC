@@ -137,6 +137,9 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
             # print(f'2. ---{product} product decay---')
             # for i in product_from_mother[0]:
             #     print(candidate_name, i)
+            #
+            # for i in candidate_array[0]:
+            #     print(candidate_name, i)
 
             if remove_find:
                 cartesian_selection = ak.argcartesian([product_decay_array.index, candidate_array[product_name]], axis=1)
@@ -148,6 +151,14 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
                     (product_decay_array.M1[cartesian_selection["0"]] == candidate_array.index[cartesian_selection["1"]])]
             product_from_mother = product_decay_array[matches_selection["0"]]
             candidate_array = candidate_array[matches_selection["1"]]
+
+            # print(f'3. ---{product} product decay---')
+            # for i in product_from_mother[0]:
+            #     print(candidate_name, i)
+            #
+            # for i in candidate_array[0]:
+            #     print(candidate_name, i)
+
             for sub_product in product_from_mother.fields:
                 if sub_product in candidate_array.fields: continue
                 candidate_array[sub_product] = product_from_mother[sub_product]
@@ -161,6 +172,10 @@ def select_by_products(parton, candidate_array, products, candidate_name, proces
             candidate_array = ak.pad_none(candidate_array, rank + 1, axis=1)
             candidate_array = ak.from_regular(candidate_array[..., [rank]])
             candidate_array = ak.drop_none(candidate_array, axis=1)
+
+            # print(f'4. ---{product} product decay---')
+            # for i in candidate_array[0]:
+            #     print(candidate_name, i)
 
         process_summary[product_name] = candidate_array[product_name]
 

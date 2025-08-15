@@ -31,7 +31,7 @@ EXCLUDE:
 ##  xsec: 13033.42 # pb
 
 HHWWWW_3l:
-  category: HH
+  category: HHML_3l
   process_id: 0
   diagram:
     H1:
@@ -40,5 +40,19 @@ HHWWWW_3l:
     H2:
       W1: *W_had
       W2: *W_lep
+#  total_entries: 10000
+#  xsec: 13033.42 # pb
+
+HHWWWW_4l:
+  category: HHML_4l
+  process_id: 0
+  diagram:
+    H1:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+    H2:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+    SYMMETRY: [ H1, H2 ]
 #  total_entries: 10000
 #  xsec: 13033.42 # pb
