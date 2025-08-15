@@ -82,9 +82,9 @@ Assignment:
 
 Segmentation:
   projection_dim: 512
-  num_heads: 32
+  num_heads: 16
   dropout: 0.1
-  num_layers: 2
+  num_layers: 1
   num_queries: 4
   return_intermediate: false
   dim_decay_rate: 4.0
