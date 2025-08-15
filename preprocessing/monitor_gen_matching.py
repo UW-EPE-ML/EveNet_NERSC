@@ -5,7 +5,6 @@ import glob
 import numpy as np
 import vector
 from preprocessing.dqm_util import get_hist, draw_hist, find_dataset_name, valid_components_mask
-from preprocessing.offshell_patch import offshell_patch
 from tqdm import tqdm
 
 vector.register_awkward()
