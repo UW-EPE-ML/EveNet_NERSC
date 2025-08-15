@@ -13,7 +13,7 @@
 #SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=128
 
-#SBATCH --reservation=EveNet_ML4Jet
+#SBATCH --reservation=EveNet_ML4Jet_2
 
 #SBATCH --image=registry.nersc.gov/m2616/avencast/evenet:1.3
 
