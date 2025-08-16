@@ -25,20 +25,25 @@ def _h5_metadata_single_file(file_path):
 
 data_prefix = "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/data"
 
+# tags = [
+#     "Run_2.Dec20",
+#     "Run_2.Dec21",
+#     "Run_2.Dec22",
+#     "Run_2.Pretrain.20250505",
+#     "Run_2.Pretrain.20250507",
+#     "Run_3.Pretrain.20250526",
+#     "Run_3.Pretrain.20250527.Run2Extra",
+# ]
+
 tags = [
-    "Run_2.Dec20",
-    "Run_2.Dec21",
-    "Run_2.Dec22",
-    "Run_2.Pretrain.20250505",
-    "Run_2.Pretrain.20250507",
-    "Run_3.Pretrain.20250526",
-    "Run_3.Pretrain.20250527.Run2Extra",
+    "HHML"
 ]
 
 INPUT_ROOTS = [Path(data_prefix) / tag for tag in tags]
-OUTPUT_ROOT = Path(data_prefix) / "Combined_Balanced"
+OUTPUT_ROOT = Path(data_prefix) / "HHML_Combined_Balanced"
 
-NUM_RUNS = 1000
+# NUM_RUNS = 1000
+NUM_RUNS = 10
 SEED = 42
 CPU_MAX = 50
 
