@@ -43,7 +43,7 @@ INPUT_ROOTS = [Path(data_prefix) / tag for tag in tags]
 OUTPUT_ROOT = Path(data_prefix) / "HHML_Combined_Balanced"
 
 # NUM_RUNS = 1000
-NUM_RUNS = 10
+NUM_RUNS = 50
 SEED = 42
 CPU_MAX = 50
 
