@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -C gpu&hbm80g
+#SBATCH -C gpu
 #SBATCH --time=4:00:00
 #SBATCH -q regular
 #SBATCH -A m5019_g
