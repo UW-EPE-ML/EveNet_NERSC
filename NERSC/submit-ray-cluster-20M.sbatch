@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -C gpu
-#SBATCH --time=8:00:00
+#SBATCH --time=10:30:00
 #SBATCH -q regular
 #SBATCH -A m5019_g
 
