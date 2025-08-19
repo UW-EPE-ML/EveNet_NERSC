@@ -80,7 +80,7 @@ def train_func(cfg):
     # callbacks
     checkpoint_callback = ModelCheckpoint(
         monitor="val/loss",
-        save_top_k=30,
+        save_top_k=50,
         mode="min",
         verbose=True,
         dirpath=global_config.options.Training.model_checkpoint_save_path,
