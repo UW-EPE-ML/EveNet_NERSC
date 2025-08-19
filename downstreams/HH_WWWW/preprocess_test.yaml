@@ -1,5 +1,5 @@
 max_neutrinos: 4
-veto_double_assign: true
+veto_double_assign: false
 
 selections:
   aliases:
@@ -38,14 +38,11 @@ selections:
 
   selections:
     HHWWWW_3l:
-      - "n_lep >= 3"
-      - "n_jet >= 2"
-      - *lep3_pT_sel
-      - *jet2_pT_sel
+      - "n_lep >= 0"
+      - "n_jet >= 0"
 
     HHWWWW_4l:
-      - "n_lep >= 4"
-      - *lep4_pT_sel
+      - "n_lep >= 0"
 
 EXTRA:
   SPECIAL:
