@@ -13,8 +13,8 @@ logger:
     project: "Pretrain"
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
-    run_name: &logger_name "nominal-20M-ablation-4"
-    id: "nominal-20M-ablation-4-20250821"
+    run_name: &logger_name "nominal-20M-ablation-4-cont"
+    id: "nominal-20M-ablation-4-20250821-cont"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "20M", "Ablation"]
     simplified: false
   local:
@@ -28,10 +28,10 @@ options:
 
   Training:
     total_epochs: 30
-    epochs: 15
+    epochs: 20
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.ablation.4"
-#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/last-unsupervised.ckpt"
-    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/last-unsupervised.ckpt"
+    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/epoch=9_train=2.3040_val=2.3412.ckpt"
+#    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/last-unsupervised.ckpt"
 
     diffusion_every_n_epochs: 5 # how often to run diffusion
     diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
