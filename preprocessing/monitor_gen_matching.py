@@ -82,9 +82,10 @@ def store_valid_components(data_dict, base_name, momentum, mask, components):
 def build_dataset_with_matching(objects, diagram, process, dqm_plot: dict, return_data: bool = True):
     mother_status = 21
     remove_find = False
+
     if diagram['category'] == 'HWW':
         mother_status = 22
-    if diagram['category'] in ['HHML_3L']:
+    if diagram['category'] in ['HHML_3l']:
         remove_find = True
 
     v4 = dict()
