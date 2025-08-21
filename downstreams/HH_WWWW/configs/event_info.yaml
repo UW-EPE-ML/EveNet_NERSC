@@ -58,7 +58,16 @@ EVENT:
 #      - q1
 #      - q2
 
-  HHWWWW_3l:
+  HHWWWW_3l_jj:
+    H1:
+      - l+
+      - l-
+    H2:
+      - l
+      - q1
+      - q2
+
+  HHWWWW_3l_lv:
     H1:
       - l+
       - l-
@@ -80,8 +89,10 @@ EVENT:
 # REQUIRED KEY - PERMUTATIONS - List of valid permutations.
 # ---------------------------------------------------------
 PERMUTATIONS:
-  HHWWWW_3l:
-#    - []
+  HHWWWW_3l_jj:
+    H2:
+      - [ q1, q2 ]
+  HHWWWW_3l_lv:
     H2:
       - [ q1, q2 ]
 

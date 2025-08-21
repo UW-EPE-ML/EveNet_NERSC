@@ -19,9 +19,10 @@ OUT_BASE="$PSCRATCH/Event_Level_Analysis/Pretrain_Parquet/HHML"
 
 for dataset in train test; do
 #for dataset in train; do
-    python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG"/preprocess_${dataset}.yaml \
-        --in_dir "$IN_BASE/$dataset" \
-        --store_dir "$OUT_BASE/$dataset"
+    shifter python3 "$PREPROCESS_SCRIPT" "$YAML_CONFIG"/preprocess_${dataset}.yaml \
+        --pretrain_dirs "$IN_BASE/$dataset" \
+        --store_dir "$OUT_BASE/$dataset" \
+        --cpu_max 100
 done
 ```
 

@@ -30,7 +30,20 @@ EXCLUDE:
 ##  total_entries: 10000
 ##  xsec: 13033.42 # pb
 
-HHWWWW_3l:
+HHWWWW_3l_jj:
+  category: HHML_3l
+  process_id: 0
+  diagram:
+    H1:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+    H2:
+      W1: *W_had
+      W2: *W_lep
+#  total_entries: 10000
+#  xsec: 13033.42 # pb
+
+HHWWWW_3l_lv:
   category: HHML_3l
   process_id: 0
   diagram:

@@ -37,7 +37,11 @@ selections:
       jet6_pT_sel: &jet6_pT_sel "(np.sum((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, axis=-1) > 5) & (-np.partition(-np.where((~is_bjet.astype(bool)) & (~is_lep.astype(bool)) & is_valid, pt, -np.inf), 5, axis=-1)[:, 5] > 20)"
 
   selections:
-    HHWWWW_3l:
+    HHWWWW_3l_lv:
+      - "n_lep >= 0"
+      - "n_jet >= 0"
+
+    HHWWWW_3l_jj:
       - "n_lep >= 0"
       - "n_jet >= 0"
 
