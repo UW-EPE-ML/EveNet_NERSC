@@ -34,7 +34,7 @@ for pdg_ in PDG_Dict:
     is_resonance_particle = True
     for pdgid in PDG_Dict[pdg_]:
         if not abs(pdgid) in [12, 14, 16]: is_full_neutrino = False
-        if not abs(pdgid) in [23, 24, 6]: is_resonance_particle = False
+        if not abs(pdgid) in [23, 24, 6, 25, 36]: is_resonance_particle = False
     if is_full_neutrino: neutrino_representation.append(pdg_)
     if is_resonance_particle: resonance_representation.append(pdg_)
 
