@@ -868,6 +868,7 @@ def shared_step(
         process_id=subprocess_id,
         event_weight=event_weight
     )
+    exit(1)
 
     print("Assigment Loss")
 
