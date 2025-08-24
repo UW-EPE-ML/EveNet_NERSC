@@ -330,8 +330,6 @@ class SingleProcessAssignmentMetrics:
         print(f"Processing {best_indices[0].shape[0]} events")
         print(f"best indices shapes: {[p.shape for p in best_indices]}")
         print(f"truth indices shapes: {[p.shape for p in truth_indices]}")
-        print(f"best indices example: {best_indices}")
-        print(f"truth indices example: {truth_indices}")
 
         best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
 
@@ -797,10 +795,15 @@ class SingleProcessAssignmentMetrics:
 
         predictions = [torch.clone(p) for p in predictions]
         targets = [torch.clone(p) for p in targets]
+
+        print(f"predictions: {predictions}")
+        print(f"targets: {targets}")
+
         for i, (_, particle_group) in enumerate(self.target_groups.items()):
             for orbit in particle_group.orbits():
                 orbit = tuple(sorted(orbit))
 
+                print(f"orbit: {orbit}")
                 targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
                 predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
         return predictions, targets
