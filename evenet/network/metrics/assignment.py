@@ -869,6 +869,8 @@ def shared_step(
         event_weight=event_weight
     )
 
+    print("Assigment Loss")
+
     assignment_predict = dict()
     ass_target_metric, ass_mask_metric = convert_target_assignment(
         targets=targets,
@@ -877,10 +879,14 @@ def shared_step(
         num_targets=num_targets
     )
 
+    print("Assignment convert")
+
     assignment_loss = torch.zeros(1, device=device, requires_grad=True)
     detected_loss = torch.zeros(1, device=device, requires_grad=True)
     active_heads_sum = {k: 0 for k in loss_dict.keys() if 'assignment_' in k}
     for process in process_names:
+        print(f"Assignment {process}")
+
         assignment_predict[process] = predict(
             assignments=assignments[process],
             detections=detections[process],

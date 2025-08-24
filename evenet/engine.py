@@ -317,7 +317,6 @@ class EveNetEngine(L.LightningModule):
         )
 
         print(f"[Step {self.current_step}] model forward done", flush=True)
-        exit(1)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
@@ -378,8 +377,6 @@ class EveNetEngine(L.LightningModule):
             ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
 
             print(f"[Step {self.current_step}] Assignment start: ")
-            print(ass_targets)
-            print(ass_targets_mask)
 
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
