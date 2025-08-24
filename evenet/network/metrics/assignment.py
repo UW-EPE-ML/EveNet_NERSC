@@ -896,8 +896,6 @@ def shared_step(
 
         print(f"Assignment {process} predict")
 
-        exit(1)
-
         if update_metric:
             metrics[process].update(
                 best_indices=assignment_predict[process]["best_indices"],
@@ -908,6 +906,8 @@ def shared_step(
                 inputs=point_cloud,
                 inputs_mask=point_cloud_mask,
             )
+
+            print(f"Assignment {process} update")
 
         loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
         loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]
@@ -920,6 +920,10 @@ def shared_step(
             ass_total = symmetric_losses["assignment"][process] + symmetric_losses["detection"][process]
             loss_dict[ass_name] = loss_dict[ass_name] + topo_weight * ass_total
             active_heads_sum[ass_name] += topo_weight
+
+        print(f"Assignment {process} done")
+
+        exit(1)
 
     loss_dict['assignment'] = (assignment_loss / num_processes * assignment_loss_scale).mean()
     loss_dict['detection'] = (detected_loss / num_processes * detection_loss_scale).mean()
