@@ -1,6 +1,6 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/HHML/train"
-  number_of_workers: 1
+  number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
@@ -35,9 +35,9 @@ options:
     pretrain_model_load_path: null
 #    pretrain_model_load_path: "/global/cfs/cdirs/m5019/Checkpoints/nominal.epoch9.ckpt"
 
-    diffusion_every_n_epochs: 5 # how often to run diffusion
+    diffusion_every_n_epochs: 25 # how often to run diffusion
     diffusion_every_n_steps: 10 # how often to run diffusion inside the valid epoch
-    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
+    eval_metrics_every_n_epochs: 25 # how often to run evaluation metrics
 
     learning_rate: &lr 0.00005
     learning_rate_body: &lr_body 0.00005
