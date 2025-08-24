@@ -897,6 +897,10 @@ def shared_step(
         print(f"Assignment {process} predict")
 
         if update_metric:
+            print(assignment_predict[process]["best_indices"])
+            print(assignment_predict[process]["assignment_probabilities"])
+            print(assignment_predict[process]["detection_probabilities"])
+
             metrics[process].update(
                 best_indices=assignment_predict[process]["best_indices"],
                 assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
@@ -908,6 +912,8 @@ def shared_step(
             )
 
             print(f"Assignment {process} update")
+
+            exit(-1)
 
         loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
         loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]
