@@ -335,6 +335,15 @@ class SingleProcessAssignmentMetrics:
             truth_masks
         )
 
+        print(f"assignment probabilities: {[p.mean().item() for p in assignment_probabilities]}")
+        print(f"detection probabilities: {[p.mean().item() for p in detection_probabilities]}")
+        print(f"correct assignment ratio: {[p.float().mean().item() for p in correct_assigned]}")
+        print(f"truth indices: {[torch.bincount(p[p >= 0]).cpu().numpy() for p in truth_indices]}")
+        print(f"predicted indices: {[torch.bincount(p[p >= 0]).cpu().numpy() for p in best_indices]}")
+        print(f"truth masks: {[p.sum().item() for p in truth_masks]}")
+        print(f"total truth particles: {sum([p.sum().item() for p in truth_masks])}")
+        print(f"total predicted particles: {sum([(p >= 0).sum().item() for p in best_indices])}")
+
         # Log purity
         total_particle_counts, particle_counts, _ = self.particle_count_info(truth_masks)
         for event_counts in product(*self.particle_ranges):
@@ -897,9 +906,6 @@ def shared_step(
         print(f"Assignment {process} predict")
 
         if update_metric:
-            print(assignment_predict[process]["best_indices"])
-            print(assignment_predict[process]["assignment_probabilities"])
-            print(assignment_predict[process]["detection_probabilities"])
 
             metrics[process].update(
                 best_indices=assignment_predict[process]["best_indices"],
