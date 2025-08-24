@@ -12,6 +12,7 @@ TriObjectDecay:
     Product_LeptonCharge: 0
     segment_tag: 1
 
+DiObjectDecay:
   H/l+l-:
     Mass: 125.09
     Spin: 0
