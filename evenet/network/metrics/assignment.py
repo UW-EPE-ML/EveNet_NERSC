@@ -330,8 +330,8 @@ class SingleProcessAssignmentMetrics:
         print(f"Processing {best_indices[0].shape[0]} events")
         print(f"best indices shapes: {[p.shape for p in best_indices]}")
         print(f"truth indices shapes: {[p.shape for p in truth_indices]}")
-        print(f"best indices example: {[p[0, :50] for p in best_indices]}")
-        print(f"truth indices example: {[p[0, :50] for p in truth_indices]}")
+        print(f"best indices example: {best_indices}")
+        print(f"truth indices example: {truth_indices}")
 
         best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
 
