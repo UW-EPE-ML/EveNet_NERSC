@@ -868,7 +868,6 @@ def shared_step(
         process_id=subprocess_id,
         event_weight=event_weight
     )
-    exit(1)
 
     print("Assigment Loss")
 
@@ -894,6 +893,10 @@ def shared_step(
             product_symbolic_groups=product_symbolic_groups[process],
             event_permutations=event_permutations[process],
         )
+
+        print(f"Assignment {process} predict")
+
+        exit(1)
 
         if update_metric:
             metrics[process].update(
