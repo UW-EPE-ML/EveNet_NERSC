@@ -560,16 +560,16 @@ class EveNetEngine(L.LightningModule):
         step = self.current_step
         batch_size = batch["x"].shape[0]
 
-        # print(f"[Step {step}] train step start", flush=True)
+        print(f"[Step {step}] train step start", flush=True)
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        # print(f"[Step {step}] share step start", flush=True)
+        print(f"[Step {step}] share step start", flush=True)
         loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
             update_metric=self.eval_metrics,
         )
-        # print(f"[Step {step}] share step end", flush=True)
+        print(f"[Step {step}] share step end", flush=True)
         final_loss = loss
         famo_logs = None
         if self.include_famo:
@@ -617,9 +617,9 @@ class EveNetEngine(L.LightningModule):
         # if gen_global_loss:
         #     gen_global_loss.mean().backward()
 
-        # print(f"[Step {step}] Loss: {final_loss.item()}")
+        print(f"[Step {step}] Loss: {final_loss.item()}")
         self.safe_manual_backward(loss.mean())
-        # print(f"[Step {step}] Backward done")
+        print(f"[Step {step}] Backward done")
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
@@ -666,7 +666,7 @@ class EveNetEngine(L.LightningModule):
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
         # self.current_step += 1
-        # print(f"[Step {step}] train step done", flush=True)
+        print(f"[Step {step}] train step done", flush=True)
         return final_loss.mean()
 
     # @time_decorator
