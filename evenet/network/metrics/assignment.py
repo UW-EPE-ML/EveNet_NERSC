@@ -922,6 +922,8 @@ def shared_step(
             event_permutations=event_permutations[process],
         )
 
+        print("assignment", assignments[process])
+
         print(f"Assignment {process} predict")
 
         if update_metric:
