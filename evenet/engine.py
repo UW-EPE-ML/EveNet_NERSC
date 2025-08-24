@@ -316,6 +316,7 @@ class EveNetEngine(L.LightningModule):
             schedules=[(key, value) for key, value in schedules.items()],
         )
 
+        print(f"[Step {self.current_step}] model forward done", flush=True)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
@@ -398,6 +399,8 @@ class EveNetEngine(L.LightningModule):
 
             loss_raw['assignment'] = scaled_ass_loss.flatten()[0]
 
+            print(f"[Step {self.current_step}] Assignment: {loss_raw['assignment']}")
+
         if self.generation_include and outputs["generations"] != dict():
             scaled_gen_loss, detailed_gen_loss = gen_step(
                 batch=batch,
@@ -429,6 +432,8 @@ class EveNetEngine(L.LightningModule):
                 loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
             if "generation-recon" in loss_head_dict:
                 loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
+
+            print(f"[Step {self.current_step}] Generation: {loss_raw['generation']}")
 
         if self.segmentation_cfg.include and outputs["segmentation-cls"] is not None:
             seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
