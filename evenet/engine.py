@@ -378,6 +378,9 @@ class EveNetEngine(L.LightningModule):
 
             print(f"[Step {self.current_step}] Assignment start: ")
 
+            print(f"ass_targets shape: {ass_targets.shape}")
+            print(f"ass_targets_mask shape: {ass_targets_mask.shape}")
+
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
                 loss_dict=loss_head_dict,
