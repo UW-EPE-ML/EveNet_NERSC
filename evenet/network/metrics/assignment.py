@@ -907,6 +907,11 @@ def shared_step(
         num_targets=num_targets
     )
 
+    print("num_targets", num_targets)
+    print("targets", targets)
+    print("targets_mask", targets_mask)
+    print("event_particles", event_particles)
+
     print("Assignment convert")
 
     assignment_loss = torch.zeros(1, device=device, requires_grad=True)
