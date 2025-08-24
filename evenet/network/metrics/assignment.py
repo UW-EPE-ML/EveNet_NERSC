@@ -796,16 +796,18 @@ class SingleProcessAssignmentMetrics:
         predictions = [torch.clone(p) for p in predictions]
         targets = [torch.clone(p) for p in targets]
 
-        print(f"predictions: {predictions}")
-        print(f"targets: {targets}")
-
         for i, (_, particle_group) in enumerate(self.target_groups.items()):
+            print(f"{i} Processing group: {particle_group}")
             for orbit in particle_group.orbits():
                 orbit = tuple(sorted(orbit))
 
                 print(f"orbit: {orbit}")
                 targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
+                print(f"target: {targets[i][:, orbit]}")
                 predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
+                print(f"prediction: {predictions[i][:, orbit]}")
+
+        print("Sorting outputs")
         return predictions, targets
 
     def particle_count_info(self, target_masks):
