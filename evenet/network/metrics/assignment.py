@@ -336,6 +336,8 @@ class SingleProcessAssignmentMetrics:
         print(f"After sorting best indices shapes: {[p.shape for p in best_indices]}")
         print(f"After sorting truth indices shapes: {[p.shape for p in truth_indices]}")
 
+        exit(1)
+
         correct_assigned = self.check_correct_assignment(
             best_indices,
             truth_indices,
@@ -351,7 +353,6 @@ class SingleProcessAssignmentMetrics:
         print(f"total truth particles: {sum([p.sum().item() for p in truth_masks])}")
         print(f"total predicted particles: {sum([(p >= 0).sum().item() for p in best_indices])}")
 
-        exit(1)
 
         # Log purity
         total_particle_counts, particle_counts, _ = self.particle_count_info(truth_masks)
