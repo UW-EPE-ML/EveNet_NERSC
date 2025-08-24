@@ -317,6 +317,7 @@ class EveNetEngine(L.LightningModule):
         )
 
         print(f"[Step {self.current_step}] model forward done", flush=True)
+        exit(1)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
