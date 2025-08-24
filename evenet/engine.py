@@ -375,6 +375,10 @@ class EveNetEngine(L.LightningModule):
         if self.assignment_cfg.include and outputs["assignments"]:
             ass_targets = batch[self.target_assignment_key].to(device=device)
             ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
+
+            print(f"[Step {self.current_step}] Assignment start: ")
+            print(ass_targets)
+
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
                 loss_dict=loss_head_dict,
