@@ -802,8 +802,8 @@ class SingleProcessAssignmentMetrics:
                 orbit = tuple(sorted(orbit))
 
                 print(f"orbit: {orbit}")
-                print(f"target before: {[targets[i][:, iorbit] for iorbit in orbit]}")
-                print(f"prediction before: {[predictions[i][:, iorbit] for iorbit in orbit]}")
+                print(f"target before: {targets[i]}")
+                print(f"prediction before: {predictions[i]}")
                 targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
                 print(f"target: {targets[i][:, orbit]}")
                 predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
