@@ -316,7 +316,6 @@ class EveNetEngine(L.LightningModule):
             schedules=[(key, value) for key, value in schedules.items()],
         )
 
-        print(f"[Step {self.current_step}] model forward done", flush=True)
 
         loss_raw: dict[str, torch.Tensor] = {}
         loss_detailed_dict = {}
@@ -375,12 +374,6 @@ class EveNetEngine(L.LightningModule):
         if self.assignment_cfg.include and outputs["assignments"]:
             ass_targets = batch[self.target_assignment_key].to(device=device)
             ass_targets_mask = batch[self.target_assignment_mask_key].to(device=device)
-
-            print(f"[Step {self.current_step}] Assignment start: ")
-
-            print(f"ass_targets shape: {ass_targets.shape}")
-            print(f"ass_targets_mask shape: {ass_targets_mask.shape}")
-
             scaled_ass_loss, ass_predicts = ass_step(
                 ass_loss_fn=self.ass_loss,
                 loss_dict=loss_head_dict,
@@ -404,8 +397,6 @@ class EveNetEngine(L.LightningModule):
             )
 
             loss_raw['assignment'] = scaled_ass_loss.flatten()[0]
-
-            print(f"[Step {self.current_step}] Assignment: {loss_raw['assignment']}")
 
         if self.generation_include and outputs["generations"] != dict():
             scaled_gen_loss, detailed_gen_loss = gen_step(
@@ -438,8 +429,6 @@ class EveNetEngine(L.LightningModule):
                 loss_raw["generation-truth"] = loss_head_dict["generation-truth"]
             if "generation-recon" in loss_head_dict:
                 loss_raw["generation-recon"] = loss_head_dict["generation-recon"]
-
-            print(f"[Step {self.current_step}] Generation: {loss_raw['generation']}")
 
         if self.segmentation_cfg.include and outputs["segmentation-cls"] is not None:
             seg_targets_cls = batch[self.target_segmentation_cls_key].to(device=device)
@@ -571,16 +560,16 @@ class EveNetEngine(L.LightningModule):
         step = self.current_step
         batch_size = batch["x"].shape[0]
 
-        print(f"[Step {step}] train step start", flush=True)
+        # print(f"[Step {step}] train step start", flush=True)
 
         gradient_heads, loss_head = self.prepare_heads_loss()
-        print(f"[Step {step}] share step start", flush=True)
+        # print(f"[Step {step}] share step start", flush=True)
         loss, loss_head, loss_dict, _, loss_raw = self.shared_step(
             batch=batch, batch_idx=batch_idx,
             loss_head_dict=loss_head,
             update_metric=self.eval_metrics,
         )
-        print(f"[Step {step}] share step end", flush=True)
+        # print(f"[Step {step}] share step end", flush=True)
         final_loss = loss
         famo_logs = None
         if self.include_famo:
@@ -628,9 +617,9 @@ class EveNetEngine(L.LightningModule):
         # if gen_global_loss:
         #     gen_global_loss.mean().backward()
 
-        print(f"[Step {step}] Loss: {final_loss.item()}")
+        # print(f"[Step {step}] Loss: {final_loss.item()}")
         self.safe_manual_backward(loss.mean())
-        print(f"[Step {step}] Backward done")
+        # print(f"[Step {step}] Backward done")
 
         # === Check for Gradients ===
         clip_grad_norm_(self.model.parameters(), 1.0)
@@ -677,7 +666,7 @@ class EveNetEngine(L.LightningModule):
             self.log("train/famo-loss", final_loss.mean(), prog_bar=True, sync_dist=True)
 
         # self.current_step += 1
-        print(f"[Step {step}] train step done", flush=True)
+        # print(f"[Step {step}] train step done", flush=True)
         return final_loss.mean()
 
     # @time_decorator

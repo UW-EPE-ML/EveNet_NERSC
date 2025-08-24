@@ -327,32 +327,13 @@ class SingleProcessAssignmentMetrics:
 
         self.detection_cut = detection_cut  # Update the self property
 
-        print(f"Processing {best_indices[0].shape[0]} events")
-        print(f"best indices shapes: {[p.shape for p in best_indices]}")
-        print(f"truth indices shapes: {[p.shape for p in truth_indices]}")
-
         best_indices, truth_indices = self.sort_outputs(best_indices, truth_indices)  # Remove intra-particle symmetries
-
-        print(f"After sorting best indices shapes: {[p.shape for p in best_indices]}")
-        print(f"After sorting truth indices shapes: {[p.shape for p in truth_indices]}")
-
-        exit(1)
 
         correct_assigned = self.check_correct_assignment(
             best_indices,
             truth_indices,
             truth_masks
         )
-
-        print(f"assignment probabilities: {[p.mean().item() for p in assignment_probabilities]}")
-        print(f"detection probabilities: {[p.mean().item() for p in detection_probabilities]}")
-        print(f"correct assignment ratio: {[p.float().mean().item() for p in correct_assigned]}")
-        print(f"truth indices: {[torch.bincount(p[p >= 0]).cpu().numpy() for p in truth_indices]}")
-        print(f"predicted indices: {[torch.bincount(p[p >= 0]).cpu().numpy() for p in best_indices]}")
-        print(f"truth masks: {[p.sum().item() for p in truth_masks]}")
-        print(f"total truth particles: {sum([p.sum().item() for p in truth_masks])}")
-        print(f"total predicted particles: {sum([(p >= 0).sum().item() for p in best_indices])}")
-
 
         # Log purity
         total_particle_counts, particle_counts, _ = self.particle_count_info(truth_masks)
@@ -795,21 +776,12 @@ class SingleProcessAssignmentMetrics:
 
         predictions = [torch.clone(p) for p in predictions]
         targets = [torch.clone(p) for p in targets]
-
         for i, (_, particle_group) in enumerate(self.target_groups.items()):
-            print(f"{i} Processing group: {particle_group}")
             for orbit in particle_group.orbits():
                 orbit = tuple(sorted(orbit))
 
-                print(f"orbit: {orbit}")
-                print(f"target before: {targets[i].shape}")
-                print(f"prediction before: {predictions[i].shape}")
                 targets[i][:, orbit] = torch.sort(targets[i][:, orbit], dim=1)[0]
-                print(f"target: {targets[i][:, orbit].shape}")
                 predictions[i][:, orbit] = torch.sort(predictions[i][:, orbit], dim=1)[0]
-                print(f"prediction: {predictions[i][:, orbit].shape}")
-
-        print("Sorting outputs")
         return predictions, targets
 
     def particle_count_info(self, target_masks):
@@ -897,8 +869,6 @@ def shared_step(
         event_weight=event_weight
     )
 
-    print("Assigment Loss")
-
     assignment_predict = dict()
     ass_target_metric, ass_mask_metric = convert_target_assignment(
         targets=targets,
@@ -907,19 +877,10 @@ def shared_step(
         num_targets=num_targets
     )
 
-    print("num_targets", num_targets)
-    print("targets", targets)
-    print("targets_mask", targets_mask)
-    print("event_particles", event_particles)
-
-    print("Assignment convert")
-
     assignment_loss = torch.zeros(1, device=device, requires_grad=True)
     detected_loss = torch.zeros(1, device=device, requires_grad=True)
     active_heads_sum = {k: 0 for k in loss_dict.keys() if 'assignment_' in k}
     for process in process_names:
-        print(f"Assignment {process}")
-
         assignment_predict[process] = predict(
             assignments=assignments[process],
             detections=detections[process],
@@ -927,12 +888,7 @@ def shared_step(
             event_permutations=event_permutations[process],
         )
 
-        print("assignment", assignments[process])
-
-        print(f"Assignment {process} predict")
-
         if update_metric:
-
             metrics[process].update(
                 best_indices=assignment_predict[process]["best_indices"],
                 assignment_probabilities=assignment_predict[process]["assignment_probabilities"],
@@ -942,10 +898,6 @@ def shared_step(
                 inputs=point_cloud,
                 inputs_mask=point_cloud_mask,
             )
-
-            print(f"Assignment {process} update")
-
-            exit(-1)
 
         loss_detailed_dict["assignment"][process] = symmetric_losses["assignment"][process]
         loss_detailed_dict["detection"][process] = symmetric_losses["detection"][process]
@@ -958,10 +910,6 @@ def shared_step(
             ass_total = symmetric_losses["assignment"][process] + symmetric_losses["detection"][process]
             loss_dict[ass_name] = loss_dict[ass_name] + topo_weight * ass_total
             active_heads_sum[ass_name] += topo_weight
-
-        print(f"Assignment {process} done")
-
-        exit(1)
 
     loss_dict['assignment'] = (assignment_loss / num_processes * assignment_loss_scale).mean()
     loss_dict['detection'] = (detected_loss / num_processes * detection_loss_scale).mean()
