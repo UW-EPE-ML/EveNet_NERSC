@@ -5,7 +5,7 @@ platform:
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 64
+  batch_size: 1024
   prefetch_batches: 2
   use_gpu: true
 
@@ -31,13 +31,13 @@ options:
 #    total_epochs: 300
 #    epochs: 300
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.hhml"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.hhml/last.ckpt"
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.hhml/last.ckpt"
     pretrain_model_load_path: null
 #    pretrain_model_load_path: "/global/cfs/cdirs/m5019/Checkpoints/nominal.epoch9.ckpt"
 
-    diffusion_every_n_epochs: 25 # how often to run diffusion
+    diffusion_every_n_epochs: 5 # how often to run diffusion
     diffusion_every_n_steps: 10 # how often to run diffusion inside the valid epoch
-    eval_metrics_every_n_epochs: 25 # how often to run evaluation metrics
+    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
     learning_rate: &lr 0.00005
     learning_rate_body: &lr_body 0.00005
