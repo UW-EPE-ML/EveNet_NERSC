@@ -520,7 +520,7 @@ CLASSIFICATIONS:
 CLASSLABEL:
   EVENT:
     signal:
-      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]/
+      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]
 
 
 RESONANCE_LABEL:
