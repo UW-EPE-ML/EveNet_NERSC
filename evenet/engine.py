@@ -82,6 +82,7 @@ class EveNetEngine(L.LightningModule):
         self.world_size = world_size
         self.total_events = total_events
         self.total_val_events = total_val_events
+
         self.pretrain_ckpt_path: str = global_config.options.Training.pretrain_model_load_path
 
         self.num_classes: list[str] = global_config.event_info.class_label.get('EVENT', {}).get('signal', [0])[0]
@@ -450,8 +451,10 @@ class EveNetEngine(L.LightningModule):
                 cls_loss_scale = self.segmentation_cfg.cls_loss_scale,
                 loss_name = "segmentation",
                 update_metrics=update_metric,
+                aux_outputs=outputs.get("segmentation-aux", None)
             )
             loss_raw["segmentation"] = scaled_seg_loss
+            loss_head_dict["segmentation"] = scaled_seg_loss
 
 
         self.general_log.update(loss_detailed_dict, is_train=self.training)

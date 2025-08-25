@@ -31,7 +31,7 @@ options:
       GlobalGeneration:
         include: true
       EventGeneration:
-        include: true
+        include: false
 
   Dataset:
     dataset_limit: 0.01

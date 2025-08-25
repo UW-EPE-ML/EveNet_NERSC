@@ -294,13 +294,16 @@ class EveNetModel(nn.Module):
         if self.include_segmentation:
             self.Segmentation = SegmentationHead(
                 projection_dim = self.network_cfg.Segmentation.projection_dim,
+                mask_dim = self.network_cfg.Segmentation.projection_dim,
                 num_heads = self.network_cfg.Segmentation.num_heads,
+                dropout = self.network_cfg.Segmentation.dropout,
                 num_layers = self.network_cfg.Segmentation.num_layers,
-                num_class = len(self.event_info.segmentation_indices), # TODO
+                num_mask_mlp_layers = self.network_cfg.Segmentation.mask_mlp_layers,
+                num_class = len(self.event_info.segmentation_indices),  # Binary classification for mask prediction
                 num_queries = self.network_cfg.Segmentation.num_queries,
                 return_intermediate = self.network_cfg.Segmentation.return_intermediate,
-                dim_decay_rate = self.network_cfg.Segmentation.dim_decay_rate,
-                dropout= self.network_cfg.Segmentation.dropout
+                norm_before = self.network_cfg.Segmentation.norm_before,
+                encode_event_token=self.network_cfg.Segmentation.encode_event_token,
             )
 
         self.schedule_flags = [
@@ -553,13 +556,16 @@ class EveNetModel(nn.Module):
                         return_type="process_base"
                     )
 
-                segmentation_cls = None
-                segmentation_mask = None
+                segmentation_out = {}
                 if self.include_segmentation:
-                    segmentation_cls, segmentation_mask = self.Segmentation(
+                    segmentation_out = self.Segmentation(
                         memory = embeddings,
                         memory_mask = full_input_point_cloud_mask,
+                        event_token = event_token
                     )
+
+                    if segmentation_out["event-token"] is not None:
+                        event_token = segmentation_out["event-token"]
 
                 # Classification head
                 classifications = None
@@ -576,8 +582,7 @@ class EveNetModel(nn.Module):
                     "regression": regressions,
                     "assignments": assignments,
                     "detections": detections,
-                    "segmentation-cls": segmentation_cls,
-                    "segmentation-mask": segmentation_mask
+                    "segmentation-out": segmentation_out,
                 }
 
             #######################################
@@ -628,11 +633,12 @@ class EveNetModel(nn.Module):
             "classification-noised": outputs.get("generation", {}).get("classification", None),
             "regression-noised": outputs.get("generation", {}).get("regression", None),
             "generations": generations,
-            "segmentation-cls": outputs.get("deterministic", {}).get("segmentation-cls", None),
+            "segmentation-cls": outputs.get("deterministic", {}).get("segmentation-out", {}).get("pred_logits", None),
             # "full_input_point_cloud": full_input_point_cloud,
             # "full_global_conditions": full_global_conditions,
             "alpha": alpha,
-            "segmentation-mask": outputs.get("deterministic", {}).get("segmentation-mask", None),
+            "segmentation-mask": outputs.get("deterministic", {}).get("segmentation-out", {}).get("pred_masks", None),
+            "segmentation-aux": outputs.get("deterministic", {}).get("segmentation-out", {}).get("aux_outputs", None)
         }
 
     def predict_diffusion_vector(

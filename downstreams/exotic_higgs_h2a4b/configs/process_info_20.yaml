@@ -8,16 +8,16 @@ QCD_2b:
   category: QCD
   process_id: 0
   diagram: { }
+  total_entries: 106997052
+  xsec: 125100
 
-QCD_2b2j:
-  category: QCD
-  process_id: 0
-  diagram: { }
 
 QCD_4b:
   category: QCD
   process_id: 0
   diagram: { }
+  total_entries: 2493063
+  xsec: 571.4
 
 haa_ma20:
   category: HAA
@@ -28,6 +28,8 @@ haa_ma20:
       a_twenty2: *a_had
       SYMMETRY: [ a_twenty1, a_twenty2 ]
 
+  total_entries: 1977054
+  xsec: 48.58
 #    a_twenty1: *a_had
 #    a_twenty2: *a_had
 #    SYMMETRY: [ H/a_twenty1, H/a_twenty2 ]

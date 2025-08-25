@@ -22,24 +22,26 @@ from helpers.basic_fit import plot_mass_distribution
 from helpers.flow_sampling import get_mass_samples
 from helpers.stats_functions import curve_fit_m_inv, parametric_fit, check_bkg_for_peaks
 from helpers.plotting import read_feature
-from helpers.utils import save_file
+from helpers.utils import save_file, get_latest_file_in_dir
 
 from rich.progress import Progress, BarColumn, TimeRemainingColumn
 
 from preprocessing.preprocess import unflatten_dict
 from functools import partial
+import random
 
 
 def setup(rank, world_size):
+    port = random.randint(6000, 12000)
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'  # Choose a free port
+    os.environ['MASTER_PORT'] = str(port)
+
     dist.init_process_group(
         backend='nccl',
         world_size=world_size,
         rank=rank
     )
     torch.cuda.set_device(rank)
-
 
 def cleanup():
     dist.destroy_process_group()
@@ -50,7 +52,7 @@ def clean_and_append(dirname, postfix):
         dirname = dirname[:-1]
     return dirname + postfix
 
-def predict(rank, world_size, gen_num_events, args):
+def predict(rank, world_size, gen_num_events, fold, args):
 
     setup(rank, world_size)
     device = torch.device(f"cuda:{rank}")
@@ -67,15 +69,27 @@ def predict(rank, world_size, gen_num_events, args):
     step_dir = f"step1_generate_SR{postfix}"
     inputdir = clean_and_append(config["output"]["storedir"], postfix)
 
-
-
     os.makedirs(os.path.join(config["output"]["plotdir"], step_dir), exist_ok=True)
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    if os.path.isdir(args.checkpoint):
+        if fold is not None:
+            checkpoint_path = os.path.join(args.checkpoint, f"fold_{fold}")
+        checkpoint_path = get_latest_file_in_dir(checkpoint_path)
+    else:
+        checkpoint_path = args.checkpoint
+
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    cwd = os.getcwd()
+    base_dir = os.path.dirname(os.path.abspath(args.config_workflow))
+    os.chdir(base_dir)
+
     global_config.load_yaml(config["train"]["config"])
     normalization_dict = torch.load(os.path.join(inputdir, "SB", "normalization.pt"))
     shape_metadata = json.load(open(os.path.join(inputdir, "SB", "shape_metadata.json")))
     with open(config["input"]["event_info"]) as f:
         event_info = yaml.safe_load(f)
+
+    os.chdir(cwd)
 
     model = EveNetModel(
         config = global_config,
@@ -83,8 +97,6 @@ def predict(rank, world_size, gen_num_events, args):
         normalization_dict=normalization_dict,
         point_cloud_generation=True,
         global_generation=True,
-        classification=True,
-        regression=True,
     ).to(device)
 
     new_state_dict = dict()
@@ -118,7 +130,9 @@ def predict(rank, world_size, gen_num_events, args):
         unflatten=unflatten_dict,
     )
 
-    inv_mass_truth = np.concatenate([df_SB["conditions"][..., 0], df_SR["conditions"][..., 0]], axis=0)
+
+    inv_mass_index = list(event_info['INPUTS']['GLOBAL']['Conditions']).index("inv_mass")
+    inv_mass_truth = np.concatenate([df_SB["conditions"][..., inv_mass_index], df_SR["conditions"][..., inv_mass_index]], axis=0)
 
     inv_mass_results = plot_mass_distribution(
         inv_mass_truth,
@@ -169,7 +183,7 @@ def predict(rank, world_size, gen_num_events, args):
 
             condition_x = {k: v.clone()[:batch_num] for k, v in dummy_batch.items()}
             condition_x["conditions"] = torch.zeros_like(condition_x["conditions"])
-            condition_x["conditions"][..., 0] = (mass_sample[num_generated_sample:num_generated_sample + batch_num])[...,0]
+            condition_x["conditions"][..., inv_mass_index] = (mass_sample[num_generated_sample:num_generated_sample + batch_num])[...,0]
             ####################################
             ##  Step 1: Generate num vectors  ##
             ####################################
@@ -181,7 +195,7 @@ def predict(rank, world_size, gen_num_events, args):
             )
 
 
-            target_global_index = [1] # HT
+            target_global_index = global_config.event_info.generation_target_indices # HT
             data_shape = [batch_num,  1 + len(target_global_index)]
             generated_distribution = sampler.sample(
                 data_shape=data_shape,
@@ -197,8 +211,6 @@ def predict(rank, world_size, gen_num_events, args):
             generated_global = model.global_normalizer.denormalize(generated_global, index = target_global_index)
             for local_idx in range(len(target_global_index)):
                 condition_x['conditions'][..., target_global_index[local_idx]] = generated_global[..., local_idx]
-
-
 
             predict_for_point_cloud = partial(
                 model.predict_diffusion_vector,
@@ -253,7 +265,7 @@ def predict(rank, world_size, gen_num_events, args):
 #
 #    gen_sample["conditions"] = inv_mass_gen.to_numpy().reshape(-1, 1)
 
-    inv_mass_gen = ak.from_numpy(gen_sample["conditions"][..., 0])
+    inv_mass_gen = ak.from_numpy(gen_sample["conditions"][..., inv_mass_index])
 
     SR_filter = (inv_mass_gen.to_numpy() > config['mass-windows']['SR-left']) & (
                 inv_mass_gen.to_numpy() < config['mass-windows']['SR-right'])
@@ -272,7 +284,6 @@ def predict(rank, world_size, gen_num_events, args):
         df_data = df_SB
 
 
-    gen_sample["conditions"][..., 0] = np.zeros_like(gen_sample["conditions"][..., 0]) # Remove invariant mass information
     gen_sample["classification"] = np.zeros_like(gen_sample["classification"])
     df_data["classification"] = np.ones_like(df_data["classification"])
 
@@ -299,7 +310,7 @@ def predict(rank, world_size, gen_num_events, args):
         data_df = gen_sample,
         norm_dict = norm_dict,
         event_filter = None,
-        postfix = f"_fold{rank}",
+        postfix = f"_rank{rank}_fold{fold}" if fold is not None else f"_rank{rank}_fold0",
     )
     cleanup()
 
@@ -310,23 +321,35 @@ def main():
     parser.add_argument("config_workflow", type = str)
     parser.add_argument("--checkpoint", type = str)
     parser.add_argument("--gen_num_events", type = int, default = 10240)
-    parser.add_argument("--batch_size", type = int, default = 2048)
+    parser.add_argument("--batch_size", type = int, default = 4096)
     parser.add_argument("--num_steps", type = int, default = 200)
     parser.add_argument("--region", type = str, default = "SR")
     parser.add_argument("--no_signal", action = "store_true", default = False)
     parser.add_argument("--ngpu", type = int, default = 1)
+    parser.add_argument("--kfold", type = int, default = 0)
     # Parse command-line arguments
     args = parser.parse_args()
     # Explore the provided HDF5 file
 
     world_size = args.ngpu
+    kfold = args.kfold if args.kfold > 0 else 1
     print(f"Using {world_size} GPUs for distributed eval.")
-    mp.spawn(
-        predict,
-        args=(world_size, int(args.gen_num_events / world_size), args),
-        nprocs=world_size,
-        join=True
-    )
+
+    if kfold > 0:
+        for fold in range(kfold):
+            mp.spawn(
+                predict,
+                args=(world_size, int(args.gen_num_events / world_size / kfold), fold, args),
+                nprocs=world_size,
+                join=True
+            )
+    else:
+        mp.spawn(
+            predict,
+            args=(world_size, int(args.gen_num_events / world_size), None, args),
+            nprocs=world_size,
+            join=True
+        )
 
 if __name__ == "__main__":
     main()

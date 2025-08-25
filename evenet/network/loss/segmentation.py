@@ -62,6 +62,9 @@ def hungarian_matching(
     target_cls: Tensor,
     target_mask: Tensor,
     class_weight: Tensor = None,
+    dice_loss_weight: float = 1.0,
+    cls_loss_weight: float = 1.0,
+    mask_ce_loss_weight: float = 1.0,
     include_cls_cost: bool = True,
 ):
     """
@@ -80,13 +83,13 @@ def hungarian_matching(
     """
     # Placeholder for the actual implementation of Hungarian matching
     # This function should return the matched indices and masks based on the inputs.
+
     num_queries = predict_cls.shape[1]
     predict_mask_expanded = predict_mask.unsqueeze(2).repeat(1, 1, num_queries, 1)  # (B, N_pred, N_tgt, P)
     target_mask_expanded = target_mask.unsqueeze(1).repeat(1, num_queries, 1, 1)  # (B, N_pred, N_tgt, P)
 
     predict_cls_expanded = predict_cls.softmax(-1).unsqueeze(2).repeat(1, 1, num_queries, 1)  # (B, N_pred, N_tgt, C)
     target_cls_expanded = target_cls.unsqueeze(1).repeat(1, num_queries, 1, 1) # (B, N_pred, N_tgt, C)
-
 
     # mask_cost = sum{c!=null}L_{mask}(pred, tgt)
     mask_cost = sigmoid_focal_loss(
@@ -101,11 +104,11 @@ def hungarian_matching(
         targets = target_mask_expanded,
     ) # (B,  N_pred, N_tgt)
 
-    total_cost = mask_cost + dice_cost
+    total_cost = mask_cost * mask_ce_loss_weight + dice_cost * dice_loss_weight # (B, N_pred, N_tgt)
 
     if include_cls_cost:
         class_cost = -(predict_cls_expanded * target_cls_expanded)
-        total_cost = total_cost + class_cost.sum(dim=-1)
+        total_cost = total_cost + class_cost.sum(dim=-1) * cls_loss_weight # (B, N_pred, N_tgt)
 
     src_indices, tgt_indices = assignment_to_indices(batch_linear_assignment(total_cost.detach())) # (B, N)
 
@@ -118,7 +121,11 @@ def loss(
         target_mask,
         class_weight=None,
         point_cloud_mask = None,
-        reduction='none'
+        dice_loss_weight=1.0,
+        cls_loss_weight=1.0,
+        mask_loss_weight=1.0,
+        reduction='none',
+        aux_outputs=None
     ):
     """
 
@@ -147,8 +154,78 @@ def loss(
             target_cls=target_cls,
             target_mask=target_mask,
             class_weight=class_weight,
+            dice_loss_weight=dice_loss_weight,
+            cls_loss_weight=cls_loss_weight,
+            mask_ce_loss_weight=mask_loss_weight,
         ) # (B, N) indices of matched predictions and targets
 
+    mask_loss, dice_loss, class_loss = calculate_loss(
+        predict_cls=predict_cls,
+        predict_mask=predict_mask,
+        target_cls=target_cls,
+        target_mask=target_mask,
+        pred_indices=pred_indices,
+        tgt_indices=tgt_indices,
+        class_weight=class_weight,
+        point_cloud_mask=point_cloud_mask,
+        reduction=reduction,
+    ) # (B,)
+
+    mask_loss_aux = 0
+    dice_loss_aux = 0
+    cls_loss_aux = 0
+
+    if aux_outputs is not None:
+        for aux_predict in aux_outputs:
+            with torch.no_grad():
+                # print("predict_cls", predict_cls.shape, "predict-mask", predict_mask.shape, target_cls.shape, target_mask.shape, class_weight.shape if class_weight is not None else None, segmentation_mask.shape if segmentation_mask is not None else None)
+                pred_indices_, tgt_indices_ = hungarian_matching(
+                    predict_cls=aux_predict['pred_logits'],
+                    predict_mask=aux_predict['pred_masks'],
+                    target_cls=target_cls,
+                    target_mask=target_mask,
+                    class_weight=class_weight,
+                    dice_loss_weight=dice_loss_weight,
+                    cls_loss_weight=cls_loss_weight,
+                    mask_ce_loss_weight=mask_loss_weight,
+                )  # (B, N) indices of matched predictions and targets
+
+            mask_loss_, dice_loss_, class_loss_ = calculate_loss(
+                predict_cls=aux_predict['pred_logits'],
+                predict_mask=aux_predict['pred_masks'],
+                target_cls=target_cls,
+                target_mask=target_mask,
+                pred_indices=pred_indices_,
+                tgt_indices=tgt_indices_,
+                class_weight=class_weight,
+                point_cloud_mask=point_cloud_mask,
+                reduction=reduction,
+            )
+            mask_loss_aux += mask_loss_
+            dice_loss_aux += dice_loss_
+            cls_loss_aux += class_loss_
+        # Average the losses from all auxiliary outputs
+        num_aux = max(len(aux_outputs), 1)
+        mask_loss_aux /= num_aux
+        dice_loss_aux /= num_aux
+        cls_loss_aux /= num_aux
+
+    return mask_loss, dice_loss, class_loss, mask_loss_aux, dice_loss_aux, cls_loss_aux
+
+def calculate_loss(
+        predict_cls,
+        predict_mask,
+        target_cls,
+        target_mask,
+        pred_indices,
+        tgt_indices,
+        class_weight=None,
+        point_cloud_mask = None,
+        reduction='none'
+    ):
+    """
+    Calculate the loss given matched indices.
+    """
     # print("pred_indices", pred_indices.shape, "tgt_indices", tgt_indices.shape)
     B, N_match = pred_indices.shape
     batch_idx = torch.arange(B, device=pred_indices.device).unsqueeze(-1)  # (B, 1)

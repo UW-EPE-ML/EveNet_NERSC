@@ -1,0 +1,46 @@
+input:
+  signal:
+    file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/Zjet/*.parquet"
+    shape: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/Zjet/shape_metadata.json"
+  background:
+    file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/QCD/*.parquet"
+    shape: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/QCD/shape_metadata.json"
+  event_info: "/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/preprocessing/event_info.yaml"
+  shuffle: true
+  max-bkg-sig-ratio: 40
+
+fit:
+  bkg-fit-degree: 5
+
+
+output:
+  plotdir: 'results/toy_model'
+  storedir: '/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection/EveNetInput'
+
+train:
+  config: '/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config/full_train.yaml'
+train-cls:
+  config: '/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config/full_train_cls.yaml'
+
+
+jet-selection:
+  eta:
+    min: -2.5
+    max: 2.5
+  pt:
+    min: 30
+
+njet-selection:
+  min: 2
+  max: 10
+
+mass-windows:
+  SB-left: 100
+  SR-left: 250
+  SR-right: 350
+  SB-right: 500
+  SR-bins: 20
+
+
+padding:
+  pad-number: 2

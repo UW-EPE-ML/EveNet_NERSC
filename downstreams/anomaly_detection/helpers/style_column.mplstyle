@@ -1,0 +1,51 @@
+# Set default figure size
+figure.figsize : 4, 4
+
+# Set x axis
+xtick.major.size : 6
+xtick.major.width : 0.75
+xtick.minor.size : 3
+xtick.minor.width : 0.25
+xtick.direction : in
+xtick.top : True
+
+# Set y axis
+ytick.major.size : 6
+ytick.major.width : 0.75
+ytick.minor.size : 3
+ytick.minor.width : 0.25
+ytick.direction : in
+ytick.right : True
+
+# Fontsizes
+xtick.labelsize : 10
+ytick.labelsize : 10
+xtick.major.pad : 5
+legend.fontsize : 10
+legend.title_fontsize : 11
+axes.titlesize : 10
+axes.labelsize : 12
+
+# Line widths
+axes.linewidth : 1
+grid.linewidth : 1
+lines.linewidth : 1
+lines.solid_capstyle : round
+lines.markersize : 2.5
+
+
+# Font style
+font.family : serif
+text.usetex : True
+font.size:    10.0
+font.serif: CM
+
+# margins
+#axes.xmargin : 0
+#axes.ymargin : 0
+
+# Legend
+legend.frameon : False
+
+# Set color cycle:
+axes.prop_cycle : cycler('color', ['0C5DA5', '00B945', 'FF9500', 'FF2C00', '845B97', '474747', '9e9e9e'])

@@ -21,8 +21,8 @@ INPUTS:
   # ---------------------------------------------------------------------
   GLOBAL:
     Conditions:
-      inv_mass: normalize
-      HT: normalize
+      inv_mass: log_normalize
+      HT: log_normalize
 
 # ----------------------------------------------------------------------
 # REQUIRED - EVENT - Complete list of resonance particles and daughters.

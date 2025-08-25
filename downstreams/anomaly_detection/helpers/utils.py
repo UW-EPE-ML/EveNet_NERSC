@@ -115,10 +115,33 @@ def save_df(
     dataset = dict()
 
     for name, index in pc_index.items():
-        dataset[f"{name}-0"] = data_df["x"][:, 0, index]
-        dataset[f"{name}-1"] = data_df["x"][:, 1, index]    
+        dataset[f"pc-{name}-0"] = data_df["x"][:, 0, index]
+        dataset[f"pc-{name}-1"] = data_df["x"][:, 1, index]
     for name, index in global_index.items():
         dataset[f"{name}"] = data_df["conditions"][:, index]
+        if f"{name}-pc" in data_df:
+            dataset[f"{name}-pc"] = data_df[f"{name}-pc"]
+
+    for name, data in data_df.items():
+        if "pc" in name and name not in dataset:
+            # If the name contains "pc" but is not in dataset, add it
+            dataset[name] = data
+            
+    # if "eta-0" in dataset and "phi-0" in dataset and "eta-1" in dataset and "phi-1" in dataset:
+    #     eta0 = dataset["eta-0"]
+    #     phi0 = dataset["phi-0"]
+    #     eta1 = dataset["eta-1"]
+    #     phi1 = dataset["phi-1"]
+    #
+    #     delta_eta = np.abs(eta1 - eta0)
+    #     delta_phi = phi1 - phi0
+    #     delta_phi = (delta_phi + np.pi) % (2 * np.pi) - np.pi  # Wrap to [-π, π]
+    #     delta_phi = np.abs(delta_phi)
+    #
+    #     dataset["delta-eta"] = delta_eta
+    #     dataset["delta-phi"] = delta_phi
+    #     dataset["delta-R"] = np.sqrt(delta_eta ** 2 + delta_phi ** 2)
+
 
     dataset["classification"] = data_df["classification"]
     df = pd.DataFrame(dataset)
@@ -127,3 +150,49 @@ def save_df(
 
     print(df)
 
+def mean_std_last_dim(x, x_mask):
+    """
+    Compute masked mean and std over all axes except the last one.
+    Supports x of shape (a, c) or (a, b, c), and x_mask of shape (a,) or (a, b).
+
+    Parameters:
+        x (np.ndarray): Input array of shape (..., c)
+        x_mask (np.ndarray): Boolean mask matching all dims except the last
+
+    Returns:
+        tuple of np.ndarray: (mean, std) with shape (1, c)
+    """
+    # Get shape info
+    if x_mask.ndim == x.ndim - 1:
+
+        # Broadcast mask to match x shape
+        mask_expanded = np.expand_dims(x_mask, axis=-1)  # shape (..., 1)
+        mask_broadcasted = np.broadcast_to(mask_expanded, x.shape)
+    else:
+        mask_broadcasted = x_mask
+
+    # Create masked array
+    x_masked = np.ma.masked_array(x, mask=~mask_broadcasted)
+
+    # Compute mean and std over all axes except the last one
+    axis_to_reduce = tuple(range(x.ndim - 1))
+    mean = x_masked.mean(axis=axis_to_reduce, keepdims=True)
+    std = x_masked.std(axis=axis_to_reduce, keepdims=True)
+
+    return mean.filled(np.nan), std.filled(np.nan)
+
+def pad_object(obj, nMax):
+  pad_awkward = ak.pad_none(obj, target = nMax, clip = True)
+  return pad_awkward
+def clean_and_append(dirname, postfix):
+    if dirname.endswith("/"):
+        dirname = dirname[:-1]
+    return dirname + postfix
+
+
+def get_latest_file_in_dir(directory):
+    files = [os.path.join(directory, f) for f in os.listdir(directory)]
+    files = [f for f in files if os.path.isfile(f)]
+    if not files:
+        raise FileNotFoundError(f"No files found in directory: {directory}")
+    return max(files, key=os.path.getmtime)

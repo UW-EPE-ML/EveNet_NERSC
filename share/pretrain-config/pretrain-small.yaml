@@ -121,5 +121,8 @@ Segmentation:
   dropout: 0.1
   num_layers: 2
   num_queries: 4
-  return_intermediate: false
+  return_intermediate: true
   dim_decay_rate: 4.0
+  mask_mlp_layers: 1
+  norm_before: False,
+  encode_event_token: true

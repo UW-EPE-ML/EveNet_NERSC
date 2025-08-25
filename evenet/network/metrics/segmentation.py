@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 import torch.nn.functional as F
+from typing import Optional
 
 from evenet.utilities.debug_tool import time_decorator
 from evenet.network.loss.segmentation import hungarian_matching
@@ -118,37 +119,29 @@ class SegmentationMetrics:
         # print("y_pred_mask", y_pred_mask[0, 1])
 
         y_true_cls = y_true_cls[batch_idx, tgt_indices]
-        y_pred_cls = y_pred_cls[batch_idx, pred_indices]
         y_true_mask = y_true_mask[batch_idx, tgt_indices]
+
+        y_pred_cls = y_pred_cls[batch_idx, pred_indices]
         y_pred_mask = y_pred_mask[batch_idx, pred_indices]
 
-
         y_pred_mask = y_pred_mask.sigmoid()
-        y_true_mask = y_true_mask
+        scores, labels = F.softmax(y_pred_cls, dim=-1).max(-1)
+        keep = labels > 0  # Keep non-null class
 
-        # Apply class zero mask and uniqueness to the predicted mask
-        predict_class_label = y_pred_cls.argmax(dim=-1)
-        class_zero_mask = ~(predict_class_label == 0)  # (B, N)
-        class_zero_mask = class_zero_mask.unsqueeze(-1).float()
-        y_pred_mask = y_pred_mask * class_zero_mask # Apply class zero mask to the predicted mask
-        max_idx = y_pred_mask.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
-        # # Create a mask with 1 at max index, 0 elsewhere
-        mask = torch.zeros_like(y_pred_mask)
-        mask.scatter_(1, max_idx, 1.0)
-        y_pred_mask = y_pred_mask * mask  # Apply the mask to y_pred_mask
-        # Find the max value in the masked prediction
-        # y_pred_mask shape: (B, N, P)
-        # Compute max over dim=(1, 2) → result shape: (B,)
-        # max_val = y_pred_mask.amax(dim=(1, 2))  # torch >=1.7, or use torch.max with reshape
-        #
-        # # To avoid division by zero, clamp min to a small positive number (or check)
-        # max_val_clamped = max_val.clamp(min=1e-8)  # prevent division by zero
-        #
-        # Reshape max_val to broadcast back to (B, N, P)
-        # max_val_reshaped = max_val_clamped[:, None, None]  # shape (B, 1, 1)
+        cur_masks = y_pred_mask * keep.unsqueeze(-1).float()  # Zero out masks for null class predictions
+        cur_prob_masks = cur_masks * scores.unsqueeze(-1).float()  # Weight masks by their confidence scores
 
-        # # Scale
-        # y_pred_mask = y_pred_mask / max_val_reshaped
+        panoptic_seg = torch.zeros_like(y_pred_mask)
+
+        if cur_masks.sum() > 0:
+            # Apply class zero mask and uniqueness to the predicted mask
+            max_idx = cur_prob_masks.argmax(dim=1, keepdim=True)  # shape: (B, 1, P)
+            mask = torch.zeros_like(cur_masks)
+            mask.scatter_(1, max_idx, 1.0)
+            y_pred_mask = y_pred_mask * mask  # Apply the mask to y_pred_mask
+        else:
+            y_pred_mask = cur_masks
+
 
         y_true_cls_np = y_true_cls.argmax(dim=-1).flatten().cpu().numpy()
         y_pred_cls_np = y_pred_cls.argmax(dim=-1).flatten().cpu().numpy()
@@ -507,6 +500,7 @@ def shared_step(
         event_weight: torch.Tensor = None,
         loss_name: str = "segmentation",
         update_metrics: bool = True,
+        aux_outputs: Optional[dict] = None
 ):
 
 
@@ -521,15 +515,20 @@ def shared_step(
     # Make non-detectable points to be null class as well.
 
 
-    mask_loss, dice_loss, cls_loss = seg_loss_fn(
+    mask_loss, dice_loss, cls_loss, mask_loss_aux, dice_loss_aux, cls_loss_aux = seg_loss_fn(
         predict_cls = predict_classification,
         predict_mask = predict_mask,
         target_cls = target_classification,
         target_mask = target_mask,
         class_weight = class_weight,
         point_cloud_mask = point_cloud_mask,
-        reduction='none'
+        cls_loss_weight = cls_loss_scale,
+        dice_loss_weight = dice_loss_scale,
+        mask_loss_weight = mask_loss_scale,
+        reduction='none',
+        aux_outputs = aux_outputs
     )
+
 
     if event_weight is not None:
         mask_loss = mask_loss * event_weight
@@ -538,10 +537,24 @@ def shared_step(
         mask_loss = mask_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
         dice_loss = dice_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
         cls_loss = cls_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
+
+        mask_loss_aux = mask_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=mask_loss.device)
+        dice_loss_aux = dice_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=dice_loss.device)
+        cls_loss_aux = cls_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=cls_loss.device)
+
+        mask_loss_aux = mask_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
+        dice_loss_aux = dice_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
+        cls_loss_aux = cls_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
+
     else:# Sum over classes if multi-class
         cls_loss = cls_loss.mean()
         mask_loss = mask_loss.mean()
         dice_loss = dice_loss.mean()
+
+
+        mask_loss_aux = mask_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=mask_loss.device)
+        dice_loss_aux = dice_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=dice_loss.device)
+        cls_loss_aux = cls_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=cls_loss.device)
 
     # print("predict_mask", predict_mask, "predict_cls", predict_classification)
 
@@ -557,8 +570,12 @@ def shared_step(
     loss_dict[f"{loss_name}-cls"] = cls_loss
     loss_dict[f"{loss_name}-mask"] = mask_loss
     loss_dict[f"{loss_name}-dice"] = dice_loss
+    loss_dict[f"{loss_name}-cls-aux"] = cls_loss_aux
+    loss_dict[f"{loss_name}-mask-aux"] = mask_loss_aux
+    loss_dict[f"{loss_name}-dice-aux"] = dice_loss_aux
 
     loss = cls_loss * cls_loss_scale + mask_loss * mask_loss_scale + dice_loss * dice_loss_scale
+    loss += cls_loss_aux * cls_loss_scale + mask_loss_aux * mask_loss_scale + dice_loss_aux * dice_loss_scale
 
     return loss
 

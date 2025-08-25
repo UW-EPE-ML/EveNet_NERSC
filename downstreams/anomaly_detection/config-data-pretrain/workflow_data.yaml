@@ -6,8 +6,10 @@ fit:
 
 
 output:
-  plotdir: 'results/pretrain-ip3d/data'
-  storedir: '/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-CMSOpenData-pretrain-ip3d/EveNetInput'
+  plotdir: 'results/pretrain-100M-v8-toy-study/data'
+  storedir: '/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-boostrap-100M-v8/'
+
+
 
 train:
   config: '/global/homes/t/tihsu/EveNet/downstreams/anomaly_detection/config-data-pretrain/full_train.yaml'

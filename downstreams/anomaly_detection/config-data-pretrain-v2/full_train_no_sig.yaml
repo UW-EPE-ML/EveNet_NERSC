@@ -1,0 +1,72 @@
+platform:
+  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-CMSOpenData-pretrain-ip3d-v2/EveNetInput_no_signal/SB"
+  number_of_workers: 4
+  resources_per_worker: {
+    "CPU": 30,
+    "GPU": 1,
+  }
+  batch_size: 2048
+  prefetch_batches: 2
+
+wandb:
+  project: "anomaly-detection"
+  entity: "ytchou97-university-of-washington"
+  name: "toy-model"
+  tags: [ "Pretrain", "Parquet", "NERSC", "Multi-Node" ]
+  run_name: "CMS-Data-Generation-pretrain-ip3d-nosignal"
+
+options:
+  default: options.yaml
+
+  # overwrites
+  Training:
+    epochs: 300
+    patience: 30
+    model_checkpoint_save_path: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-CMSOpenData-pretrain-ip3d-v2/EveNetInput_no_signal/SB/log"
+    model_checkpoint_load_path: null
+
+    pretrain_model_load_path: "/pscratch/sd/t/tihsu/database/pretrain-wp/pretrain_2025May28.ckpt"
+
+    Components:
+      GlobalGeneration:
+        include: true
+      ReconGeneration:
+        include: true
+  ProgressiveTraining:
+    stages:
+      - name: "full_training"
+        epoch_ratio: 1.0
+        transition_ratio: 0.0
+        loss_weights:
+          generation-recon: [ 1.0, 1.0 ]
+          generation: [ 1.0, 1.0 ]
+          classification: [ 0.0, 0.0 ]
+          classification-noised: [ 0.0, 0.0 ]
+          regression: [ 0.0, 0.0 ]
+          assignment: [ 0.0, 0.0 ]
+        train_parameters:
+          noise_prob: [1.0, 1.0]
+          reco_attn_mask: [0.0, 0.0]
+          ema_decay: [ 0.999, 0.999 ]
+
+  Dataset:
+    dataset_limit: 1.0
+    normalization_file: "/pscratch/sd/t/tihsu/database/EveNet-AnomalyDetection-CMSOpenData-pretrain-ip3d-v2/EveNetInput_no_signal/SB/normalization.pt"
+
+network:
+  default: network.yaml
+
+  # overwrites
+  # ...
+
+event_info:
+  default: event_info.yaml
+
+  # overwrites
+  # ...
+
+resonance:
+  default: resonance.yaml
+
+  # overwrites
+  # ...
