@@ -84,10 +84,13 @@ Segmentation:
   projection_dim: 512
   num_heads: 16
   dropout: 0.1
-  num_layers: 1
+  num_layers: 2
   num_queries: 4
-  return_intermediate: false
+  return_intermediate: true
   dim_decay_rate: 4.0
+  mask_mlp_layers: 1
+  norm_before: false
+  encode_event_token: true
 
 GlobalGeneration:
   num_layers: 1
