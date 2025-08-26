@@ -51,6 +51,7 @@ Classification:
   hidden_dim: 64
   dropout: 0.1
   skip_connection: true
+  num_attention_heads: 8
 
 
 Regression:
