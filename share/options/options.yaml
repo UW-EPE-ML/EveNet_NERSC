@@ -20,7 +20,7 @@ Training:
   eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
   apply_event_weight: false # whether to apply event weight to the loss
-
+  log_gradient_step: 100 # how often to log gradient
 
   Components:
     GlobalEmbedding:

@@ -1356,9 +1356,22 @@ class EveNetEngine(L.LightningModule):
         task_losses = {}
         task_loss_global = None
 
-        # if "classification" in loss_head:
-        #     task_losses["classification"] = loss_head["classification"]
-        #
+        if "classification" in loss_head:
+            task_losses["classification"] = loss_head["classification"]
+
+        seg_losses = {
+            'segmentation': ['segmentation'],
+            'segmentation-mask': [
+                'segmentation-mask', 'segmentation-mask-aux', 'segmentation-dice', 'segmentation-dice-aux'
+            ],
+            'segmentation-cls': ['segmentation-cls', 'segmentation-cls-aux'],
+        }
+
+        for task_name, loss_names in seg_losses.items():
+            present = [name for name in loss_names if name in loss_head]
+            if present:  # only create the grouped loss if at least one component is present
+                task_losses[task_name] = sum(loss_head[name] for name in present)
+
         # if "assignment" in loss_head or "detection" in loss_head:
         #     task_losses["assignment"] = (
         #             loss_head.get("assignment", 0.0) + loss_head.get("detection", 0.0)
