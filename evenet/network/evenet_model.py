@@ -181,6 +181,7 @@ class EveNetModel(nn.Module):
                 hidden_dim=cls_cfg.hidden_dim,
                 skip_connection=cls_cfg.skip_connection,
                 dropout=cls_cfg.dropout,
+                num_attention_heads=cls_cfg.num_attention_heads,
             )
         # [4] Regression Head
         if self.include_regression:
@@ -546,8 +547,9 @@ class EveNetModel(nn.Module):
                 # Create output lists for each particle in event.
                 assignments = dict()
                 detections = dict()
+                final_event_token = event_token.clone()
                 if self.include_assignment:
-                    assignments, detections, event_token = self.Assignment(
+                    assignments, detections, event_token_assignments = self.Assignment(
                         x=embeddings,
                         x_mask=full_input_point_cloud_mask,
                         global_condition=embedded_global_conditions,
@@ -555,6 +557,7 @@ class EveNetModel(nn.Module):
                         event_token=event_token,
                         return_type="process_base"
                     )
+                    final_event_token += event_token_assignments
 
                 segmentation_out = {}
                 if self.include_segmentation:
@@ -564,13 +567,17 @@ class EveNetModel(nn.Module):
                         event_token = event_token
                     )
 
-                    if segmentation_out["event-token"] is not None:
-                        event_token = segmentation_out["event-token"]
+                    if segmentation_out.get("event-token", None) is not None:
+                        final_event_token += segmentation_out["event-token"]
 
                 # Classification head
                 classifications = None
                 if self.include_classification:
-                    classifications = self.Classification(event_token)
+                    classifications = self.Classification(
+                        x = embeddings,
+                        x_mask = full_input_point_cloud_mask,
+                        event_token=event_token
+                    )
 
                 # Regression head
                 regressions = None

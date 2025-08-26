@@ -51,7 +51,7 @@ Classification:
   hidden_dim: 256
   dropout: 0.1
   skip_connection: true
-
+  num_attention_heads: 8
 
 Regression:
   num_regression_layers: 1
@@ -92,12 +92,14 @@ GlobalGeneration:
 
 Segmentation:
   projection_dim: 256
-  num_heads: 16
+  num_heads: 8
   dropout: 0.1
   num_layers: 2
   num_queries: 3
-  return_intermediate: false
-  dim_decay_rate: 4.0
+  return_intermediate: true
+  mask_mlp_layers: 1
+  norm_before: false
+  encode_event_token: false
   
 ReconGeneration:
   hidden_dim: 256
@@ -122,3 +124,4 @@ TruthGeneration:
   extend_batch: true
   neutrino_position_encode: true
   max_position_length: 36 # Must be larger than max object number
+

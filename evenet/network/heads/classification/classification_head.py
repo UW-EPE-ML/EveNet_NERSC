@@ -7,6 +7,7 @@ import torch
 
 import numpy as np
 from evenet.network.layers.activation import  create_residual_connection
+from evenet.network.layers.transformer import ClassifierTransformerBlockModule
 
 
 class BranchLinear(nn.Module):
@@ -100,6 +101,7 @@ class ClassificationHead(nn.Module):
             self,
             class_label,
             event_num_classes,
+            num_attention_heads: int,
             num_layers: int,
             input_dim: int,
             hidden_dim: int,
@@ -107,11 +109,19 @@ class ClassificationHead(nn.Module):
             skip_connection: bool = False,
     ):
         super(ClassificationHead, self).__init__()
+
+        self.class_transformer = ClassifierTransformerBlockModule(
+            input_dim=input_dim,
+            projection_dim=hidden_dim,
+            num_heads=num_attention_heads,
+            dropout=dropout
+        )
+
         networks = OrderedDict()
         for name in class_label:
             num_classes = event_num_classes[name]
             networks[f"classification/{name}"] = BranchLinear(
-                input_dim=input_dim,
+                input_dim=hidden_dim,
                 num_layers=num_layers,
                 hidden_dim=hidden_dim,
                 num_outputs=num_classes,
@@ -121,14 +131,21 @@ class ClassificationHead(nn.Module):
             )
         self.networks = nn.ModuleDict(networks)
 
-    def forward(self, x) -> Dict[str, Tensor]:
+    def forward(self, x, x_mask, event_token) -> Dict[str, Tensor]:
         """
         :param x: input point cloud (batch_size, hidden_dim)
         :return: Dict[str, Tensor]
         """
+        class_token = event_token.clone()
+        class_token = self.class_transformer(
+            x = x,
+            class_token = class_token,
+            mask = x_mask
+        )
+        class_token = event_token + class_token
 
         return {
-            key: network(x)
+            key: network(class_token)
             for key, network in self.networks.items()
         }
 

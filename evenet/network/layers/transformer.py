@@ -261,7 +261,8 @@ class ClassifierTransformerBlockModule(nn.Module):
         class_token = self.bridge_class_token(class_token)
         x1 = self.norm1(x)
         query = class_token.unsqueeze(1)  # Only use the class token as query
-        padding_mask = ~(mask.unsqueeze(2).bool()) if mask is not None else None
+
+        padding_mask = ~(mask.squeeze(2).bool()) if mask is not None else None
         updates, _ = self.attn(query, x1, x1, key_padding_mask=padding_mask)  # [batch_size, 1, projection_dim]
         updates = self.norm2(updates)
 
