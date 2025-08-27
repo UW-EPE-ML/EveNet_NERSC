@@ -126,12 +126,14 @@ class SegmentationMetrics:
 
         y_pred_mask = y_pred_mask.sigmoid()
         scores, labels = F.softmax(y_pred_cls, dim=-1).max(-1)
+
+        # empty_mask = ~((y_pred_mask > self.mask_threshold).long().sum(dim=-1) == 0)  # shape: (B, N)
+        # labels = labels * empty_mask.long()  # Set labels to 0 for empty masks
         keep = labels > 0  # Keep non-null class
+
 
         cur_masks = y_pred_mask * keep.unsqueeze(-1).float()  # Zero out masks for null class predictions
         cur_prob_masks = cur_masks * scores.unsqueeze(-1).float()  # Weight masks by their confidence scores
-
-        panoptic_seg = torch.zeros_like(y_pred_mask)
 
         if cur_masks.sum() > 0:
             # Apply class zero mask and uniqueness to the predicted mask
@@ -144,7 +146,7 @@ class SegmentationMetrics:
 
 
         y_true_cls_np = y_true_cls.argmax(dim=-1).flatten().cpu().numpy()
-        y_pred_cls_np = y_pred_cls.argmax(dim=-1).flatten().cpu().numpy()
+        y_pred_cls_np = labels.flatten().cpu().numpy()
         # Cluster confusion matrix
         cm_partial = confusion_matrix(y_true_cls_np, y_pred_cls_np, labels=self.labels)
         for i, true_label in enumerate(self.labels):
@@ -155,7 +157,7 @@ class SegmentationMetrics:
 
         # Number confusion matrix
         y_true_num_np = (y_true_cls.argmax(dim=-1) > 0).sum(-1).flatten().cpu().numpy()
-        y_pred_num_np = (y_pred_cls.argmax(dim=-1) > 0).sum(-1).flatten().cpu().numpy()
+        y_pred_num_np = (labels > 0).sum(-1).flatten().cpu().numpy()
         cm_number = confusion_matrix(y_true_num_np, y_pred_num_np, labels=self.labels_num)
         for i, true_label in enumerate(self.labels_num):
             for j, pred_label in enumerate(self.labels_num):
@@ -164,7 +166,7 @@ class SegmentationMetrics:
 
         # Mask distribution
         # Setup
-        cls_true_filter = (y_true_cls.argmax(dim=-1) == y_pred_cls.argmax(dim=-1))  # (B, N)
+        cls_true_filter = (y_true_cls.argmax(dim=-1) == labels)  # (B, N)
         inside_filter = (y_true_mask.float() > 0)  # (B, N, P)
         outside_filter = ~inside_filter  # (B, N, P)
 
@@ -525,36 +527,9 @@ def shared_step(
         cls_loss_weight = cls_loss_scale,
         dice_loss_weight = dice_loss_scale,
         mask_loss_weight = mask_loss_scale,
-        reduction='none',
+        event_weight=event_weight,
         aux_outputs = aux_outputs
     )
-
-
-    if event_weight is not None:
-        mask_loss = mask_loss * event_weight
-        dice_loss = dice_loss * event_weight
-        cls_loss  = cls_loss * event_weight
-        mask_loss = mask_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-        dice_loss = dice_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-        cls_loss = cls_loss.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-
-        mask_loss_aux = mask_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=mask_loss.device)
-        dice_loss_aux = dice_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=dice_loss.device)
-        cls_loss_aux = cls_loss_aux.sum(dim=-1) * event_weight if aux_outputs is not None else torch.tensor(0.0, device=cls_loss.device)
-
-        mask_loss_aux = mask_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-        dice_loss_aux = dice_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-        cls_loss_aux = cls_loss_aux.sum(dim=-1) / event_weight.sum(dim=-1).clamp(1e-6)
-
-    else:# Sum over classes if multi-class
-        cls_loss = cls_loss.mean()
-        mask_loss = mask_loss.mean()
-        dice_loss = dice_loss.mean()
-
-
-        mask_loss_aux = mask_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=mask_loss.device)
-        dice_loss_aux = dice_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=dice_loss.device)
-        cls_loss_aux = cls_loss_aux.mean() if aux_outputs is not None else torch.tensor(0.0, device=cls_loss.device)
 
     # print("predict_mask", predict_mask, "predict_cls", predict_classification)
 

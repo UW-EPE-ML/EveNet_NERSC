@@ -3,7 +3,7 @@ Training:
   total_epochs: 200
   # Trainer will stop at this epoch number
   epochs: 200
-
+  log_gradient_step: 1
   model_checkpoint_save_path: "."
   model_checkpoint_load_path: null
 
@@ -162,7 +162,6 @@ Training:
       weight_decay: *wd
       decoupled_weight_decay: *decouple_wd
       use_full_mask: true # whether to use full mask for training
-      diffusion_steps: 100
       freeze:
         type: none # ['partial', 'full', 'none', 'random']
         partial_freeze_components: [ ]

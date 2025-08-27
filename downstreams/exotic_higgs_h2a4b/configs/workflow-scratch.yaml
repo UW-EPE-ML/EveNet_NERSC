@@ -20,6 +20,7 @@ pretrain_choice:
 
 assign_seg_choice:
   - [false, true]
+  - [false, false]
 
 
 

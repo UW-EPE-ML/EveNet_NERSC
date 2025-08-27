@@ -451,6 +451,7 @@ class EveNetEngine(L.LightningModule):
                 cls_loss_scale = self.segmentation_cfg.cls_loss_scale,
                 loss_name = "segmentation",
                 update_metrics=update_metric,
+                event_weight=event_weight,
                 aux_outputs=outputs.get("segmentation-aux", None)
             )
             loss_raw["segmentation"] = scaled_seg_loss
