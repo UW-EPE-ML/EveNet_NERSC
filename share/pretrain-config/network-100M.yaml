@@ -51,6 +51,7 @@ Classification:
   hidden_dim: 512
   dropout: 0.1
   skip_connection: true
+  num_attention_heads: 8
 
 
 Regression:
@@ -73,7 +74,7 @@ Assignment:
   num_detection_layers: 1
   dropout: 0.1
   combinatorial_scale: 0.0
-  encode_event_token: true
+  encode_event_token: false
   activation: GELU
   num_encoder_layers: 1 # At least 1 layer, otherwise detection will not work
   num_linear_layers: 1
@@ -82,15 +83,14 @@ Assignment:
 
 Segmentation:
   projection_dim: 512
-  num_heads: 16
+  num_heads: 8
   dropout: 0.1
-  num_layers: 2
+  num_layers: 1
   num_queries: 4
   return_intermediate: true
-  dim_decay_rate: 4.0
   mask_mlp_layers: 1
   norm_before: false
-  encode_event_token: true
+  encode_event_token: false
 
 GlobalGeneration:
   num_layers: 1

@@ -99,7 +99,7 @@ Segmentation:
   return_intermediate: true
   mask_mlp_layers: 1
   norm_before: false
-  encode_event_token: false
+  encode_event_token: true
   
 ReconGeneration:
   hidden_dim: 256

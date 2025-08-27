@@ -274,13 +274,13 @@ def calculate_loss(
 
     target_class_label_best = target_class_best.argmax(dim=-1)  # (B, N)
     final_event_weight = event_weight if event_weight is not None else torch.ones(B, device=predict_cls.device)
-    final_event_weight = final_event_weight.unsqueeze(-1) * class_weight[target_class_label_best] # (B, 1)
+    final_event_weight_w_cls_weight = final_event_weight.unsqueeze(-1) * class_weight[target_class_label_best] # (B, N)
 
     # focal/dice loss should handle class imbalance, so we do not weight them by class weight
     mask_loss = (mask_loss * non_null_cls_masking).sum() / (non_null_cls_masking.sum().clamp(1e-6))
     dice_loss = (dice_loss * non_null_cls_masking).sum() / (non_null_cls_masking.sum().clamp(1e-6))
 
     # only class related loss is weighted by event weight
-    class_loss = (class_loss * event_weight.unsqueeze(-1)).sum() / final_event_weight.sum().clamp(1e-6)
+    class_loss = (class_loss * final_event_weight.unsqueeze(-1)).sum() / final_event_weight_w_cls_weight.sum().clamp(1e-6)
 
     return mask_loss, dice_loss, class_loss

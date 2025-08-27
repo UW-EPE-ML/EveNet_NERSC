@@ -24,9 +24,6 @@ def loss(predict, target, class_weight=None, event_weight=None):
 
     if event_weight is not None:
         class_loss = class_loss * event_weight
-        overall_class_weight_sum = event_weight.sum()
-    else:
-        overall_class_weight_sum = target.numel() - (target == -1).sum()
 
         # Mask out ignored targets
     mask_cls = target != -1

@@ -2,12 +2,12 @@ platform:
 #  data_parquet_dir: "/pscratch/sd/t/tihsu/EventLevelPretrainedDataset/"
 #  data_parquet_dir: "/pscratch/sd/t/tihsu/database/EveNet-segInput/"
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M"
-  number_of_workers: 4
+  number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 2048
+  batch_size: 512
   prefetch_batches: 2
 
 
@@ -137,7 +137,7 @@ options:
       "global-HT": [ 50, 2, 8 ]
 
 network:
-  default: pretrain-small.yaml
+  default: network-100M.yaml
 
   # overwrites
   # ...
