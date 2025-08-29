@@ -190,8 +190,8 @@ def debug_nonfinite_batch(
             return torch.full((batch_size,), ~torch.isfinite(x), dtype=torch.bool, device=x.device)
         # move batch_dim to 0, then reduce over all remaining dims
         x_moved = x.transpose(0, batch_dim)
-        # bad = ~torch.isfinite(x_moved)
-        bad = x_moved > 0
+        bad = ~torch.isfinite(x_moved)
+        # bad = x_moved > 0
         if bad.ndim == 1:
             return bad
         reduce_dims = tuple(range(1, bad.ndim))
