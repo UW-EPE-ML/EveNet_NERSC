@@ -12,10 +12,13 @@ import matplotlib.colors as mcolors
 import torch.nn.functional as F
 from typing import Optional
 
-from evenet.utilities.debug_tool import time_decorator
+from evenet.utilities.debug_tool import time_decorator, debug_nonfinite_batch
 from evenet.network.loss.segmentation import hungarian_matching
 from sklearn.metrics import confusion_matrix, roc_curve, auc
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 class SegmentationMetrics:
     def __init__(
@@ -516,6 +519,18 @@ def shared_step(
 
     # Make non-detectable points to be null class as well.
 
+    debug_nonfinite_batch(
+        {
+            "target_classification": target_classification,
+            "target_mask": target_mask,
+            "predict_classification": predict_classification,
+            "predict_mask": predict_mask,
+            "point_cloud_mask": point_cloud_mask,
+            "class_label": class_label,
+            "event_weight": event_weight
+        },
+        batch_dim=0, name=loss_name, logger=logger
+    )
 
     mask_loss, dice_loss, cls_loss, mask_loss_aux, dice_loss_aux, cls_loss_aux = seg_loss_fn(
         predict_cls = predict_classification,

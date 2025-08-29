@@ -3,7 +3,7 @@ import re
 import torch.nn
 
 from evenet.network.loss.assignment import convert_target_assignment
-from evenet.utilities.debug_tool import time_decorator
+from evenet.utilities.debug_tool import time_decorator, debug_nonfinite_batch
 from evenet.utilities.group_theory import complete_indices, symmetry_group
 from evenet.control.event_info import EventInfo
 from evenet.network.metrics.predict_assignment import extract_predictions
@@ -21,6 +21,9 @@ from scipy.optimize import curve_fit
 
 import wandb
 from matplotlib.lines import Line2D
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @time_decorator(name="[Assignment] reconstruct_mass_peak")
@@ -881,6 +884,15 @@ def shared_step(
     detected_loss = torch.zeros(1, device=device, requires_grad=True)
     active_heads_sum = {k: 0 for k in loss_dict.keys() if 'assignment_' in k}
     for process in process_names:
+
+        # debug_nonfinite_batch(
+        #     {
+        #         "assignments": assignments[process],
+        #         "detections": detections[process],
+        #     },
+        #     batch_dim=0, name=f"ass/{process}", logger=logger
+        # )
+
         assignment_predict[process] = predict(
             assignments=assignments[process],
             detections=detections[process],

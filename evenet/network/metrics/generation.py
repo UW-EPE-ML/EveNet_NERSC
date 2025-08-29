@@ -3,6 +3,7 @@ from typing import Callable, Union
 import numpy as np
 import torch
 from evenet.utilities.diffusion_sampler import DDIMSampler
+from evenet.utilities.debug_tool import debug_nonfinite_batch
 from functools import partial
 
 import matplotlib.pyplot as plt
@@ -486,13 +487,23 @@ def shared_step(
             event_weight=event_weight
         )
 
+        debug_nonfinite_batch(
+            {
+                "predict": generation_result["vector"],
+                "truth": generation_result["truth"],
+                "mask": masking,
+                "weight": event_weight,
+            },
+            batch_dim=0,  # change if your batch axis differs
+            name=f"gen/{generation_target}",
+            logger=logger,
+        )
+
         # if generation loss is nan, then print all details
         if torch.isnan(generation_loss[generation_target]):
             logger.warning(
-                f"NaN in generation loss for batch: {batch}, "
-                f"masking: {masking}, feature_dim: {feature_dim}, "
+                f"NaN in generation loss for {generation_target} "
                 f"predict: {generation_result['vector']}, truth: {generation_result['truth']}, "
-                f"event_weight: {event_weight}, schedules: {schedules}"
             )
 
             generation_loss[generation_target] = 0.0

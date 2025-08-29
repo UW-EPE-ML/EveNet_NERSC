@@ -5,16 +5,16 @@ import torch
 import wandb
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
-from sklearn.preprocessing import label_binarize
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 import torch.nn.functional as F
 
-from evenet.utilities.debug_tool import time_decorator
+from evenet.utilities.debug_tool import time_decorator, debug_nonfinite_batch
 import logging
 
+logger = logging.getLogger(__name__)
 
 class ClassificationMetrics:
     def __init__(self, num_classes, device, normalize=False, num_bins=100):
@@ -298,6 +298,15 @@ def shared_step(
         event_weight: torch.Tensor = None,
         loss_name: str = "classification"
 ):
+    debug_nonfinite_batch(
+        {
+            "logits": cls_output,
+            "labels": target_classification,
+            "event_weight": event_weight,
+        },
+        batch_dim=0, name=loss_name, logger=logger
+    )
+
     cls_loss = cls_loss_fn(
         cls_output,
         target_classification,
