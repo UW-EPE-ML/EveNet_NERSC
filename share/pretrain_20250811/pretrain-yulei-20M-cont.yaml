@@ -40,7 +40,7 @@ options:
 #    learning_rate: &lr 0.000018
     learning_rate: &lr 0.000015
     #    learning_rate: &lr 0.000045
-    learning_rate_warm_up_factor: 2.0
+    learning_rate_warm_up_factor: 1.0
     weight_decay: &wd 0.001
     optimizer_type_base: &opt "lion"
     Components:
