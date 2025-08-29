@@ -1,11 +1,11 @@
 platform:
   data_parquet_dir: "/pscratch/sd/a/avencast/Event_Level_Analysis/Pretrain_Parquet/run.20250808.2700M"
-  number_of_workers: 8
+  number_of_workers: 16
   resources_per_worker: {
     "CPU": 30,
     "GPU": 1,
   }
-  batch_size: 512
+  batch_size: 1024
   prefetch_batches: 2
 
 logger:
@@ -20,7 +20,7 @@ logger:
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
-    version: "test-20M-01"
+    version: "test-20M"
 
 
 options:
@@ -30,8 +30,8 @@ options:
     total_epochs: 4
     epochs: 4
     model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.test"
-    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.test/epoch=1_train=0.9228_val=0.9186.ckpt"
-    pretrain_model_load_path: null
+#    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.test/epoch=1_train=0.9228_val=0.9186.ckpt"
+    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/last-unsupervised.ckpt"
 
     diffusion_every_n_epochs: 4 # how often to run diffusion
     diffusion_every_n_steps: 20 # how often to run diffusion inside the valid epoch
@@ -96,22 +96,22 @@ options:
 
     ProgressiveTraining:
       stages:
-        - name: "masking point prediction"
-          epoch_ratio: 0.75
-#          epoch_ratio: 0.0
-          transition_ratio: 0.5
-          loss_weights:
-            generation-truth: [ 0.0, 0.0 ]
-            generation-recon: [ 1.0, 1.0 ]
-            classification: [ 0.0, 0.0 ]
-            classification-noised: [ 0.0, 0.0 ]
-            regression: [ 0.0, 0.0 ]
-            assignment: [ 0.0, 0.0 ]
-            segmentation: [ 0.0, 0.0 ]
-          train_parameters:
-            noise_prob: [ 0.3, 1.0 ]
-            reco_attn_mask: [ 1.0, 0.0 ]
-            ema_decay: [ 0.5, 0.9 ]
+#        - name: "masking point prediction"
+#          epoch_ratio: 0.75
+##          epoch_ratio: 0.0
+#          transition_ratio: 0.5
+#          loss_weights:
+#            generation-truth: [ 0.0, 0.0 ]
+#            generation-recon: [ 1.0, 1.0 ]
+#            classification: [ 0.0, 0.0 ]
+#            classification-noised: [ 0.0, 0.0 ]
+#            regression: [ 0.0, 0.0 ]
+#            assignment: [ 0.0, 0.0 ]
+#            segmentation: [ 0.0, 0.0 ]
+#          train_parameters:
+#            noise_prob: [ 0.3, 1.0 ]
+#            reco_attn_mask: [ 1.0, 0.0 ]
+#            ema_decay: [ 0.5, 0.9 ]
 
         - name: "full_training"
           epoch_ratio: 0.25
