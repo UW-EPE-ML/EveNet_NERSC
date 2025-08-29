@@ -33,7 +33,7 @@ def make_process_fn(base_dir: Path):
     component_map = {
 #        "Classification": "classification",
         "Regression": "regression-",
-        "Assignment": "assignment-",
+        "Assignment": "assignments-",
         # "TruthGeneration": "event_generation-",
         # "ReconGeneration": "event_generation-",
         "Segmentation": "segmentation-",
