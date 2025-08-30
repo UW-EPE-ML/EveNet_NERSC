@@ -13,10 +13,10 @@ logger:
     project: "Pretrain"
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
-    run_name: &logger_name "nominal-100M-cont-20250815.small_head"
-    id: "pretrain-100M-20250815-cont.small_head.1"
+    run_name: &logger_name "nominal-100M-cont-20250830"
+#    id: "pretrain-100M-20250815-cont.sma"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "100M", "Vanilla"]
-    simplified: true
+    simplified: false
   local:
     save_dir: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/logs"
     name: *logger_name
@@ -28,18 +28,18 @@ options:
 
   Training:
     total_epochs: 50
-    epochs: 2
-    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M"
+    epochs: 6
+    model_checkpoint_save_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M.newhead"
 #    model_checkpoint_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M/epoch=15_train=0.6222_val=0.5237.ckpt"
     pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.100M/epoch=14_train=0.4870_val=0.4815.ckpt"
 
-    diffusion_every_n_epochs: 2 # how often to run diffusion
-    diffusion_every_n_steps: 200 # how often to run diffusion inside the valid epoch
-    eval_metrics_every_n_epochs: 2 # how often to run evaluation metrics
+    diffusion_every_n_epochs: 3 # how often to run diffusion
+    diffusion_every_n_steps: 100 # how often to run diffusion inside the valid epoch
+    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
-    learning_rate: &lr 0.000025
+    learning_rate: &lr 0.000018
     #    learning_rate: &lr 0.000045
-    learning_rate_warm_up_factor: 2.0
+    learning_rate_warm_up_factor: 1.0
     weight_decay: &wd 0.001
     optimizer_type_base: &opt "lion"
     Components:
