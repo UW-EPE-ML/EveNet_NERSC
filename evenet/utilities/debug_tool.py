@@ -225,7 +225,7 @@ def debug_nonfinite_batch(
     bad_indices = torch.nonzero(any_bad, as_tuple=False).flatten()
     n_bad = bad_indices.numel()
     if n_bad == 0:
-        log(f"[{name}] No NaN/Inf found across {list(tensors.keys())}")
+        # log(f"[{name}] No NaN/Inf found across {list(tensors.keys())}")
         return
 
     log(f"[{name}] Found {n_bad} bad batch item(s) across {list(tensors.keys())}")
