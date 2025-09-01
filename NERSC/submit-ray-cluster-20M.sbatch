@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH -C gpu
-#SBATCH --time=10:00:00
+#SBATCH --time=7:00:00
 #SBATCH -q regular
-#SBATCH -A m5019_g
+#SBATCH -A m2616_g
 
 ### This script works for any number of nodes, Ray will find and manage all resources
 #SBATCH --nodes=128
@@ -49,6 +49,7 @@ cd ../ && source setup.sh
 
 export TORCH_NCCL_TIMEOUT=180
 
-shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-20M-cont.yaml
+#shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-20M-cont.yaml
+shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-20M-famo.yaml
 
 exit
