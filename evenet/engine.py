@@ -622,7 +622,8 @@ class EveNetEngine(L.LightningModule):
         #     gen_global_loss.mean().backward()
 
         # print(f"[Step {step}] Loss: {final_loss.item()}")
-        self.safe_manual_backward(loss.mean())
+        # self.safe_manual_backward(loss.mean())
+        self.safe_manual_backward(final_loss.mean())
         # print(f"[Step {step}] Backward done")
 
         # === Check for Gradients ===
