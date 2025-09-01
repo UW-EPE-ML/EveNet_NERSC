@@ -13,7 +13,7 @@ logger:
     project: "Pretrain"
     entity: "ytchou97-university-of-washington"
     name: "Pretrain"
-    run_name: &logger_name "nominal-100M-cont-20250830"
+    run_name: &logger_name "nominal-100M-cont-20250901"
 #    id: "pretrain-100M-20250815-cont.sma"
     tags: [ "Pretrain", "NERSC", "Multi-Node", "500M-Data", "100M", "Vanilla"]
     simplified: false
@@ -37,7 +37,7 @@ options:
     diffusion_every_n_steps: 100 # how often to run diffusion inside the valid epoch
     eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
-    learning_rate: &lr 0.000018
+    learning_rate: &lr 0.000012
     #    learning_rate: &lr 0.000045
     learning_rate_warm_up_factor: 1.0
     weight_decay: &wd 0.001
