@@ -67,6 +67,7 @@ class FAMO(nn.Module):
 
         weighted_loss = (D.log() * weights / c).sum()
 
+        # print(f"raw losses: {loss_dict}")
         # print(f"losses: {losses} min_vec: {min_vec} D: {D} c: {c} weighted_loss: {weighted_loss}")
         # print(f"weights: {weights} logits: {logits}")
 
