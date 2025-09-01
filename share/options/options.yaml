@@ -213,11 +213,14 @@ Training:
     detailed_loss: false
     detailed_loss_list:
       - classification
+      - classification-noised
       - generation-global
       - generation-event
       - generation-invisible
       - assignment
       - detection
+      - regression
+      - segmentation
     logits_bound: 1.0
     lr: 0.025
 
