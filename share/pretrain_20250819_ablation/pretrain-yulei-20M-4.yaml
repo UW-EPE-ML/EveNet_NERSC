@@ -35,9 +35,9 @@ options:
 #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M/last-unsupervised.ckpt"
 #    pretrain_model_load_path: "/global/cfs/cdirs/m2616/avencast/Event_Level_Analysis/playground/checkpoints.20M.ablation.4.abl.newcls/last.ckpt"
 
-    diffusion_every_n_epochs: 5 # how often to run diffusion
+    diffusion_every_n_epochs: 3 # how often to run diffusion
     diffusion_every_n_steps: 100 # how often to run diffusion inside the valid epoch
-    eval_metrics_every_n_epochs: 5 # how often to run evaluation metrics
+    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
     learning_rate: &lr 0.000012
     #    learning_rate: &lr 0.000045
