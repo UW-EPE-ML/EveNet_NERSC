@@ -85,7 +85,10 @@ class EveNetEngine(L.LightningModule):
 
         self.pretrain_ckpt_path: str = global_config.options.Training.pretrain_model_load_path
 
-        self.num_classes: list[str] = global_config.event_info.class_label.get('EVENT', {}).get('signal', [0])[0]
+        self.num_classes: list[str] = (
+            signal if isinstance((signal := global_config.event_info.class_label.get("EVENT", {}).get("signal")), list)
+            else [1]
+        )
 
         ###### Initialize Keys for Data Inputs #####
         self.input_keys = ["x", "x_mask", "conditions", "conditions_mask"]
@@ -119,9 +122,15 @@ class EveNetEngine(L.LightningModule):
         if self.config.options.Dataset.get("balance_file", None) is not None:
             self.balance_dict = torch.load(self.config.options.Dataset.balance_file)
 
-        self.class_weight = self.balance_dict["class_balance"]
-        self.assignment_weight = self.balance_dict["particle_balance"]
-        self.subprocess_balance = self.balance_dict["subprocess_balance"]
+        self.class_weight=None
+        if self.classification_cfg.include:
+            self.class_weight = self.balance_dict["class_balance"]
+
+        self.assignment_weight = None
+        self.subprocess_balance = None
+        if self.assignment_cfg.include:
+            self.assignment_weight = self.balance_dict["particle_balance"]
+            self.subprocess_balance = self.balance_dict["subprocess_balance"]
 
         self.segmentation_cls_balance = None
         if self.segmentation_cfg.include:
@@ -914,7 +923,7 @@ class EveNetEngine(L.LightningModule):
 
         if self.generation_include:
             generation_kwargs = {
-                "class_names": self.config.event_info.class_label['EVENT']['signal'][0],
+                "class_names": self.config.event_info.class_label.get("EVENT", {}).get("signal", ["a"])[0],
                 "sequential_feature_names": self.config.event_info.sequential_feature_names,
                 "invisible_feature_names": self.config.event_info.invisible_feature_names,
                 "device": self.device,

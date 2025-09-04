@@ -178,7 +178,7 @@ class GenerationMetrics:
 
             data_shape = input_set['x_invisible'].shape
             process_id = input_set['classification'] if 'classification' in input_set else torch.zeros_like(
-                input_set['conditions_mask']).long()  # (batch_size, 1)
+                input_set['conditions_mask'].flatten()).long()  # (batch_size, 1)
 
             predict_for_neutrino = partial(
                 model.predict_diffusion_vector,

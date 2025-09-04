@@ -104,19 +104,21 @@ class EveNetModel(nn.Module):
             std=global_normalizer_info["std"].to(self.device),
         )
 
-        self.num_point_cloud_normalizer = Normalizer(
-            mean=normalization_dict["input_num_mean"]["Source"].unsqueeze(-1).to(self.device),
-            std=normalization_dict["input_num_std"]["Source"].unsqueeze(-1).to(self.device),
-            norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool)
-        )
+        if self.include_point_cloud_generation:
+            self.num_point_cloud_normalizer = Normalizer(
+                mean=normalization_dict["input_num_mean"]["Source"].unsqueeze(-1).to(self.device),
+                std=normalization_dict["input_num_std"]["Source"].unsqueeze(-1).to(self.device),
+                norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool)
+            )
 
-        self.invisible_normalizer = Normalizer(
-            mean=normalization_dict["invisible_mean"]["Source"].to(self.device),
-            std=normalization_dict["invisible_std"]["Source"].to(self.device),
-            norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool),
-            inv_cdf_index=self.event_info.invisible_inv_cdf_index,
-            padding_size=self.invisible_padding,
-        )
+        if self.include_neutrino_generation:
+            self.invisible_normalizer = Normalizer(
+                mean=normalization_dict["invisible_mean"]["Source"].to(self.device),
+                std=normalization_dict["invisible_std"]["Source"].to(self.device),
+                norm_mask=torch.tensor([1], device=self.device, dtype=torch.bool),
+                inv_cdf_index=self.event_info.invisible_inv_cdf_index,
+                padding_size=self.invisible_padding,
+            )
 
         # [1] Body
         global_embedding_cfg = self.network_cfg.Body.GlobalEmbedding
@@ -294,16 +296,16 @@ class EveNetModel(nn.Module):
         # [7] Segmentation Head
         if self.include_segmentation:
             self.Segmentation = SegmentationHead(
-                projection_dim = self.network_cfg.Segmentation.projection_dim,
-                mask_dim = self.network_cfg.Segmentation.projection_dim,
-                num_heads = self.network_cfg.Segmentation.num_heads,
-                dropout = self.network_cfg.Segmentation.dropout,
-                num_layers = self.network_cfg.Segmentation.num_layers,
-                num_mask_mlp_layers = self.network_cfg.Segmentation.mask_mlp_layers,
-                num_class = len(self.event_info.segmentation_indices),  # Binary classification for mask prediction
-                num_queries = self.network_cfg.Segmentation.num_queries,
-                return_intermediate = self.network_cfg.Segmentation.return_intermediate,
-                norm_before = self.network_cfg.Segmentation.norm_before,
+                projection_dim=self.network_cfg.Segmentation.projection_dim,
+                mask_dim=self.network_cfg.Segmentation.projection_dim,
+                num_heads=self.network_cfg.Segmentation.num_heads,
+                dropout=self.network_cfg.Segmentation.dropout,
+                num_layers=self.network_cfg.Segmentation.num_layers,
+                num_mask_mlp_layers=self.network_cfg.Segmentation.mask_mlp_layers,
+                num_class=len(self.event_info.segmentation_indices),  # Binary classification for mask prediction
+                num_queries=self.network_cfg.Segmentation.num_queries,
+                return_intermediate=self.network_cfg.Segmentation.return_intermediate,
+                norm_before=self.network_cfg.Segmentation.norm_before,
                 encode_event_token=self.network_cfg.Segmentation.encode_event_token,
             )
 
@@ -366,7 +368,10 @@ class EveNetModel(nn.Module):
 
         class_label = x['classification'].unsqueeze(-1) if 'classification' in x else torch.zeros_like(
             x['conditions_mask']).long()  # (batch_size, 1)
-        num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
+
+        num_point_cloud = None
+        if self.include_global_generation or self.include_point_cloud_generation:
+            num_point_cloud = x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
 
         B, _, num_features = input_point_cloud.shape
         if 'x_invisible' in x:
@@ -406,19 +411,22 @@ class EveNetModel(nn.Module):
             mask=input_point_cloud_mask,
         )
 
-        invisible_point_cloud = self.invisible_normalizer(
-            x=invisible_point_cloud,
-            mask=invisible_point_cloud_mask
-        )
+        if self.include_neutrino_generation:
+            invisible_point_cloud = self.invisible_normalizer(
+                x=invisible_point_cloud,
+                mask=invisible_point_cloud_mask
+            )
 
         global_conditions = self.global_normalizer(
             x=global_conditions,
             mask=global_conditions_mask
         )
-        num_point_cloud = self.num_point_cloud_normalizer(
-            x=num_point_cloud,
-            mask=None
-        )
+
+        if self.include_global_generation or self.include_point_cloud_generation:
+            num_point_cloud = self.num_point_cloud_normalizer(
+                x=num_point_cloud,
+                mask=None
+            )
 
         ###########################
         ## Global Generator Head ##
@@ -619,7 +627,7 @@ class EveNetModel(nn.Module):
                     x_mask=full_input_point_cloud_mask,
                     global_cond=full_global_conditions,
                     global_cond_mask=global_conditions_mask,
-                    num_x=num_point_cloud,
+                    num_x=None,
                     time=full_time,
                     label=class_label,
                     attn_mask=full_attn_mask,
@@ -728,7 +736,7 @@ class EveNetModel(nn.Module):
             global_conditions_mask = cond_x['conditions_mask'].unsqueeze(-1)  # (batch_size, 1, 1)
             class_label = cond_x['classification'].unsqueeze(-1) if 'classification' in cond_x else torch.zeros_like(
                 cond_x['conditions_mask']).long()  # (batch_size, 1)
-            num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
+            # num_point_cloud = cond_x['num_sequential_vectors'].unsqueeze(-1)  # (batch_size, 1)
             input_point_cloud = cond_x['x']
             input_point_cloud_mask = cond_x['x_mask'].unsqueeze(-1)
 
@@ -742,10 +750,10 @@ class EveNetModel(nn.Module):
                 mask=global_conditions_mask
             )
 
-            num_point_cloud = self.num_point_cloud_normalizer(
-                x=num_point_cloud,
-                mask=None
-            )
+            # num_point_cloud = self.num_point_cloud_normalizer(
+            #     x=num_point_cloud,
+            #     mask=None
+            # )
 
             invisible_point_cloud_noised = noise_x
             invisible_point_cloud_mask = noise_mask
@@ -793,7 +801,7 @@ class EveNetModel(nn.Module):
                 x_mask=full_input_point_cloud_mask,
                 global_cond=full_global_conditions,
                 global_cond_mask=global_conditions_mask,
-                num_x=num_point_cloud,
+                num_x=None,
                 time=full_time,
                 label=class_label,
                 attn_mask=full_attn_mask,
