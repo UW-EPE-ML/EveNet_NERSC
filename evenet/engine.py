@@ -86,7 +86,7 @@ class EveNetEngine(L.LightningModule):
         self.pretrain_ckpt_path: str = global_config.options.Training.pretrain_model_load_path
 
         self.num_classes: list[str] = (
-            signal if isinstance((signal := global_config.event_info.class_label.get("EVENT", {}).get("signal")), list)
+            signal[0] if isinstance((signal := global_config.event_info.class_label.get("EVENT", {}).get("signal")), list)
             else [1]
         )
 
