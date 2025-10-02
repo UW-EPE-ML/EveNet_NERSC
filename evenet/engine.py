@@ -35,9 +35,6 @@ from evenet.utilities.debug_tool import time_decorator, log_function_stats
 from evenet.utilities.task_scheduler import ProgressiveTaskScheduler
 from evenet.utilities.tool import get_transition, check_param_overlap, print_params_used_by_loss, safe_load_state
 
-from torchjd import mtl_backward
-from torchjd.aggregation import UPGrad
-
 from evenet.utilities.logger import LocalLogger
 import logging
 
@@ -1289,7 +1286,7 @@ class EveNetEngine(L.LightningModule):
         self.sampler = DDIMSampler(device=self.device)
 
         ### Initialize Jacobian Descent ###
-        self.aggregator = UPGrad()
+        # self.aggregator = UPGrad()
 
     def on_save_checkpoint(self, checkpoint):
         orig_model = getattr(self.model, "_orig_mod", self.model)
