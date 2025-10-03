@@ -14,7 +14,7 @@ nav:
 theme:
   name: readthedocs
   custom_dir: docs/overrides
-repo_url: https://github.com/<your-org>/EveNet_Public
+repo_url: https://github.com/UW-EPE-ML/EveNet_Public
 repo_name: EveNet_Public
 markdown_extensions:
   - admonition
