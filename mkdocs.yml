@@ -8,7 +8,7 @@ nav:
   - Data Preparation: data_preparation.md
   - Model Architecture: model_architecture.md
   - Training: train.md
-  - Prediction: predict.md
+#  - Prediction: predict.md
   - Configuration Reference: configuration.md
   - Internal Notes: preprocess_internal_only.md
 theme:
