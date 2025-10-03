@@ -23,8 +23,8 @@ Ideal when you want the official binaries and ready-made CLIs without touching t
    ```
 3. Invoke the packaged CLIs with your configuration files.
    ```bash
-   evenet-train share/configs/train.yaml --ray_dir ~/ray_results
-   evenet-predict share/configs/predict.yaml
+   evenet-train share/finetune-example.yaml --ray_dir ~/ray_results
+   evenet-predict share/predict-example.yaml
    ```
 
 This path is “plug and play”—you only manage YAML configs and data paths.
@@ -43,12 +43,12 @@ Choose this when you want to edit the Lightning modules, extend datasets, or cus
    - Native install: `pip install -r requirements.txt` (plus any CUDA/PyTorch builds required by your system).
 3. Run the CLIs straight from source when iterating rapidly.
    ```bash
-   python -m evenet.train share/configs/train.yaml --ray_dir ~/ray_results
-   python -m evenet.predict share/configs/predict.yaml
+   python -m evenet.train share/finetune-example.yaml --ray_dir ~/ray_results
+   python -m evenet.predict share/predict-example.yaml
 
    # or call the scripts directly
-   python evenet/train.py share/configs/train.yaml --ray_dir ~/ray_results
-   python evenet/predict.py share/configs/predict.yaml
+   python evenet/train.py share/finetune-example.yaml --ray_dir ~/ray_results
+   python evenet/predict.py share/predict-example.yaml
    ```
 
 Both options are interoperable—you can install the PyPI package for quick tests and then switch to the cloned source for deeper development.

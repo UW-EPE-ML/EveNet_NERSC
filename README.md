@@ -29,8 +29,8 @@ Set up a runnable EveNet environment in minutes:
    ```
 3. Launch the bundled CLIs with your YAML configuration files.
    ```bash
-   evenet-train share/configs/train.yaml --ray_dir ~/ray_results
-   evenet-predict share/configs/predict.yaml
+   evenet-train share/finetune-example.yaml --ray_dir ~/ray_results
+   evenet-predict share/predict-example.yaml
    ```
 
 These entry points wrap the Ray + PyTorch Lightning pipelines documented in the [training](docs/train.md) and
