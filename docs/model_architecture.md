@@ -38,7 +38,7 @@ flowchart LR
         SEG[Segmentation]
     end
     subgraph GenerativeHeads
-        GG[Global Generation<br/>(standalone)]
+        GG[Global Generation]
         RG[Recon Generation]
         TG[Truth Generation]
     end
