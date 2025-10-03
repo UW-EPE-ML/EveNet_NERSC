@@ -1,0 +1,23 @@
+site_name: EveNet Documentation Portal
+site_description: "Guides and references for installing, training, and deploying EveNet."
+# Update `site_url` once the repository lives under a permanent GitHub organization/user.
+site_url: ""
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Data Preparation: data_preparation.md
+  - Model Architecture: model_architecture.md
+  - Training: train.md
+  - Prediction: predict.md
+  - Configuration Reference: configuration.md
+  - Internal Notes: preprocess_internal_only.md
+theme:
+  name: readthedocs
+repo_url: https://github.com/<your-org>/EveNet_NERSC
+repo_name: EveNet_NERSC
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences

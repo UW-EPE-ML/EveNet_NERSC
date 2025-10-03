@@ -1,51 +1,94 @@
-# EveNet
+# EveNet 🌌
 
-- Option
-    - EventInfo
-        - MultiProcess.yaml
-            - Model:
-                - Normalization.pkl (from training dataset)
-                - Balance.pkl (from training dataset)
-            - Dataset
+EveNet is a multi-task, event-level neural network for large-scale high-energy physics analyses. It combines a Ray + PyTorch Lightning training loop, a flexible multi-GPU inferstructure for slurms, and modular YAML-driven configuration so new datasets and studies can be onboarded quickly.
 
-```yaml
-INPUTS:
-  point_cloud: (num_events, num_particles, num_features)
-  point_cloud_mask: (num_events, num_particles)
-  condition: (num_events, num_conditions)
-  condition_mask: (num_events, 1) # ?? should pad?
+---
 
-  classification: (num_events, 1) # one-hot in model
-  regression: (num_events, num_regressions)
-  regression_mask: (num_events, num_regressions)
+## 🧭 Quick Navigation
+- 📘 [New user tutorial](docs/getting_started.md)
+- 🧪 [Data preparation & input guide](docs/data_preparation.md)
+- ⚙️ [Configuration reference](docs/configuration.md)
+- 🧠 [Model architecture tour](docs/model_architecture.md)
 
-  # num_assignment = num_process * num_level1_particles
-  assignment_indices: (num_events, num_assignment, num_level2_particles) # with padding
-  assignment_indices_mask: (num_events, num_assignment, num_level2_particles) # with padding
-  assignment_mask: (num_events, num_assignment)
+---
 
-  num_vectors: (num_events, ) # num_particles
-  num_sequential_vectors: (num_events, ) # num_particles
+## 📚 Documentation Website
+
+The Markdown guides in `docs/` now power a GitHub Pages site via [MkDocs](https://www.mkdocs.org/). After every push to `main`,
+the automated "Deploy documentation site" workflow rebuilds the static site and publishes it to the `gh-pages` branch for GitHub Pages.
+
+### Preview locally
+
+```bash
+pip install mkdocs mkdocs-material pymdown-extensions
+mkdocs serve
 ```
 
+Then open http://127.0.0.1:8000/ in your browser to browse the docs with live reload while you edit Markdown files.
 
-| Function                                 | Call Count | Total Time [sec] | Average Time [sec] |
-|------------------------------------------|------------|------------------|---------------------|
-| EveNetEngine.backward                    | 5          | 1.7846           | 0.3569              |
-| EveNetEngine.on_train_epoch_end          | 1          | 0.0002           | 0.0002              |
-| EveNetEngine.on_validation_epoch_end     | 1          | 12.5136          | 12.5136             |
-| EveNetEngine.shared_step                 | 10         | 3.6951           | 0.3695              |
-| EveNetEngine.training_step               | 5          | 3.6671           | 0.7334              |
-| [Assignment] assignment_cross_entropy_loss | 280        | 0.0112           | 0.0000401           |
-| [Assignment] convert_target_assignment   | 10         | 0.0009           | 0.0000902           |
-| [Assignment] convert_target_assignment_array | 10     | 0.0021           | 0.0002146           |
-| [Assignment] loss_single_process         | 160        | 0.0628           | 0.0003923           |
-| [Assignment] predict                     | 160        | 0.5675           | 0.003547            |
-| [Assignment] reconstruct_mass_peak       | 856        | 0.0399           | 0.0000466           |
-| [Assignment] shared_epoch_end            | 1          | 9.9822           | 9.9822              |
-| [Assignment] shared_step                 | 10         | 0.7446           | 0.0745              |
-| [Classification] shared_epoch_end        | 1          | 2.5312           | 2.5312              |
-| [Classification] shared_step             | 10         | 0.0108           | 0.001081            |
+### Publish manually (optional)
 
+If you need to deploy without waiting for CI, run:
 
+```bash
+mkdocs gh-deploy --force
+```
+
+This pushes the built site to `gh-pages` using your local Git credentials.
+
+---
+
+## 🚀 Quickstart Workflow
+
+1. **Start from the prebuilt Docker image (recommended).** Pull the GPU-enabled container so CUDA, PyTorch, and system libraries are preconfigured.
+   ```bash
+   docker pull docker.io/avencast1994/evenet:1.3
+   docker run --gpus all -it \
+     -v /path/to/your/data:/workspace/data \
+     -v $(pwd):/workspace/project \
+     docker.io/avencast1994/evenet:1.3
+   ```
+   Inside the container, change to `/workspace/project` to access this checkout. If you cannot use Docker, install dependencies manually with `pip install -r requirements.txt`.
+2. **Prepare your dataset.** Follow the [data guide](docs/data_preparation.md#run-the-preprocessing-cli) to configure preprocessing for your ntuples, then build parquet shards and normalization stats.
+3. **Launch training.** Edit the example YAML (see the [configuration reference](docs/configuration.md)) and run:
+   ```bash
+   WANDB_API_KEY=<your_key> \
+   python evenet/train.py share/finetune-example.yaml
+   ```
+4. **Run prediction.** Point the prediction YAML at your checkpoint and execute:
+   ```bash
+   python evenet/predict.py share/predict-example.yaml
+   ```
+5. **Explore results.** Visualize metrics in Weights & Biases or the local log directory listed in the YAML.
+
+> 💡 **Tip:** Ray launches one worker per GPU/CPU pair by default. Adjust `platform.number_of_workers` and `platform.resources_per_worker` inside the YAML to scale up or down.
+
+---
+
+## 🗂️ Repository Highlights
+
+| Path | What lives here? |
+| --- | --- |
+| `evenet/` | Core Python package: Lightning engine, Ray data adapters, model modules, utilities. |
+| `preprocessing/` | Scripts that turn raw samples into parquet shards, metadata, and normalization statistics. |
+| `share/` | Example YAML configurations (`*-example.yaml`) plus reusable templates under `options/`, `network/`, `event_info/`, `process_info/`, and `resonance/`. |
+| `docs/` | User documentation (this README plus deep dives on data, configs, and architecture). |
+| `downstreams/` | Example analyses demonstrating how to consume EveNet outputs. |
+| `NERSC/`, `Docker/` | Environment helpers for HPC deployments and container builds. |
+
+---
+
+## 🏁 End-to-End Checklist
+
+1. 📦 **Package setup** – install requirements and verify CUDA/Ray availability.
+2. 🧪 **Preprocessing dry run** – process a small run to confirm parquet + metadata generation.
+3. 🧾 **Config audit** – update dataset paths, logging directories, and checkpoint destinations in the example YAMLs.
+4. 🧉 **Training run** – start with a short epoch count (`options.Training.epochs`) to validate metrics/logging.
+5. 🛰️ **Prediction or downstream analysis** – reuse the same normalization + event metadata to ensure tensors line up.
+
+---
+
+## 🤝 Contributing
+
+Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks. When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
 
