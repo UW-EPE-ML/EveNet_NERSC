@@ -45,8 +45,8 @@ flowchart LR
     end
 
     subgraph Generative_Heads
-        RECON[ReconGeneration\n(Self-supervised)]
-        TRUTH[TruthGeneration\n(Supervised)]
+        RECON["ReconGeneration\n(Self-supervised)"]
+        TRUTH["TruthGeneration\n(Supervised)"]
     end
 
     subgraph Targets
@@ -79,7 +79,7 @@ flowchart LR
     RECON -.->|reconstructs| PC
     TRUTH -.-> Tinv
 
-    GN -.->|conditioning| GlobalGen[Global Generation\n(Independent)]
+    GN -.->|conditioning| GlobalGen["Global Generation\n(Independent)"]
     GlobalGen -.-> TargetGlobal[[Global Scalar Targets]]
 
     class PC,GC input;
