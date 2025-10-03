@@ -19,7 +19,7 @@ from ray.train import Checkpoint
 
 from evenet.control.global_config import global_config
 from evenet.dataset.preprocess import process_event_batch
-from preprocessing.preprocess import unflatten_dict
+from evenet.utilities.tool import unflatten_dict
 import logging
 
 def make_process_fn(base_dir: Path):
