@@ -121,10 +121,9 @@ When you run training or prediction, `evenet/shared.py` stitches everything back
 3. **Apply normalization** from `options.Dataset.normalization_file`.
 4. **Verify metadata** – use the same `event_info`/`process_info` YAML files that were active during preprocessing.
 
-> ✅ Consistency checklist:
-> - `platform.data_parquet_dir` → folder with `data_*.parquet` and `shape_metadata.json`.
-> - `options.Dataset.normalization_file` → matching `normalization.pt`.
-> - `event_info` + `process_info` in the runtime config → same files used while preprocessing.
+### ✅ Consistency checklist:
+- `platform.data_parquet_dir` → folder with `data_*.parquet` and `shape_metadata.json`.
+- `options.Dataset.normalization_file` → matching `normalization.pt`.
 
 With those pieces aligned, EveNet can stream data across Ray workers and match the exact tensor schema you curated in the preprocessing config.
 

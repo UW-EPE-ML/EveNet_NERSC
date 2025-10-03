@@ -71,10 +71,10 @@ Predicts process probabilities using `ClassificationHead`. Configure layer count
 
 Two sibling diffusion heads branch off from the shared body, each with a distinct training objective, plus an optional standalone module for scalar generation:
 
-| Head | Objective type | Input features | Supervision | Notes |
-| --- | --- | --- | --- | --- |
-| `ReconGeneration` | Self-supervised reconstruction | PET embeddings + global tokens before the object encoder. | No external targets—the head denoises the noisy visible point-cloud channels it perturbs. | Shares the PET backbone directly so reconstruction quality reflects the sequential encoder capacity. Configure under `ReconGeneration`. |
-| `TruthGeneration` | Supervised generation | PET embeddings + global tokens with optional invisible padding. | Padded invisible particle features (e.g., neutrinos) supplied in the dataset. | Mirrors the reconstruction architecture but learns to sample toward truth-level targets. Settings sit under `TruthGeneration`. |
+| Head              | Objective type                 | Input features                                                  | Supervision                                                                               | Notes                                                                                                                                   |
+|-------------------|--------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `ReconGeneration` | Self-supervised reconstruction | PET embeddings + global tokens before the object encoder.       | No external targets—the head denoises the noisy visible point-cloud channels it perturbs. | Shares the PET backbone directly so reconstruction quality reflects the sequential encoder capacity. Configure under `ReconGeneration`. |
+| `TruthGeneration` | Supervised generation          | PET embeddings + global tokens with optional invisible padding. | Padded invisible particle features (e.g., neutrinos) supplied in the dataset.             | Mirrors the reconstruction architecture but learns to sample toward truth-level targets. Settings sit under `TruthGeneration`.          |
 
 > 💡 `GlobalGeneration` remains available as an **independent** diffusion network for event-level scalars. It conditions on the normalized global tokens but does not connect through the PET/ObjectEncoder stack, so you can enable or disable it without affecting the primary generative heads.
 

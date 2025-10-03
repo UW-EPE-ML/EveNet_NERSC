@@ -14,39 +14,6 @@ so researchers can quickly fine-tune it on their own datasets and extend it to n
 
 ---
 
-## 🚀 Quick Start (Docker + PyPI)
-
-Set up a runnable EveNet environment in minutes:
-
-1. Pull the pre-built CUDA image with all binary dependencies.
-   ```bash
-   docker pull docker.io/avencast1994/evenet:1.3
-   docker run --gpus all -it docker.io/avencast1994/evenet:1.3
-   ```
-2. Inside the container (or any GPU-ready Python 3.12+ environment), install the EveNet package from PyPI.
-   ```bash
-   pip install evenet
-   ```
-3. Launch the bundled CLIs with your YAML configuration files.
-   ```bash
-   evenet-train share/finetune-example.yaml --ray_dir ~/ray_results
-   evenet-predict share/predict-example.yaml
-   ```
-
-These entry points wrap the Ray + PyTorch Lightning pipelines documented in the [training](docs/train.md) and
-[prediction](docs/predict.md) guides.
-
----
-
-## 🧩 Advanced Development
-
-Prefer to modify the source code? Clone this repository (or mount it into the Docker image) and work directly
-with the modules under `evenet/`, the CLIs in `evenet/train.py` and `evenet/predict.py`, and the configuration
-templates in `share/`. The documentation portal highlights the hooks and extension points for custom research
-projects.
-
----
-
 ## 🎯 Pretrained Weights
 
 Start directly from pretrained EveNet checkpoints for fine-tuning or inference:
