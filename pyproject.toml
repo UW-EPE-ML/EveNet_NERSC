@@ -19,4 +19,4 @@ evenet-predict = "evenet.predict:cli"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["evenet"]
+include = ["evenet*"]
