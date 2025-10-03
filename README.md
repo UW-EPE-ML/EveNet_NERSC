@@ -1,5 +1,7 @@
 # EveNet 🌌
 
+[![Open App](https://img.shields.io/badge/Open-Doc-blue?style=for-the-badge)](https://uw-epe-ml.github.io/EveNet_Public/)
+
 EveNet is a multi-task, event-level neural network for large-scale high-energy physics analyses. It combines a Ray + PyTorch Lightning training loop, a flexible multi-GPU inferstructure for slurms, and modular YAML-driven configuration so new datasets and studies can be onboarded quickly.
 
 ---
@@ -9,32 +11,6 @@ EveNet is a multi-task, event-level neural network for large-scale high-energy p
 - 🧪 [Data preparation & input guide](docs/data_preparation.md)
 - ⚙️ [Configuration reference](docs/configuration.md)
 - 🧠 [Model architecture tour](docs/model_architecture.md)
-
----
-
-## 📚 Documentation Website
-
-The Markdown guides in `docs/` now power a GitHub Pages site via [MkDocs](https://www.mkdocs.org/). After every push to `main`,
-the automated "Deploy documentation site" workflow rebuilds the static site and publishes it to the `gh-pages` branch for GitHub Pages.
-
-### Preview locally
-
-```bash
-pip install mkdocs mkdocs-material pymdown-extensions
-mkdocs serve
-```
-
-Then open http://127.0.0.1:8000/ in your browser to browse the docs with live reload while you edit Markdown files.
-
-### Publish manually (optional)
-
-If you need to deploy without waiting for CI, run:
-
-```bash
-mkdocs gh-deploy --force
-```
-
-This pushes the built site to `gh-pages` using your local Git credentials.
 
 ---
 
