@@ -18,10 +18,10 @@ EveNet is a multitask, event-level neural network for large-scale high-energy ph
 | 1️⃣ | Install dependencies | ```bash
 pip install -r requirements.txt
 ``` |
-| 2️⃣ | Prepare your dataset | Copy `share/preprocess-example.yaml`, edit paths & selections, then run the preprocessing CLI (see the [data guide](docs/data_preparation.md#run-the-preprocessing-cli)). |
-| 3️⃣ | Launch training | Customize `share/finetune-example.yaml`, then start a run:<br>`WANDB_API_KEY=<your_key> \`<br>`python evenet/train.py share/finetune-example.yaml` |
-| 4️⃣ | Run prediction | Point `share/predict-example.yaml` to your checkpoint:<br>`python evenet/predict.py share/predict-example.yaml` |
-| 5️⃣ | Explore results | Visualize metrics in Weights & Biases or the local log directory listed in the config. |
+| 2️⃣ | Prepare your dataset | Follow the [data guide](docs/data_preparation.md#run-the-preprocessing-cli) to configure preprocessing for your ntuples, then build parquet shards + normalization stats. |
+| 3️⃣ | Launch training | Tweak the example YAML (see the [configuration reference](docs/configuration.md)) and run:<br>`WANDB_API_KEY=<your_key> \`<br>`python evenet/train.py share/finetune-example.yaml` |
+| 4️⃣ | Run prediction | Point the prediction YAML at your checkpoint and execute:<br>`python evenet/predict.py share/predict-example.yaml` |
+| 5️⃣ | Explore results | Visualize metrics in Weights & Biases or the local log directory listed in the YAML. |
 
 > 💡 **Tip:** Ray launches one worker per GPU/CPU pair by default. Adjust `platform.number_of_workers` and `platform.resources_per_worker` inside the YAML to scale up or down.
 

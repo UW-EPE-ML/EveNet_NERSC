@@ -14,15 +14,21 @@ Welcome to the EveNet control center! This document explains how the YAML exampl
 
 ## 🧰 Loader Basics {#loader-basics}
 
-`evenet/control/global_config.py` reads a top-level YAML file (for example, `share/finetune-example.yaml`) and merges each section with its declared `default` template. Fields are exposed through a recursive `DotDict`, so you can write `config.options.Training.epochs` inside Python. Event metadata is instantiated as an `EventInfo` object, which downstream modules use to look up feature schemas and resonance trees. Peek at the implementation here: [`evenet/control/global_config.py`](../evenet/control/global_config.py).
+Top-level scripts expect a single YAML path as their **positional** argument:
 
-**Key behaviors**
+```bash
+python evenet/train.py share/finetune-example.yaml
+python evenet/predict.py share/predict-example.yaml
+```
 
-- `default: path/to/base.yaml` loads the base template before applying inline overrides.
-- The `event_info` and `resonance` sections are required; the loader constructs `EventInfo` using both blocks.
-- Additional sections (such as `process_info`) are merged verbatim and made available across preprocessing, training, and logging.
+Inside the script, `evenet/control/global_config.py` handles parsing:
 
-> 📝 **Remember:** the positional argument to `evenet/train.py` or `evenet/predict.py` is the path to your top-level YAML. No `--config` flag is necessary.
+1. `Config.load_yaml(path)` reads the YAML file.
+2. For any section containing a `default:` key, the loader first reads that template (relative to the YAML file) and then merges inline overrides.
+3. `event_info` and `resonance` are combined into an `EventInfo` instance so downstream code can access schemas, resonance trees, and process metadata by attribute (`config.event_info.regression_names`, etc.).
+4. Other sections remain accessible as nested `DotDict` objects, which means attribute access (e.g., `config.options.Training.epochs`) works as expected.
+
+> 🔁 Want to inspect the merged configuration? Call `global_config.display()` inside a script to print a rich table of overrides versus defaults.
 
 ---
 
