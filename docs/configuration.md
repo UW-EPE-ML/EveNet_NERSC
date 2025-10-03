@@ -12,7 +12,8 @@ Welcome to the EveNet control center! This document explains how the YAML exampl
 
 ---
 
-## 🧰 Loader Basics {#loader-basics}
+<a id="loader-basics"></a>
+## 🧰 Loader Basics
 
 Top-level scripts expect a single YAML path as their **positional** argument:
 
@@ -32,7 +33,8 @@ Inside the script, `evenet/control/global_config.py` handles parsing:
 
 ---
 
-## 📄 Tour of `share/finetune-example.yaml` {#finetune-example}
+<a id="finetune-example"></a>
+## 📄 Tour of `share/finetune-example.yaml`
 
 This example highlights the main sections you will encounter:
 
@@ -67,7 +69,8 @@ For inference, `share/predict-example.yaml` mirrors the structure but requires `
 
 ---
 
-## 🧩 Options Deep Dive {#options-deep-dive}
+<a id="options-deep-dive"></a>
+## 🧩 Options Deep Dive
 
 `share/options/options.yaml` collects optimizer groups, scheduler defaults, and component toggles. Use the top-level `options` block in your example file to override any field.
 
@@ -107,7 +110,8 @@ Within `options.Training` you will find:
 
 ---
 
-## 🏗️ Network Templates {#network-templates}
+<a id="network-templates"></a>
+## 🏗️ Network Templates
 
 Files under `share/network/` specify architectural hyperparameters for the shared body and task heads. For example, [`share/network/network-20M.yaml`](../share/network/network-20M.yaml) defines transformer depth, attention heads, neighborhood sizes, and diffusion dimensions. Override specific fields inside the `network` section of your top-level YAML to experiment without editing the base template.
 
@@ -115,7 +119,8 @@ Files under `share/network/` specify architectural hyperparameters for the share
 
 ---
 
-## 🧬 Physics Metadata {#physics-metadata}
+<a id="physics-metadata"></a>
+## 🧬 Physics Metadata
 
 ### Event Info
 
@@ -142,13 +147,15 @@ Templates under [`share/resonance/`](../share/resonance) hold reusable resonance
 
 ---
 
-## 📦 Prediction Extras {#prediction-notes}
+<a id="prediction-notes"></a>
+## 📦 Prediction Extras
 
 `share/predict-example.yaml` includes an `options.prediction` block where you can specify the output directory, filename, and any extra tensors to persist. The `platform` section mirrors training but is often tuned for throughput (e.g., more workers with smaller batch sizes). Always set `Training.model_checkpoint_load_path` to the checkpoint you want to score.
 
 ---
 
-## 🆕 Creating a New Experiment {#new-experiment}
+<a id="new-experiment"></a>
+## 🆕 Creating a New Experiment
 
 1. **Copy an example** – duplicate `share/finetune-example.yaml` (or `share/predict-example.yaml`).
 2. **Update paths** – fill in `platform.data_parquet_dir`, `options.Dataset.normalization_file`, and logging/checkpoint directories.

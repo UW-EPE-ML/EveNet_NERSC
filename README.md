@@ -5,7 +5,8 @@ EveNet is a multi-task, event-level neural network for large-scale high-energy p
 ---
 
 ## 🧭 Quick Navigation
-- 👉 [Data preparation & input guide](docs/data_preparation.md)
+- 📘 [New user tutorial](docs/getting_started.md)
+- 🧪 [Data preparation & input guide](docs/data_preparation.md)
 - ⚙️ [Configuration reference](docs/configuration.md)
 - 🧠 [Model architecture tour](docs/model_architecture.md)
 
@@ -13,15 +14,26 @@ EveNet is a multi-task, event-level neural network for large-scale high-energy p
 
 ## 🚀 Quickstart Workflow
 
-| Step | Action | Command / Notes |
-| --- | --- | --- |
-| 1️⃣ | Install dependencies | ```bash
-pip install -r requirements.txt
-``` |
-| 2️⃣ | Prepare your dataset | Follow the [data guide](docs/data_preparation.md#run-the-preprocessing-cli) to configure preprocessing for your ntuples, then build parquet shards + normalization stats. |
-| 3️⃣ | Launch training | Tweak the example YAML (see the [configuration reference](docs/configuration.md)) and run:<br>`WANDB_API_KEY=<your_key> \`<br>`python evenet/train.py share/finetune-example.yaml` |
-| 4️⃣ | Run prediction | Point the prediction YAML at your checkpoint and execute:<br>`python evenet/predict.py share/predict-example.yaml` |
-| 5️⃣ | Explore results | Visualize metrics in Weights & Biases or the local log directory listed in the YAML. |
+1. **Start from the prebuilt Docker image (recommended).** Pull the GPU-enabled container so CUDA, PyTorch, and system libraries are preconfigured.
+   ```bash
+   docker pull docker.io/avencast1994/evenet:1.3
+   docker run --gpus all -it \
+     -v /path/to/your/data:/workspace/data \
+     -v $(pwd):/workspace/project \
+     docker.io/avencast1994/evenet:1.3
+   ```
+   Inside the container, change to `/workspace/project` to access this checkout. If you cannot use Docker, install dependencies manually with `pip install -r requirements.txt`.
+2. **Prepare your dataset.** Follow the [data guide](docs/data_preparation.md#run-the-preprocessing-cli) to configure preprocessing for your ntuples, then build parquet shards and normalization stats.
+3. **Launch training.** Edit the example YAML (see the [configuration reference](docs/configuration.md)) and run:
+   ```bash
+   WANDB_API_KEY=<your_key> \
+   python evenet/train.py share/finetune-example.yaml
+   ```
+4. **Run prediction.** Point the prediction YAML at your checkpoint and execute:
+   ```bash
+   python evenet/predict.py share/predict-example.yaml
+   ```
+5. **Explore results.** Visualize metrics in Weights & Biases or the local log directory listed in the YAML.
 
 > 💡 **Tip:** Ray launches one worker per GPU/CPU pair by default. Adjust `platform.number_of_workers` and `platform.resources_per_worker` inside the YAML to scale up or down.
 
