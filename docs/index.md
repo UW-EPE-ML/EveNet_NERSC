@@ -6,7 +6,8 @@ Use the navigation menu to jump straight to the guide you need, or start with th
 
 ## 🚀 Quick Starts
 
-- **New contributor?** Begin with the [Getting Started tutorial](getting_started.md) for a tour of the repo, environment setup, and the end-to-end workflow from preprocessing to inference.
+- **Plug-and-play setup?** Follow the Quick Start path in the [Getting Started tutorial](getting_started.md) to pair the official Docker image with the PyPI package.
+- **Hacking on the source?** The same guide outlines the advanced workflow for cloning the repo and running modules directly.
 - **Prepping datasets?** Head to the [Data Preparation guide](data_preparation.md) to learn how to configure preprocessing YAMLs and generate parquet shards.
 - **Training & inference.** Consult the [Training playbook](train.md) and [Prediction walkthrough](predict.md) for command-line examples and Ray configuration tips.
 

@@ -14,7 +14,40 @@ so researchers can quickly fine-tune it on their own datasets and extend it to n
 
 ---
 
-## 🚀 Pretrained Weights
+## 🚀 Quick Start (Docker + PyPI)
+
+Set up a runnable EveNet environment in minutes:
+
+1. Pull the pre-built CUDA image with all binary dependencies.
+   ```bash
+   docker pull docker.io/avencast1994/evenet:1.3
+   docker run --gpus all -it docker.io/avencast1994/evenet:1.3
+   ```
+2. Inside the container (or any GPU-ready Python 3.12+ environment), install the EveNet package from PyPI.
+   ```bash
+   pip install evenet
+   ```
+3. Launch the bundled CLIs with your YAML configuration files.
+   ```bash
+   evenet-train share/configs/train.yaml --ray_dir ~/ray_results
+   evenet-predict share/configs/predict.yaml
+   ```
+
+These entry points wrap the Ray + PyTorch Lightning pipelines documented in the [training](docs/train.md) and
+[prediction](docs/predict.md) guides.
+
+---
+
+## 🧩 Advanced Development
+
+Prefer to modify the source code? Clone this repository (or mount it into the Docker image) and work directly
+with the modules under `evenet/`, the CLIs in `evenet/train.py` and `evenet/predict.py`, and the configuration
+templates in `share/`. The documentation portal highlights the hooks and extension points for custom research
+projects.
+
+---
+
+## 🎯 Pretrained Weights
 
 Start directly from pretrained EveNet checkpoints for fine-tuning or inference:
 
@@ -22,34 +55,15 @@ Start directly from pretrained EveNet checkpoints for fine-tuning or inference:
 
 ---
 
-## 📦 Python Package Distribution
+## 📚 Documentation
 
-The repository now ships as a lightweight Python package that exposes ready-to-run CLI entry points for
-training and prediction. We intentionally **do not declare runtime dependencies** in `pyproject.toml`
-because EveNet targets GPU-enabled environments that often require bespoke CUDA, PyTorch, and Ray
-builds. Create your own virtual environment on **Python 3.12+** or use one of the provided Docker images
-before installing EveNet.
+Explore the full documentation site for setup options, configuration references, and tutorials:
 
-```bash
-pip install .
-```
-
-After installation you can launch the existing Ray/Lightning workflows directly from the command line:
-
-```bash
-# Start a training run
-evenet-train share/configs/train.yaml --ray_dir ~/ray_results
-
-# Run inference
-evenet-predict share/configs/predict.yaml
-```
-
-Both CLIs expect the same YAML configuration files documented in [`docs/train.md`](docs/train.md) and
-[`docs/predict.md`](docs/predict.md). Ensure your environment has access to GPUs (where required) and
-the appropriate dataset shards referenced in the configuration.
+[uw-epe-ml.github.io/EveNet_Public](https://uw-epe-ml.github.io/EveNet_Public/)
 
 ---
 
 ## 🤝 Contributing
 
-Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks. When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
+Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks.
+When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
