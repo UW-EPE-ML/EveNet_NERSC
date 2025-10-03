@@ -16,51 +16,79 @@ Take a guided walk through EveNet’s multitask architecture—from input normal
 
 ```mermaid
 flowchart LR
+    classDef input fill:#d8ecff,stroke:#3a6ea5,color:#0c263f,font-weight:bold;
+    classDef module fill:#f4f9ff,stroke:#4a5568,color:#1f2933;
+    classDef head fill:#fff4d6,stroke:#b7791f,color:#4a2f05;
+    classDef target fill:#ffe4dc,stroke:#c05621,color:#3c1f10;
+
     subgraph Inputs
-        A[(Point Cloud)]
-        B[(Global Conditions)]
-        C[(Invisible Particles)]
+        PC[(Point Cloud\nSequential Features)]
+        GC[(Global Event\nFeatures)]
     end
-    subgraph Normalizers
-        N1[Sequential Normalizer]
-        N2[Global Normalizer]
-        N3[Invisible Normalizer]
+
+    subgraph Normalization
+        SN[Sequential\nNormalizer]
+        GN[Global\nNormalizer]
     end
-    subgraph SharedBody
-        GE[Global Embedding]
+
+    subgraph Shared_Body
+        GE[Global Vector\nEmbedding]
         PET[PET Body]
         OE[Object Encoder]
     end
-    subgraph DiscriminativeHeads
+
+    subgraph Discriminative_Heads
         CLF[Classification]
         REG[Regression]
         ASN[Assignment]
         SEG[Segmentation]
     end
-    subgraph GenerativeHeads
-        GG[Global Generation]
-        RG[Recon Generation]
-        TG[Truth Generation]
+
+    subgraph Generative_Heads
+        RECON[ReconGeneration\n(Self-supervised)]
+        TRUTH[TruthGeneration\n(Supervised)]
     end
-    A --> N1 --> PET
-    B --> N2 --> GE
-    C --> N3
-    N1 -->|mask align| PET
-    N3 --> PET
+
+    subgraph Targets
+        Tclf[[Event Labels]]
+        Treg[[Regression Targets]]
+        Tasn[[Assignment Indices]]
+        Tseg[[Segmentation Masks]]
+        Tinv[[Invisible Feature\nTargets]]
+    end
+
+    PC --> SN --> PET
+    GC --> GN --> GE
     GE --> PET
-    GE --> GG
     PET --> OE
+
     OE --> CLF
     OE --> REG
     OE --> ASN
     OE --> SEG
-    PET --> RG
-    PET --> TG
-    GE --> RG
-    GE --> TG
+
+    PET --> RECON
+    GE --> RECON
+    PET --> TRUTH
+    GE --> TRUTH
+
+    CLF -.-> Tclf
+    REG -.-> Treg
+    ASN -.-> Tasn
+    SEG -.-> Tseg
+    RECON -.->|reconstructs| PC
+    TRUTH -.-> Tinv
+
+    GN -.->|conditioning| GlobalGen[Global Generation\n(Independent)]
+    GlobalGen -.-> TargetGlobal[[Global Scalar Targets]]
+
+    class PC,GC input;
+    class SN,GN,GE,PET,OE module;
+    class CLF,REG,ASN,SEG,RECON,TRUTH,GlobalGen head;
+    class Tclf,Treg,Tasn,Tseg,Tinv,TargetGlobal target;
 ```
 
-Every stage is instantiated inside [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py) using the options loaded from your YAML files.
+Inputs are split into point-cloud tensors and global per-event features. Explicit supervision arrives through the target nodes shown on the right, while the reconstruction head trains against the noisy point-cloud inputs it perturbs. Each module in the flow is instantiated inside [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py) using the options loaded from your YAML files. The optional global-diffusion network is configured separately and conditions on the same normalized scalars.
 
 ---
 
@@ -72,7 +100,7 @@ When `EveNetModel` is built, it grabs feature statistics from `normalization.pt`
 - **Sequential features** (`INPUTS/Source`) use a `Normalizer` that understands mixed discrete/continuous distributions and optional inverse-CDF indices.
 - **Global features** (`INPUTS/Conditions`) map through a second `Normalizer` sized to the event-level vector.
 - **Multiplicity channels** (`num_vectors`, `num_sequential_vectors`) are normalized when generation heads are active.
-- **Invisible particles** share embedding widths with sequential features and are padded to `max_neutrinos` so diffusion heads can operate consistently.
+- **Invisible particle targets** reuse the sequential embedding width and are padded to `max_neutrinos` so diffusion heads can operate consistently whenever truth-level supervision is available.
 
 Implementation details live near the top of [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py#L1-L120).
 
@@ -95,7 +123,7 @@ Outputs from the PET body and global tokens meet in the `ObjectEncoder`, which m
 <a id="task-heads"></a>
 ## 🎯 Task Heads
 
-Heads are instantiated only when `options.Training.Components.<Head>.include` is `true`. EveNet groups them into discriminative predictors that score events and objects, and generative heads that learn diffusion processes.
+Heads are instantiated only when `options.Training.Components.<Head>.include` is `true`. EveNet groups them into discriminative predictors that score events and objects, and generative heads that either reconstruct their own inputs or learn diffusion processes against explicit supervision.
 
 ### 🔍 Discriminative Heads
 
@@ -113,13 +141,14 @@ Predicts process probabilities using `ClassificationHead`. Configure layer count
 
 ### 🌬️ Generative Heads
 
-EveNet carries **three** diffusion-based heads, all orchestrated in the forward pass but connected differently:
+Two sibling diffusion heads branch off from the shared body, each with a distinct training objective, plus an optional standalone module for scalar generation:
 
-| Head | Input features | Output target | Notes |
-| --- | --- | --- | --- |
-| `GlobalGeneration` | Only the normalized global tokens and multiplicities (no PET/object encoder). | Event-level scalars such as multiplicity counts. | Implemented as an independent network; think of it as a standalone diffusion chain that shares only the label embedding. Hyperparameters live under `GlobalGeneration` in the network block. |
-| `ReconGeneration` | PET embeddings + global tokens before the object encoder. | Visible point-cloud features (`INPUTS/Source`). | Shares the PET backbone directly—noise is injected on the sequential features and denoised with the same PET parameters. Configure under `ReconGeneration`. |
-| `TruthGeneration` | PET embeddings + global tokens with optional invisible padding. | Invisible particle features (e.g., neutrinos). | Uses the same architecture family as reconstruction but targets the padded invisible channels. Settings sit under `TruthGeneration`. |
+| Head | Objective type | Input features | Supervision | Notes |
+| --- | --- | --- | --- | --- |
+| `ReconGeneration` | Self-supervised reconstruction | PET embeddings + global tokens before the object encoder. | No external targets—the head denoises the noisy visible point-cloud channels it perturbs. | Shares the PET backbone directly so reconstruction quality reflects the sequential encoder capacity. Configure under `ReconGeneration`. |
+| `TruthGeneration` | Supervised generation | PET embeddings + global tokens with optional invisible padding. | Padded invisible particle features (e.g., neutrinos) supplied in the dataset. | Mirrors the reconstruction architecture but learns to sample toward truth-level targets. Settings sit under `TruthGeneration`. |
+
+> 💡 `GlobalGeneration` remains available as an **independent** diffusion network for event-level scalars. It conditions on the normalized global tokens but does not connect through the PET/ObjectEncoder stack, so you can enable or disable it without affecting the primary generative heads.
 
 ---
 
