@@ -22,12 +22,9 @@ flowchart LR
         C[(Invisible Particles)]
     end
     subgraph Normalizers
-        N1[Sequential
-        Normalizer]
-        N2[Global
-        Normalizer]
-        N3[Invisible
-        Normalizer]
+        N1[Sequential Normalizer]
+        N2[Global Normalizer]
+        N3[Invisible Normalizer]
     end
     subgraph SharedBody
         GE[Global Embedding]
@@ -41,8 +38,7 @@ flowchart LR
         SEG[Segmentation]
     end
     subgraph GenerativeHeads
-        GG[Global Generation
-        (separate network)]
+        GG[Global Generation<br/>(standalone)]
         RG[Recon Generation]
         TG[Truth Generation]
     end
@@ -99,22 +95,24 @@ Outputs from the PET body and global tokens meet in the `ObjectEncoder`, which m
 <a id="task-heads"></a>
 ## 🎯 Task Heads
 
-Heads are instantiated only when `options.Training.Components.<Head>.include` is `true`.
+Heads are instantiated only when `options.Training.Components.<Head>.include` is `true`. EveNet groups them into discriminative predictors that score events and objects, and generative heads that learn diffusion processes.
 
-### 🏷️ Classification
+### 🔍 Discriminative Heads
+
+#### 🏷️ Classification
 Predicts process probabilities using `ClassificationHead`. Configure layer counts, hidden size, dropout, and optional attention under `Classification` in the network YAML (see [configuration reference](configuration.md#network-templates)).
 
-### 📈 Regression
+#### 📈 Regression
 `RegressionHead` regresses continuous targets (momenta, masses). Normalization tensors (`regression_mean`, `regression_std`) are injected so outputs can be de-standardized. Hyperparameters mirror the classification head (see [configuration reference](configuration.md#network-templates)).
 
-### 🔗 Assignment
+#### 🔗 Assignment
 `SharedAssignmentHead` tackles combinatorial matching between reconstructed objects and truth daughters defined in `event_info`. It leverages symmetry-aware attention and optional detection layers. Tune `feature_drop`, attention heads, and decoder depth via the `Assignment` block (see [configuration reference](configuration.md#network-templates)).
 
-### 🌈 Segmentation
-
+#### 🌈 Segmentation
 `SegmentationHead` predicts binary masks for resonance-specific particle groups. Configure the number of queries, transformer layers, and projection widths in the `Segmentation` block (see [configuration reference](configuration.md#network-templates)).
 
-### 🌬️ Generation Family
+### 🌬️ Generative Heads
+
 EveNet carries **three** diffusion-based heads, all orchestrated in the forward pass but connected differently:
 
 | Head | Input features | Output target | Notes |
@@ -128,7 +126,7 @@ EveNet carries **three** diffusion-based heads, all orchestrated in the forward 
 <a id="progressive-training"></a>
 ## 🌀 Progressive Training Hooks
 
-`EveNetModel` exposes `schedule_flags` describing which heads are active (diffusion, neutrino, deterministic). The training loop combines these flags with the curriculum defined in `options.ProgressiveTraining` so that loss weights, dropout, or EMA decay ramp smoothly over time. Inspect the scheduling logic in [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py#L352-L380) and pair it with the YAML stages summarized in the [configuration reference](configuration.md#options-deep-dive).
+`EveNetModel` exposes `schedule_flags` describing which heads are active (diffusion, neutrino, deterministic). The training loop combines these flags with the curriculum defined in `options.ProgressiveTraining` so that loss weights, dropout, EMA decay, or teacher-forcing gradually adjust across stages. Inspect the scheduling logic in [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py#L352-L380) and pair it with the YAML stages summarized in the [configuration reference](configuration.md#options-deep-dive).
 
 ---
 
