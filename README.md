@@ -2,10 +2,12 @@
 
 [![Open App](https://img.shields.io/badge/Open-Doc-blue?style=for-the-badge)](https://uw-epe-ml.github.io/EveNet_Public/)
 
+
 EveNet is a pretrained, multi-task foundation model for event-level collider physics. 
 It comes with a scalable Ray + PyTorch Lightning training pipeline, SLURM-ready multi-GPU infrastructure, 
 and modular YAML configuration, 
 so researchers can quickly fine-tune it on their own datasets and extend it to new physics analyses.
+
 ---
 
 ![](docs/network_summary.png)
@@ -45,16 +47,6 @@ evenet-predict share/configs/predict.yaml
 Both CLIs expect the same YAML configuration files documented in [`docs/train.md`](docs/train.md) and
 [`docs/predict.md`](docs/predict.md). Ensure your environment has access to GPUs (where required) and
 the appropriate dataset shards referenced in the configuration.
-
-### 🔄 Publishing to PyPI via GitHub Actions
-
-This repository ships with a workflow that builds wheels and source distributions on every push and PR.
-To automatically publish the package to PyPI when a release is published:
-
-1. Generate a PyPI token with project-scoped permissions.
-2. Add the token to the repository secrets as `PYPI_API_TOKEN`.
-3. Create and publish a GitHub Release (backed by a tag). The workflow uploads the previously built
-   distribution artifacts with that token.
 
 ---
 
