@@ -1,6 +1,6 @@
 # Training
 
-> 🚀 **Quickstart:** After `pip install .`, launch training with `evenet-train <config.yaml>`.
+> 🚀 **Quickstart:** Install the package with `pip install evenet` and run `evenet-train <config.yaml>`. Developing from source? Use `python -m evenet.train <config.yaml>` to pick up local edits.
 
 ## Loading and Saving Models
 
