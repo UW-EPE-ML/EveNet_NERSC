@@ -13,8 +13,8 @@ nav:
   - Internal Notes: preprocess_internal_only.md
 theme:
   name: readthedocs
-repo_url: https://github.com/<your-org>/EveNet_NERSC
-repo_name: EveNet_NERSC
+repo_url: https://github.com/<your-org>/EveNet_Public
+repo_name: EveNet_Public
 markdown_extensions:
   - admonition
   - toc:
