@@ -1,5 +1,7 @@
 # Training
 
+> 🚀 **Quickstart:** After `pip install .`, launch training with `evenet-train <config.yaml>`.
+
 ## Loading and Saving Models
 
 This guide outlines how model weights and Exponential Moving Average (EMA) weights are handled in the training workflow.

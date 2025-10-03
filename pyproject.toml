@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evenet"
+version = "0.1.0"
+description = "Training and inference entry points for the EveNet event processing model."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{name = "EveNet Team"}]
+dependencies = []
+
+[project.scripts]
+evenet-train = "evenet.train:cli"
+evenet-predict = "evenet.predict:cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["evenet"]

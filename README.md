@@ -20,6 +20,44 @@ Start directly from pretrained EveNet checkpoints for fine-tuning or inference:
 
 ---
 
+## 📦 Python Package Distribution
+
+The repository now ships as a lightweight Python package that exposes ready-to-run CLI entry points for
+training and prediction. We intentionally **do not declare runtime dependencies** in `pyproject.toml`
+because EveNet targets GPU-enabled environments that often require bespoke CUDA, PyTorch, and Ray
+builds. Create your own virtual environment on **Python 3.12+** or use one of the provided Docker images
+before installing EveNet.
+
+```bash
+pip install .
+```
+
+After installation you can launch the existing Ray/Lightning workflows directly from the command line:
+
+```bash
+# Start a training run
+evenet-train share/configs/train.yaml --ray_dir ~/ray_results
+
+# Run inference
+evenet-predict share/configs/predict.yaml
+```
+
+Both CLIs expect the same YAML configuration files documented in [`docs/train.md`](docs/train.md) and
+[`docs/predict.md`](docs/predict.md). Ensure your environment has access to GPUs (where required) and
+the appropriate dataset shards referenced in the configuration.
+
+### 🔄 Publishing to PyPI via GitHub Actions
+
+This repository ships with a workflow that builds wheels and source distributions on every push and PR.
+To automatically publish the package to PyPI when a release is published:
+
+1. Generate a PyPI token with project-scoped permissions.
+2. Add the token to the repository secrets as `PYPI_API_TOKEN`.
+3. Create and publish a GitHub Release (backed by a tag). The workflow uploads the previously built
+   distribution artifacts with that token.
+
+---
+
 ## 🤝 Contributing
 
 Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks. When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
