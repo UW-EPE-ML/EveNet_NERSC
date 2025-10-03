@@ -15,8 +15,7 @@ EveNet is a multi-task, event-level neural network for large-scale high-energy p
 ## 📚 Documentation Website
 
 The Markdown guides in `docs/` now power a GitHub Pages site via [MkDocs](https://www.mkdocs.org/). After every push to `main`,
-the automated "Deploy documentation site" workflow runs MkDocs inside GitHub Actions, uploads the generated `site/` artifact, and
-publishes it to the project Pages environment.
+the automated "Deploy documentation site" workflow rebuilds the static site and publishes it to the `gh-pages` branch for GitHub Pages.
 
 ### Preview locally
 
