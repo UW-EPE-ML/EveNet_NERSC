@@ -1,6 +1,7 @@
 import os
 import argparse
 from pathlib import Path
+from typing import Optional, Sequence
 
 import ray
 import ray.train
@@ -19,7 +20,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from lightning.pytorch.profilers import PyTorchProfiler
 
 from evenet.control.global_config import global_config
-from shared import make_process_fn, prepare_datasets, EveNetTrainCallback
+from .shared import make_process_fn, prepare_datasets, EveNetTrainCallback
 from evenet.engine import EveNetEngine
 from evenet.utilities.logger import LocalLogger, setup_logging
 
@@ -220,13 +221,30 @@ def main(args):
         dist.destroy_process_group()
 
 
-if __name__ == '__main__':
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EveNet Training Program")
     parser.add_argument("config", help="Path to config file")
-    # argument for loading all dataset files into RAM
-    parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
-    parser.add_argument("--ray_dir", type=str, default="~/ray_results")
+    parser.add_argument(
+        "--load_all",
+        action="store_true",
+        help="Load all dataset files into RAM",
+    )
+    parser.add_argument(
+        "--ray_dir",
+        type=str,
+        default="~/ray_results",
+        help="Directory where Ray runtime artifacts are stored",
+    )
+    return parser
 
-    args, _ = parser.parse_known_args()
 
+def cli(argv: Optional[Sequence[str]] = None) -> None:
+    """Console script entry point for EveNet training."""
+
+    parser = build_parser()
+    args, _ = parser.parse_known_args(argv)
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

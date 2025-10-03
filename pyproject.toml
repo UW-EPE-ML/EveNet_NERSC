@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evenet"
+version = "0.1.0"
+description = "EveNet training and inference toolkit for event-level physics modeling"
+readme = "README.md"
+authors = [
+    { name = "EveNet Team" },
+]
+requires-python = ">=3.10"
+license = { text = "UNLICENSED" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+]
+
+
+[project.urls]
+Homepage = "https://uw-epe-ml.github.io/EveNet_Public/"
+Repository = "https://github.com/uw-epe-ml/EveNet_Public"
+
+[project.scripts]
+evenet-train = "evenet.train:cli"
+evenet-predict = "evenet.predict:cli"
+
+[tool.setuptools.packages.find]
+include = ["evenet*"]

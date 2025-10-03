@@ -1,23 +1,22 @@
-import copy
+import argparse
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 import glob
 
 import ray
 from ray.actor import ActorHandle
-from ray.train import ScalingConfig, RunConfig
+from ray.train import DataConfig, RunConfig, ScalingConfig
 from ray.train.torch import TorchTrainer
 from ray.train.lightning import RayDDPStrategy, RayLightningEnvironment, prepare_trainer
 
-from ray.train import DataConfig, ScalingConfig
-from ray.data import Dataset, DataIterator, NodeIdStr, ExecutionResources
+from ray.data import Dataset, DataIterator, NodeIdStr
 
 import lightning as L
 from evenet.control.global_config import global_config
 from evenet.engine import EveNetEngine
 from evenet.network.callbacks.predict_writer import PredWriter
-from shared import make_process_fn, prepare_datasets
+from .shared import make_process_fn, prepare_datasets
 
 
 def predict_func(cfg):
@@ -117,13 +116,17 @@ class PredictDataControl(DataConfig):
         return [{name: it} for it in iterator_shards]
 
 
-if __name__ == '__main__':
-    import argparse
-
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EveNet Prediction Program")
     parser.add_argument("config", help="Path to config YAML")
+    return parser
 
-    args = parser.parse_args()
+
+def cli(argv: Optional[Sequence[str]] = None) -> None:
+    """Console script entry point for EveNet prediction."""
+
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
     runtime_env = {
         "env_vars": {
@@ -162,5 +165,9 @@ if __name__ == '__main__':
         dataset_config=PredictDataControl()
     )
 
-    result = trainer.fit()
+    trainer.fit()
     print("Prediction finished.")
+
+
+if __name__ == "__main__":
+    cli()
