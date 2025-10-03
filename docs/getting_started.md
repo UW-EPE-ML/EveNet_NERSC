@@ -11,7 +11,7 @@ Before running any commands, skim these key directories:
 - `evenet/` – PyTorch Lightning modules, Ray data pipelines, and trainer utilities.
 - `preprocessing/` – CLI and helpers for converting raw ntuples into parquet shards and metadata.
 - `share/` – Ready-to-edit YAML configurations for preprocessing, training, and prediction.
-- `docs/` – Reference documentation that expands on this tutorial.
+- `docs/` – Reference documentation that expands on this tutorial. Start with [Model Architecture Tour](model_architecture.md) to see how point-cloud and global features flow through EveNet.
 
 ---
 
