@@ -55,7 +55,7 @@ Both options are interoperable—you can install the PyPI package for quick test
 
 ---
 
-## 2. Understand the Project Layout
+## 2. Understand the Project Layout (Advanced Users)
 
 Before running any commands, skim these key directories:
 
@@ -98,14 +98,20 @@ See [data preparation guide](data_preparation.md) for details on schema, normali
 
 ## 6. Configure an Experiment
 
-1. Copy `share/finetune-example.yaml` (for training) and `share/predict-example.yaml` (for inference) into a working directory.
-2. Update paths and experiment metadata:
-   - `platform.data_parquet_dir` → location of your processed parquet files
-   - `Dataset.normalization_file` → normalization statistics file you created
-   - `options.Training.pretrain_model_load_path` → path to downloaded pretrained weights
-   - `logger` → project names, WANDB API key, or local log paths
-3. Review the [configuration reference](configuration.md) for a description of every YAML section and available overrides.
+> **Note:** The example configs are **not standalone**. Each one uses  
+> `default: ...yaml` to load additional base configs. The parser resolves  
+> these paths relative to the example’s location, so you must also copy  
+> the referenced YAML files and preserve their directory structure.
 
+1. Copy both `share/finetune-example.yaml` (for training) and `share/predict-example.yaml` (for inference) into your working directory.  
+
+2. Update key fields for your experiment:
+   - `platform.data_parquet_dir` → directory of your processed parquet files  
+   - `Dataset.normalization_file` → path to the normalization statistics you created  
+   - `options.Training.pretrain_model_load_path` → pretrained checkpoint to load  
+   - `logger` → project name, WANDB API key, or local log directory  
+
+3. For a detailed description of every section and all available overrides, see the [configuration reference](configuration.md).
 
 ## 7. Fine-Tune the Model
 
