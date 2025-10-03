@@ -31,6 +31,7 @@ def train_func(cfg):
     total_events = cfg['total_events']
     total_val_events = cfg['total_val_events']
     world_rank = ray.train.get_context().get_world_rank()
+    global_config.load_yaml(cfg['global_config_path'])
 
     log_cfg = cfg.get('logger', {})
     loggers = []
@@ -210,6 +211,7 @@ def main(args: argparse.Namespace) -> None:
         "total_events": total_events,
         "total_val_events": total_val_events,
         "early_stopping": global_config.options.Training.EarlyStopping,
+        "global_config_path": args.config,
     }
 
     trainer = TorchTrainer(

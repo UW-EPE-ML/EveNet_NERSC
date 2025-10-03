@@ -29,6 +29,7 @@ def predict_func(cfg):
         prefetch_batches=cfg['prefetch_batches'],
     )
 
+    global_config.load_yaml(cfg['global_config_path'])
 
     if global_config.options.Training.model_checkpoint_load_path:
         if Path(global_config.options.Training.model_checkpoint_load_path).is_dir():
@@ -150,6 +151,7 @@ def main(args: argparse.Namespace) -> None:
             "prefetch_batches": platform_info.prefetch_batches,
             "total_events": predict_count,
             "current_dir": os.getcwd(),
+            "global_config_path": args.config,
         },
         scaling_config=ScalingConfig(
             num_workers=platform_info.number_of_workers,
