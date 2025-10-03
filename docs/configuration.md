@@ -1,117 +1,154 @@
-# Configuration Reference
+# ⚙️ Configuration Reference
 
-EveNet composes its runtime configuration from modular YAML fragments. This document explains how the loader merges defaults, how to edit the example configs under `share/*-example.yaml`, and which sections control training, datasets, and physics metadata.
+Welcome to the EveNet control center! This document explains how the YAML examples under `share/*-example.yaml` fit together, how defaults are merged, and which knobs to tweak for your experiments.
 
-## Configuration Loader
+- [Loader basics](#loader-basics)
+- [Tour of `share/finetune-example.yaml`](#finetune-example)
+- [Options deep dive](#options-deep-dive)
+- [Network templates](#network-templates)
+- [Physics metadata](#physics-metadata)
+- [Prediction-specific notes](#prediction-notes)
+- [Creating a new experiment](#new-experiment)
 
-`evenet/control/global_config.Config` reads a top-level YAML file (e.g., `share/finetune-example.yaml`) and merges each section with its declared `default` file. Entries are wrapped in a recursive `DotDict`, allowing attribute access (`config.options.Training.epochs`). Event metadata is instantiated as an `EventInfo` object so downstream code can look up feature schemas and resonance trees.【F:evenet/control/global_config.py†L1-L120】【F:evenet/control/global_config.py†L121-L199】
+---
 
-Key behaviors:
+## 🧰 Loader Basics {#loader-basics}
 
-- A section with `default: path/to/base.yaml` loads the base file and merges any overrides that follow it.
-- `event_info` and `resonance` sections are required; the loader constructs `EventInfo` using both blocks.
-- Additional YAML fragments (e.g., `process_info`) are merged verbatim and exposed on `global_config` for preprocessing, training, and logging.【F:evenet/control/global_config.py†L68-L137】
+`evenet/control/global_config.py` reads a top-level YAML file (for example, `share/finetune-example.yaml`) and merges each section with its declared `default` template. Fields are exposed through a recursive `DotDict`, so you can write `config.options.Training.epochs` inside Python. Event metadata is instantiated as an `EventInfo` object, which downstream modules use to look up feature schemas and resonance trees. Peek at the implementation here: [`evenet/control/global_config.py`](../evenet/control/global_config.py).
 
-## Top-Level Example (`share/finetune-example.yaml`)
+**Key behaviors**
 
-The example fine-tuning config illustrates the major sections:
+- `default: path/to/base.yaml` loads the base template before applying inline overrides.
+- The `event_info` and `resonance` sections are required; the loader constructs `EventInfo` using both blocks.
+- Additional sections (such as `process_info`) are merged verbatim and made available across preprocessing, training, and logging.
 
-| Section | Purpose |
+> 📝 **Remember:** the positional argument to `evenet/train.py` or `evenet/predict.py` is the path to your top-level YAML. No `--config` flag is necessary.
+
+---
+
+## 📄 Tour of `share/finetune-example.yaml` {#finetune-example}
+
+This example highlights the main sections you will encounter:
+
+| Section | What it controls |
 | --- | --- |
-| `platform` | Ray cluster parameters (number of workers, GPU/CPU resources, batch size, prefetching). Also sets `data_parquet_dir` for dataset discovery.【F:share/finetune-example.yaml†L1-L23】 |
-| `logger` | Optional Weights & Biases and local file logging configuration. The `run_name` anchor is reused between loggers.【F:share/finetune-example.yaml†L24-L38】 |
-| `options` | Points to `options/options.yaml` for optimizer, scheduler, and component defaults, then overrides specific entries for this run (epochs, checkpoint paths, task inclusion).【F:share/finetune-example.yaml†L40-L107】 |
-| `Dataset` | Path overrides for normalization statistics, dataset limits, and validation split boundaries.【F:share/finetune-example.yaml†L109-L118】 |
-| `network` | Architecture template selection (`network/network-20M.yaml`) plus optional overrides (e.g., disabling feature drop).【F:share/finetune-example.yaml†L120-L133】 |
-| `event_info`, `resonance` | Pointers to the canonical particle definitions used during preprocessing and model construction. You can extend or override subsections inline.【F:share/finetune-example.yaml†L135-L143】 |
+| `platform` | Ray cluster parameters: worker count, per-worker CPU/GPU resources, batch size, and the `data_parquet_dir` used to discover shards. |
+| `logger` | Logging destinations, including Weights & Biases and the optional local logger. Anchors let you reuse names across loggers. |
+| `options` | Points to `options/options.yaml` for defaults, then overrides epochs, checkpoints, and component toggles. |
+| `Dataset` | Dataset-wide overrides like `normalization_file`, dataset subsampling, and validation split. |
+| `network` | Which architecture template to load (`network/network-20M.yaml`, for example) plus any inline tweaks. |
+| `event_info`, `resonance` | Canonical particle definitions, resonance trees, and symmetries used during preprocessing and by the model. |
 
-For inference, `share/predict-example.yaml` reuses the same defaults but introduces an `options.prediction` block for the on-disk writer and requires `model_checkpoint_load_path` to point to a saved Lightning checkpoint.【F:share/predict-example.yaml†L1-L74】
+For inference, `share/predict-example.yaml` mirrors the structure but requires `Training.model_checkpoint_load_path` and defines an `options.prediction` block for output writers.
 
-### Platform Settings
+### Platform Keys
 
-| Key | Effect |
+| Key | Description |
 | --- | --- |
-| `data_parquet_dir` | Directory containing the parquet shards and `shape_metadata.json`. |
-| `number_of_workers` | Ray workers launched for training/prediction. |
-| `resources_per_worker` | Dict specifying CPU/GPU requirements per worker. |
-| `batch_size`, `prefetch_batches` | Passed directly to `iter_torch_batches` for Ray Data loaders. |
-| `use_gpu` | Toggle GPU allocation when running on CPU-only environments. |
+| `data_parquet_dir` | Folder containing `data_*.parquet` and `shape_metadata.json`. |
+| `number_of_workers` | Ray workers to launch. Adjust alongside `resources_per_worker`. |
+| `resources_per_worker` | CPU/GPU allocation per worker (e.g., `{CPU: 1, GPU: 1}`). |
+| `batch_size`, `prefetch_batches` | Passed to Ray Data’s `iter_torch_batches` loader. |
+| `use_gpu` | Toggle GPU usage for CPU-only runs. |
 
 ### Dataset Block
 
 | Key | Meaning |
 | --- | --- |
-| `dataset_limit` | Fraction of available events to sample (1.0 uses the full dataset). |
-| `normalization_file` | Absolute path to the `normalization.pt` produced during preprocessing. |
-| `val_split` | Two-element list describing the validation window in `[0,1]` fraction of the shuffled dataset. |
+| `dataset_limit` | Fraction of the shuffled dataset to use (1.0 = full dataset). |
+| `normalization_file` | Absolute path to `normalization.pt` from preprocessing. |
+| `val_split` | `[start, end]` fraction describing the validation window. |
 
-## Options (`share/options/options.yaml`)
+---
 
-The options file stores optimizer, scheduler, and task toggles. Highlights include:
+## 🧩 Options Deep Dive {#options-deep-dive}
 
-### Training
+`share/options/options.yaml` collects optimizer groups, scheduler defaults, and component toggles. Use the top-level `options` block in your example file to override any field.
+
+### Training Settings
 
 | Field | Description |
 | --- | --- |
-| `total_epochs` / `epochs` | Planned schedule vs. epochs executed in the current run. |
-| `learning_rate`, `weight_decay` | Default hyperparameters broadcast to individual components via YAML anchors. |
-| `model_checkpoint_*` | Save/load locations for Lightning checkpoints. |
-| `diffusion_every_n_epochs`, `diffusion_every_n_steps` | Evaluation cadence for diffusion-based heads. |
-| `apply_event_weight` | If `true`, multiplies losses by per-event weights from preprocessing.【F:share/options/options.yaml†L1-L71】 |
+| `total_epochs` / `epochs` | Planned total vs. epochs executed in the current run. |
+| `learning_rate`, `weight_decay` | Shared defaults broadcast to component blocks. |
+| `model_checkpoint_save_path` | Directory for Lightning checkpoints. |
+| `model_checkpoint_load_path` | Resume training from this checkpoint (set to `null` to start fresh). |
+| `pretrain_model_load_path` | Load weights for fine-tuning without resuming optimizer state. |
+| `diffusion_every_n_epochs`, `diffusion_every_n_steps` | Validation cadence for diffusion-based heads. |
+| `eval_metrics_every_n_epochs` | Controls how often expensive metrics are computed. |
+| `apply_event_weight` | When `true`, multiplies losses by per-event weights from preprocessing. |
 
 ### Component Blocks
 
-Each model component inherits defaults and can be toggled independently:
+Each component inherits optimizer settings and can be toggled independently:
 
 | Component | Notable knobs |
 | --- | --- |
-| `GlobalEmbedding`, `PET`, `ObjectEncoder` | Optimizer group, warm-up behavior, optional layer freezing strategies. |
-| `Classification`, `Regression`, `Assignment`, `Segmentation` | `include` flag, loss scales, task-specific hyperparameters (e.g., focal gamma, dice loss weight). |
-| `GlobalGeneration`, `ReconGeneration`, `TruthGeneration` | Diffusion step count, whether to reuse generated samples, optimizer routing.【F:share/options/options.yaml†L22-L159】 |
-
-All sub-blocks share the same schema: learning rate, optimizer type, warm-up toggle, weight decay, and fine-grained freeze controls. This structure makes it easy to partially freeze modules or adjust loss weights during fine-tuning.
+| `GlobalEmbedding`, `PET`, `ObjectEncoder` | Optimizer group, warm-up behavior, layer freezing. |
+| `Classification`, `Regression`, `Assignment`, `Segmentation` | `include` flags, loss scales, attention/decoder depth, mask usage. |
+| `GlobalGeneration`, `ReconGeneration`, `TruthGeneration` | Diffusion steps, reuse settings, optimizer routing. |
 
 ### Progressive Training
 
-`ProgressiveTraining` defines staged schedules where loss weights and training parameters evolve across epochs. Each stage specifies an `epoch_ratio`, optional `transition_ratio`, and lists of `[start, end]` values for loss weights or parameters (e.g., `noise_prob`, `ema_decay`). Modify or disable stages to control curriculum learning during long runs.【F:share/options/options.yaml†L160-L218】
+The `ProgressiveTraining` section defines staged curricula. Each stage supplies an `epoch_ratio`, optional `transition_ratio`, and start/end values for parameters (loss weights, noise probabilities, EMA decay). Modify stages to ramp tasks gradually or disable them for single-stage training.
 
-### EMA and Early Stopping
+### EMA & Early Stopping
 
-Inside the `Training` overrides (e.g., in `finetune-example.yaml`), the `EMA` block controls exponential moving average updates, including decay, start epoch, and whether to swap EMA weights into the model at the end of training. `EarlyStopping` follows Lightning’s API for patience, monitored metric, and comparison mode.【F:share/finetune-example.yaml†L60-L107】
+Within `options.Training` you will find:
 
-## Network Templates (`share/network/*.yaml`)
+- `EMA` – enable/disable exponential moving averages, set decay, start epoch, and whether to swap EMA weights into the model after loading or at run completion.
+- `EarlyStopping` – Lightning-compatible patience, monitored metric, comparison mode, and verbosity.
 
-Network YAMLs describe architectural hyperparameters for the body and heads. For instance, `network-20M.yaml` configures transformer depth, attention heads, local neighborhood size, and diffusion latent dimensions. Override specific fields under the `network` section of your top-level config to experiment without modifying the base file.【F:share/finetune-example.yaml†L120-L133】
+---
 
-## Physics Metadata
+## 🏗️ Network Templates {#network-templates}
 
-### Event Info (`share/event_info/multi_process.yaml`)
+Files under `share/network/` specify architectural hyperparameters for the shared body and task heads. For example, [`share/network/network-20M.yaml`](../share/network/network-20M.yaml) defines transformer depth, attention heads, neighborhood sizes, and diffusion dimensions. Override specific fields inside the `network` section of your top-level YAML to experiment without editing the base template.
 
-Defines:
+> 🧠 Combine template overrides with component toggles: disable `Body.PET.feature_drop` during fine-tuning, or shrink head hidden sizes for small datasets.
 
-- **Inputs** – sequential particle features (`energy`, `p_T`, `η`, `φ`, b-tag, lepton flag, charge) and global event conditions (MET, multiplicities, aggregate masses). Each entry also specifies the normalization mode applied during preprocessing and model inference.【F:share/event_info/multi_process.yaml†L1-L35】
-- **Resonance topology** – `EVENT` lists parent particles and their daughters for each process. These relationships drive assignment targets and segmentation tags.【F:share/event_info/multi_process.yaml†L37-L120】
-- **Regression and segmentation targets** – enumerations of momenta to regress and particle groups for segmentation heads.【F:share/event_info/multi_process.yaml†L398-L440】
+---
 
-### Process Info (`share/process_info/default.yaml`)
+## 🧬 Physics Metadata {#physics-metadata}
 
-Captures per-process metadata:
+### Event Info
 
-- `category` (used for logging or grouping processes).
-- `process_id` (integer label stored alongside events).
-- `diagram` definitions referencing reusable resonances (with symmetry hints). This mapping is consumed during preprocessing when assigning truth particles and computing weights.【F:share/process_info/default.yaml†L1-L64】
+[`share/event_info/multi_process.yaml`](../share/event_info/multi_process.yaml) describes:
 
-You can duplicate `default.yaml` to create experiment-specific subsets or rename processes via the `rename_to` key (see entries under `share/process_info/pretrain.yaml`). Ensure the same file is used during preprocessing and training to keep class indices aligned.
+- **Inputs** – sequential particle features and global condition vectors, including normalization strategies.
+- **Resonance topology** – parent/daughter relationships for each process, powering assignments and segmentation targets.
+- **Regression & segmentation catalogs** – enumerations of momenta and particle groups used by the respective heads.
 
-## Prediction Extras
+### Process Info
 
-When running inference the `options.prediction` block specifies the output directory, filename, and optional lists of extra features to persist. The `platform` section mirrors training but typically runs with `num_workers` tuned for evaluation throughput. Set `Training.model_checkpoint_load_path` to the checkpoint you wish to score.【F:share/predict-example.yaml†L1-L74】
+[`share/process_info/default.yaml`](../share/process_info/default.yaml) captures per-process metadata:
 
-## Adding a New Experiment
+- `category` names for grouping.
+- `process_id` integers stored with each event.
+- `diagram` entries referencing resonance definitions and symmetry hints.
+- Optional `rename_to` fields for remapping process names during preprocessing.
 
-1. Copy `share/finetune-example.yaml` (or `predict-example.yaml` for inference) to a new file.
-2. Update `platform.data_parquet_dir`, `options.Dataset.normalization_file`, and checkpoint paths.
-3. Toggle heads or adjust hyperparameters under `options.Training` and `options.Training.Components` as needed.
-4. If introducing new physics processes, extend the appropriate YAMLs under `share/event_info/`, `share/process_info/`, and rerun preprocessing so the new schema is reflected everywhere.
+Ensure the same event/process files are used in preprocessing **and** training so label ordering stays consistent.
 
-Following this structure keeps EveNet’s configuration reproducible and shareable across collaborators.
+### Resonance Catalogs
+
+Templates under [`share/resonance/`](../share/resonance) hold reusable resonance definitions. Reference them from `event_info` to avoid duplicating decay trees across configs.
+
+---
+
+## 📦 Prediction Extras {#prediction-notes}
+
+`share/predict-example.yaml` includes an `options.prediction` block where you can specify the output directory, filename, and any extra tensors to persist. The `platform` section mirrors training but is often tuned for throughput (e.g., more workers with smaller batch sizes). Always set `Training.model_checkpoint_load_path` to the checkpoint you want to score.
+
+---
+
+## 🆕 Creating a New Experiment {#new-experiment}
+
+1. **Copy an example** – duplicate `share/finetune-example.yaml` (or `share/predict-example.yaml`).
+2. **Update paths** – fill in `platform.data_parquet_dir`, `options.Dataset.normalization_file`, and logging/checkpoint directories.
+3. **Toggle components** – adjust `options.Training.Components` to match the supervision you have.
+4. **Tweak network settings** – override fields in the `network` section as needed.
+5. **Track metadata** – if you add new processes or features, update the relevant YAMLs under `share/event_info/` and `share/process_info/`, then rerun preprocessing so tensors stay aligned.
+
+Happy experimenting! 🧪
+

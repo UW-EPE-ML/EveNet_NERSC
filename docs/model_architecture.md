@@ -1,6 +1,17 @@
-# Model Architecture Guide
+# 🧠 Model Architecture Tour
 
-EveNet assembles a multitask architecture that normalizes heterogeneous physics inputs, processes them with shared transformers, and branches into task-specific heads. This guide explains each stage and how configuration options shape the network.
+Take a guided walk through EveNet’s multitask architecture—from input normalization to the specialized heads. Pair this with the [configuration guide](configuration.md) to see how YAML choices shape each component.
+
+- [Signal flow at a glance](#signal-flow)
+- [Input normalization](#input-normalization)
+- [Shared body](#shared-body)
+- [Task heads](#task-heads)
+- [Progressive training hooks](#progressive-training)
+- [Customizing the network](#customizing)
+
+---
+
+## 🔁 Signal Flow at a Glance {#signal-flow}
 
 ```
 Inputs → Normalizers → Global Embedding ┐
@@ -12,66 +23,75 @@ Inputs → Normalizers → Global Embedding ┐
                                                             └─ Neutrino Generation
 ```
 
-## Input Normalization
+Every stage is instantiated inside [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py) using the options loaded from your YAML files.
 
-When `EveNetModel` is constructed it collects normalization statistics from `normalization.pt` and the feature schema defined in `event_info`. Separate `Normalizer` layers handle sequential particles, global conditions, optional point-cloud counts, and invisible particles. Each normalizer receives mean/std tensors derived during preprocessing and boolean masks that indicate which features should be normalized.【F:evenet/network/evenet_model.py†L1-L120】
+---
 
-- **Sequential features** (`INPUTS/Source`) use `Normalizer` with optional inverse-CDF indices for mixed discrete/continuous distributions.
-- **Global features** (`INPUTS/Conditions`) map to a second `Normalizer` sized by the event-level feature count.
-- **Point-cloud multiplicities** (`input_num_*`) are normalized when the point-cloud generation head is enabled.
-- **Invisible particles** reuse the sequential feature dimension with optional zero-padding so diffusion heads can operate on the same embedding width.【F:evenet/network/evenet_model.py†L41-L118】
+## 🧴 Input Normalization {#input-normalization}
 
-## Shared Body
+When `EveNetModel` is built, it grabs feature statistics from `normalization.pt` plus schema details from `event_info` and constructs a collection of `Normalizer` layers:
 
-### Global Embedding
+- **Sequential features** (`INPUTS/Source`) use a `Normalizer` that understands mixed discrete/continuous distributions and optional inverse-CDF indices.
+- **Global features** (`INPUTS/Conditions`) map through a second `Normalizer` sized to the event-level vector.
+- **Multiplicity channels** (`num_vectors`, `num_sequential_vectors`) are normalized when generation heads are active.
+- **Invisible particles** share embedding widths with sequential features and are padded to `max_neutrinos` so diffusion heads can operate consistently.
 
-`GlobalVectorEmbedding` transforms the event-level condition vector into a learned embedding. Hyperparameters such as embedding depth, hidden dimension, dropout, and activation are set under `Body.GlobalEmbedding` in the network YAML (e.g., GRU blocks with 256 hidden units in `network-20M.yaml`).【F:evenet/network/evenet_model.py†L120-L160】【F:share/network/network-20M.yaml†L1-L32】
+Implementation details live near the top of [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py#L1-L120).
 
-### PET Body
+---
 
-`PETBody` ingests the sequential particle cloud using transformer layers, optional local neighborhood attention, and stochastic feature dropping. Configuration fields like `num_layers`, `num_heads`, `feature_drop`, and `local_point_index` determine receptive field and regularization strength.【F:evenet/network/evenet_model.py†L120-L160】【F:share/network/network-20M.yaml†L14-L32】
+## 🧱 Shared Body {#shared-body}
 
-### Object Encoder
+### 🌐 Global Embedding
+`GlobalVectorEmbedding` converts the condition vector into learned tokens. Hyperparameters like depth, hidden dimension, dropout, and activation come from `Body.GlobalEmbedding` in your network YAML (e.g., [`share/network/network-20M.yaml`](../share/network/network-20M.yaml#L1-L18)).
 
-Outputs from the PET body feed into an `ObjectEncoder` that mixes particle and global tokens. The encoder’s attention heads, depth, positional embedding size, and skip connections are controlled by `Body.ObjectEncoder` in the network YAML.【F:evenet/network/evenet_model.py†L160-L176】【F:share/network/network-20M.yaml†L33-L46】
+### 🧲 PET Body
+`PETBody` processes the sequential particle cloud with transformer-style layers, local neighborhood attention, and optional stochastic feature dropping. Configure `num_layers`, `num_heads`, `feature_drop`, and `local_point_index` under `Body.PET` (see [`network-20M.yaml`](../share/network/network-20M.yaml#L14-L32)).
 
-## Task Heads
+### 🧵 Object Encoder
+Outputs from the PET body and global tokens meet in the `ObjectEncoder`, which mixes information across objects. Attention depth, head counts, positional embedding size, and skip connections are controlled by `Body.ObjectEncoder` (see [`network-20M.yaml`](../share/network/network-20M.yaml#L33-L46)).
 
-Each task is optional and activated by the `options.Training.Components.<Task>.include` flags. When enabled, EveNet instantiates the corresponding head with parameters pulled from the network YAML.
+---
 
-### Classification
+## 🎯 Task Heads {#task-heads}
 
-Predicts process probabilities using `ClassificationHead`. It consumes the encoded objects, applies multi-head attention if requested, and outputs logits for every process defined in `event_info`. The number of layers, hidden size, dropout, and skip connections come from `Classification` in the network config.【F:evenet/network/evenet_model.py†L176-L199】【F:share/network/network-20M.yaml†L48-L60】
+Heads are instantiated only when `options.Training.Components.<Head>.include` is `true`.
 
-### Regression
+### 🏷️ Classification
+Predicts process probabilities using `ClassificationHead`. Configure layer counts, hidden size, dropout, and optional attention under `Classification` in the network YAML ([`network-20M.yaml`](../share/network/network-20M.yaml#L48-L60)).
 
-`RegressionHead` regresses momenta and other continuous targets. It receives normalization tensors (`regression_mean`/`regression_std`) to de-standardize outputs during inference. Configuration mirrors the classification head but without attention-specific knobs.【F:evenet/network/evenet_model.py†L199-L214】【F:share/network/network-20M.yaml†L62-L70】
+### 📈 Regression
+`RegressionHead` regresses continuous targets (momenta, masses). Normalization tensors (`regression_mean`, `regression_std`) are injected so outputs can be de-standardized. Hyperparameters mirror the classification head ([`network-20M.yaml`](../share/network/network-20M.yaml#L62-L70)).
 
-### Assignment
+### 🔗 Assignment
+`SharedAssignmentHead` tackles combinatorial matching between reconstructed objects and truth daughters defined in `event_info`. It leverages symmetry-aware attention and optional detection layers. Tune `feature_drop`, attention heads, and decoder depth via the `Assignment` block ([`network-20M.yaml`](../share/network/network-20M.yaml#L72-L108)).
 
-`SharedAssignmentHead` solves combinatorial assignments between reconstructed objects and truth daughters defined in `event_info.event_particles`. It leverages symmetry-aware attention and optional detection layers. The head relies on process-specific pairing topology, permutation catalogs, and particle symmetries also loaded from `event_info`. Tunable options (feature drop, attention heads, detection depth) live in the `Assignment` block of the network YAML.【F:evenet/network/evenet_model.py†L214-L262】【F:share/network/network-20M.yaml†L72-L108】
+### 🌈 Segmentation
+`SegmentationHead` predicts binary masks for resonance-specific particle groups. Configure the number of queries, transformer layers, and projection widths in the `Segmentation` block ([`network-20M.yaml`](../share/network/network-20M.yaml#L108-L126)).
 
-### Generation Heads
+### 🌬️ Generation Family
+Three diffusion-based heads share the `EventGenerationHead` implementation:
 
-- **GlobalConditional Generation** (`GlobalGeneration`) diffuses over event-level scalar targets (e.g., multiplicities). Inputs include both the diffusion time and condition indices configured in `event_info` and the YAML. Layer counts, hidden sizes, and resnet dimensions are configurable.【F:evenet/network/evenet_model.py†L262-L290】【F:share/network/network-20M.yaml†L110-L126】
-- **Reconstruction Generation** (`ReconGeneration`) produces point-cloud features conditioned on the PET embeddings and class labels. Hyperparameters mirror the PET body but with diffusion-specific knobs like `layer_scale` and `drop_probability`.【F:evenet/network/evenet_model.py†L290-L311】【F:share/network/network-20M.yaml†L128-L146】
-- **Truth Generation** (`TruthGeneration`) models invisible particles (e.g., neutrinos). It shares the `EventGenerationHead` implementation but adapts output dimensionality and can optionally encode positional information for variable-length targets.【F:evenet/network/evenet_model.py†L311-L331】【F:share/network/network-20M.yaml†L128-L146】
+| Head | Purpose | Key knobs |
+| --- | --- | --- |
+| `GlobalGeneration` | Diffuse event-level scalars (multiplicities, global targets). | `diffusion_steps`, latent dimensions, conditioning indices ([`network-20M.yaml`](../share/network/network-20M.yaml#L110-L126)). |
+| `ReconGeneration` | Reconstruct particle-cloud features conditioned on PET embeddings. | Layer scale, dropout probability, hidden width ([`network-20M.yaml`](../share/network/network-20M.yaml#L128-L146)). |
+| `TruthGeneration` | Generate invisible particles (e.g., neutrinos). | Shares configuration with reconstruction but adapts output dimensionality ([`network-20M.yaml`](../share/network/network-20M.yaml#L128-L146)). |
 
-### Segmentation
+---
 
-`SegmentationHead` predicts binary masks for resonance-specific particle groups. The number of queries and transformer layers determines how many candidate segments are produced per event. Configuration fields include projection dimension, number of heads, and whether to return intermediate decoder layers.【F:evenet/network/evenet_model.py†L331-L352】【F:share/network/network-20M.yaml†L108-L126】
+## 🌀 Progressive Training Hooks {#progressive-training}
 
-## Progressive Training & Scheduling
+`EveNetModel` exposes `schedule_flags` describing which heads are active (diffusion, neutrino, deterministic). The training loop combines these flags with the curriculum defined in `options.ProgressiveTraining` so that loss weights, dropout, or EMA decay ramp smoothly over time. Inspect the scheduling logic in [`evenet/network/evenet_model.py`](../evenet/network/evenet_model.py#L352-L380) and pair it with the YAML stages in [`share/options/options.yaml`](../share/options/options.yaml#L160-L218).
 
-`EveNetModel` exposes `schedule_flags` that describe which heads are active (generation, neutrino generation, deterministic tasks). The training engine combines these flags with the progressive training schedule defined in `options/options.yaml` to ramp losses, dropout, and EMA decay across curriculum stages.【F:evenet/network/evenet_model.py†L352-L380】【F:share/options/options.yaml†L160-L218】
+---
 
-During `forward`, the model expects the tensors produced by preprocessing (point cloud, masks, assignments, regressions, segmentation, invisible particles). These inputs are normalized, embedded, and dispatched to each active head, producing a dictionary of task outputs ready for Lightning loss computation.【F:evenet/network/evenet_model.py†L1-L120】【F:evenet/network/evenet_model.py†L352-L380】
+## 🛠️ Customizing the Network {#customizing}
 
-## Customizing the Architecture
+1. **Pick a template** – start from `share/network/network-20M.yaml` or another file under `share/network/`.
+2. **Override selectively** – in your top-level YAML, override only the fields you want to tweak (e.g., set `Body.PET.feature_drop: 0.0` for fine-tuning).
+3. **Match supervision** – enable heads under `options.Training.Components` only when the dataset provides the required targets.
+4. **Refresh normalization** – if you change the input schema in `event_info`, rerun preprocessing so new statistics land in `normalization.pt` (see the saving logic in [`preprocessing/postprocessor.py`](../preprocessing/postprocessor.py#L360-L406)).
 
-1. Choose a base template under `share/network/` (`network-20M.yaml` for the compact model, `network-100M.yaml` for a larger footprint).
-2. Override specific fields in your top-level config’s `network` section (e.g., set `Body.PET.feature_drop: 0.0` to disable stochastic feature dropping during fine-tuning).【F:share/finetune-example.yaml†L120-L133】
-3. Enable or disable task heads via `options.Training.Components`. Only instantiate heads you have supervision for to save memory and compute.【F:share/finetune-example.yaml†L60-L107】
-4. Regenerate normalization statistics if you change the input schema in `event_info` so the normalizers remain consistent.【F:preprocessing/postprocessor.py†L360-L406】
+With these controls, you can resize EveNet for tiny studies or scale it up for production campaigns—all while keeping the codepath consistent.
 
-By aligning the network YAML, options file, and preprocessing schema, you can tailor EveNet’s capacity to new physics targets while keeping the shared training loop intact.

@@ -1,50 +1,56 @@
-# EveNet
+# EveNet 🌌
 
-EveNet is a multitask event-level neural network designed for large-scale high-energy physics analyses. The repository couples a Ray + PyTorch Lightning training loop with a preprocessing pipeline that turns NERSC-format ntuples into parquet shards, and a modular configuration system that enables fast experimentation across physics processes.
+EveNet is a multitask, event-level neural network for large-scale high-energy physics analyses. It combines a Ray + PyTorch Lightning training loop, a flexible preprocessing pipeline for NERSC-format ntuples, and modular YAML-driven configuration so new datasets and studies can be onboarded quickly.
 
-## Getting Started
+---
 
-1. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. **Prepare data** – convert raw ntuples into the parquet + metadata bundle expected by EveNet. Follow the [data preparation guide](docs/data_preparation.md).
-3. **Fine-tune or train** – customize `share/finetune-example.yaml`, then launch training:
-   ```bash
-   WANDB_API_KEY=<your_key> \
-   python evenet/train.py --config share/finetune-example.yaml
-   ```
-4. **Predict** – load a trained checkpoint with `share/predict-example.yaml`:
-   ```bash
-   python evenet/predict.py --config share/predict-example.yaml
-   ```
+## 🧭 Quick Navigation
+- 👉 [Data preparation & input guide](docs/data_preparation.md)
+- ⚙️ [Configuration reference](docs/configuration.md)
+- 🧠 [Model architecture tour](docs/model_architecture.md)
 
-## Repository Layout
+---
 
-| Path | Description |
+## 🚀 Quickstart Workflow
+
+| Step | Action | Command / Notes |
+| --- | --- | --- |
+| 1️⃣ | Install dependencies | ```bash
+pip install -r requirements.txt
+``` |
+| 2️⃣ | Prepare your dataset | Copy `share/preprocess-example.yaml`, edit paths & selections, then run the preprocessing CLI (see the [data guide](docs/data_preparation.md#run-the-preprocessing-cli)). |
+| 3️⃣ | Launch training | Customize `share/finetune-example.yaml`, then start a run:<br>`WANDB_API_KEY=<your_key> \`<br>`python evenet/train.py share/finetune-example.yaml` |
+| 4️⃣ | Run prediction | Point `share/predict-example.yaml` to your checkpoint:<br>`python evenet/predict.py share/predict-example.yaml` |
+| 5️⃣ | Explore results | Visualize metrics in Weights & Biases or the local log directory listed in the config. |
+
+> 💡 **Tip:** Ray launches one worker per GPU/CPU pair by default. Adjust `platform.number_of_workers` and `platform.resources_per_worker` inside the YAML to scale up or down.
+
+---
+
+## 🗂️ Repository Highlights
+
+| Path | What lives here? |
 | --- | --- |
-| `evenet/` | Core Python package (Lightning engine, model, Ray data plumbing, utilities). |
-| `preprocessing/` | Scripts for converting raw samples into model-ready parquet datasets plus normalization statistics. |
-| `share/` | Example YAMLs for preprocessing, options, network architecture, event/process metadata, and resonance catalogs. |
-| `docs/` | User-facing documentation (this README, data/config/model references). |
-| `downstreams/` | Illustrative downstream analysis notebooks and scripts. |
-| `NERSC/` & `Docker/` | Environment helpers for NERSC deployments and container builds. |
+| `evenet/` | Core Python package: Lightning engine, Ray data adapters, model modules, utilities. |
+| `preprocessing/` | Scripts that turn raw samples into parquet shards, metadata, and normalization statistics. |
+| `share/` | Example YAML configurations (`*-example.yaml`) plus reusable templates under `options/`, `network/`, `event_info/`, `process_info/`, and `resonance/`. |
+| `docs/` | User documentation (this README plus deep dives on data, configs, and architecture). |
+| `downstreams/` | Example analyses demonstrating how to consume EveNet outputs. |
+| `NERSC/`, `Docker/` | Environment helpers for HPC deployments and container builds. |
 
-## Documentation Map
+---
 
-- [Data preparation & input reference](docs/data_preparation.md)
-- [Configuration reference](docs/configuration.md)
-- [Model architecture guide](docs/model_architecture.md)
+## 🏁 End-to-End Checklist
 
-Each document links back to the relevant YAML templates under `share/*-example.yaml`, making it straightforward to adapt EveNet to new datasets and tasks.
+1. 📦 **Package setup** – install requirements and verify CUDA/Ray availability.
+2. 🧪 **Preprocessing dry run** – process a small run to confirm parquet + metadata generation.
+3. 🧾 **Config audit** – update dataset paths, logging directories, and checkpoint destinations in the example YAMLs.
+4. 🧉 **Training run** – start with a short epoch count (`options.Training.epochs`) to validate metrics/logging.
+5. 🛰️ **Prediction or downstream analysis** – reuse the same normalization + event metadata to ensure tensors line up.
 
-## Typical Workflow
+---
 
-1. **Generate parquet data** using the preprocessing CLI. Capture the produced `data_*.parquet`, `shape_metadata.json`, and `normalization.pt`.
-2. **Clone the example configs** from `share/` and fill in absolute paths for parquet, normalization, and checkpoint locations.
-3. **Run training** to fine-tune or continue pretraining on the prepared samples. Monitor metrics in Weights & Biases or the local log directory.
-4. **Run prediction or downstream tasks** on Ray clusters or workstations by pointing to the trained checkpoint and matching normalization file.
+## 🤝 Contributing
 
-## Contributing
+Improvements are welcome! File an issue or open a pull request for bug fixes, new physics processes, or documentation tweaks. When you add new components or datasets, update the relevant markdown guides so future users can follow along easily.
 
-Contributions are welcome! Please open issues or pull requests with improvements to the preprocessing pipeline, configuration templates, or documentation. When adding new features, update the relevant guides under `docs/` so new users can benefit from the changes.
