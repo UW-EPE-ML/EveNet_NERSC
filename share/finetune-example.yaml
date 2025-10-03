@@ -10,37 +10,36 @@ platform:
   # Enable GPU if available and desired
   use_gpu: true
 
+logger:
+  wandb:
+    project: "EveNet"
+    run_name: &logger_name "Pretrain"
+    tags: ["EveNet"]
+    simplified: false # If true, all metrics will be saved locally and only final metrics will be logged to wandb
+  local:
+    save_dir: <log_save_dir>
+    name: *logger_name
+    version: "v1"
+
+
 options:
   default: options/options.yaml
 
-  # For prediction Only
-  prediction:
-    # The directory where the prediction data is saved
-    output_dir: <output_dir>
-    # The filename of the prediction data
-    filename: <filename>
-
-    # if you want to save the point cloud (reconstructed particles) during prediction
-    save_point_cloud: true
-    # if you want to save extra features from the input data
-    extra_save:
-      []
-
+  # overwrites
   Training:
-    # no use for prediction
-    total_epochs: 500
-    # no use for prediction
-    epochs: 500
-    # no use for prediction
-    model_checkpoint_save_path: null
-    # Path to load the checkpoint
-    model_checkpoint_load_path: <ckpt_path>
-    # If you want to load a pre-trained model without fine-tuning, specify the path
+    total_epochs: 50 # total epochs for the whole training
+    epochs: 10 # epochs for this run
+    model_checkpoint_save_path: <model_checkpoint_save_path>
+    # Path to a checkpoint to resume training from, or null to start fresh
+    model_checkpoint_load_path: null
+    # If you want to load a pre-trained model for fine-tuning, specify the path
     pretrain_model_load_path: null
 
-    diffusion_every_n_steps: 1 # how often to run diffusion
+    diffusion_every_n_epochs: 4 # how often to run diffusion
+    diffusion_every_n_steps: 1 # how often to run diffusion inside the valid epoch
+    eval_metrics_every_n_epochs: 1 # how often to run evaluation metrics
 
-    # keep the same as fine-tuning
+    # see more details in options/options.yaml
     Components:
       Classification:
         include: true
@@ -67,18 +66,32 @@ options:
         include: true
         diffusion_steps: 2
 
+    EarlyStopping:
+      patience: 100
+      min_delta: 0.0
+      monitor: "lr-body"
+      mode: "min"
+      verbose: true
+
     EMA:
       enable: true               # Enable or disable EMA
+      decay: 0.999               # EMA decay rate
+      start_epoch: 0             # Start updating EMA after this epoch
+      update_every_n_steps: 1    # Update EMA every N steps
+
       replace_model_after_load: true    # After loading checkpoint, copy EMA weights into model
+      replace_model_at_end: false         # At training end, copy EMA weights into model (will not save EMA weights)
+
 
   Dataset:
     dataset_limit: 1.0
     normalization_file: <normalization_file> # Path to normalization file
-
+    val_split: [0.95, 1.0]
 
 network:
   default: network/network-20M.yaml
 
+  # remove feature drop
   Body:
     PET:
       feature_drop: 0.0
@@ -86,8 +99,7 @@ network:
     feature_drop: 0.0
   TruthGeneration:
     feature_drop: 0.0
-  # overwrites
-  # ...
+
 
 event_info:
   default: event_info/multi_process.yaml
