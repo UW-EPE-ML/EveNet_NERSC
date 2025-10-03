@@ -10,7 +10,8 @@ Welcome! This guide shows how to convert raw ntuples into EveNet-ready parquet s
 
 ---
 
-## 🔭 Pipeline Overview {#pipeline-overview}
+<a id="pipeline-overview"></a>
+## 🔭 Pipeline Overview
 
 1. **Draft a config** – start from your own YAML (you can peek at the internal `share/preprocess_pretrain.yaml` for inspiration) and list the processes, selections, and padding choices you need.
 2. **Customize selections** – edit aliases, anchors, and selection blocks to match the processes you want to keep.
@@ -21,7 +22,8 @@ Welcome! This guide shows how to convert raw ntuples into EveNet-ready parquet s
 
 ---
 
-## ⚙️ Run the Preprocessing CLI {#run-the-preprocessing-cli}
+<a id="run-the-preprocessing-cli"></a>
+## ⚙️ Run the Preprocessing CLI
 
 ```bash
 python preprocessing/preprocess.py share/preprocess_pretrain.yaml \
@@ -60,7 +62,8 @@ Peek at the in-repo reference (`share/preprocess_pretrain.yaml`) when you need m
 
 ---
 
-## 📁 Outputs & Artifact Map {#outputs-artifact-map}
+<a id="outputs-artifact-map"></a>
+## 📁 Outputs & Artifact Map
 
 Running the pipeline fills `--store_dir` with a tidy bundle:
 
@@ -75,7 +78,8 @@ Running the pipeline fills `--store_dir` with a tidy bundle:
 
 ---
 
-## 🧬 Dataset Layout {#dataset-layout}
+<a id="dataset-layout"></a>
+## 🧬 Dataset Layout
 
 Each parquet row is a single event. Shapes below reference the **unflattened** tensors reconstructed with `shape_metadata.json`.
 
@@ -107,7 +111,8 @@ Each parquet row is a single event. Shapes below reference the **unflattened** t
 
 ---
 
-## 📚 Reading Datasets in EveNet {#reading-datasets}
+<a id="reading-datasets"></a>
+## 📚 Reading Datasets in EveNet
 
 When you run training or prediction, `evenet/shared.py` stitches everything back together:
 
