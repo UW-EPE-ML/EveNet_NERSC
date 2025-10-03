@@ -17,11 +17,16 @@ Before running any commands, skim these key directories:
 
 ## 2. Set Up Your Environment
 
-1. **Install Python dependencies.** EveNet targets Python 3.10+.
+1. **Pull the official Docker image (recommended).** It bundles CUDA, PyTorch, and all Python requirements so you can start immediately.
    ```bash
-   pip install -r requirements.txt
+   docker pull docker.io/avencast1994/evenet:1.3
+   docker run --gpus all -it \
+     -v /path/to/your/data:/workspace/data \
+     -v $(pwd):/workspace/project \
+     docker.io/avencast1994/evenet:1.3
    ```
-2. **Optional:** If you plan to run inside Docker or on NERSC, review the environment helpers under `Docker/` and `NERSC/` for prebuilt container recipes and SLURM launch scripts.
+   Inside the container, switch to `/workspace/project` to use your local checkout. If Docker is unavailable, install dependencies manually with `pip install -r requirements.txt` on Python 3.10+.
+2. **Review cluster helpers as needed.** The `Docker/` and `NERSC/` directories include recipes and SLURM launch scripts tailored for HPC environments.
 3. **Verify GPU visibility (if available).**
    ```bash
    python -c "import torch; print(torch.cuda.device_count())"

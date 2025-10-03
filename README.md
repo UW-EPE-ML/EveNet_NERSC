@@ -14,10 +14,15 @@ EveNet is a multi-task, event-level neural network for large-scale high-energy p
 
 ## 🚀 Quickstart Workflow
 
-1. **Install dependencies.**
+1. **Start from the prebuilt Docker image (recommended).** Pull the GPU-enabled container so CUDA, PyTorch, and system libraries are preconfigured.
    ```bash
-   pip install -r requirements.txt
+   docker pull docker.io/avencast1994/evenet:1.3
+   docker run --gpus all -it \
+     -v /path/to/your/data:/workspace/data \
+     -v $(pwd):/workspace/project \
+     docker.io/avencast1994/evenet:1.3
    ```
+   Inside the container, change to `/workspace/project` to access this checkout. If you cannot use Docker, install dependencies manually with `pip install -r requirements.txt`.
 2. **Prepare your dataset.** Follow the [data guide](docs/data_preparation.md#run-the-preprocessing-cli) to configure preprocessing for your ntuples, then build parquet shards and normalization stats.
 3. **Launch training.** Edit the example YAML (see the [configuration reference](docs/configuration.md)) and run:
    ```bash
