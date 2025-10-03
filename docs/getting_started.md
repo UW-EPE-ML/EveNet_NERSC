@@ -25,7 +25,7 @@ Before running any commands, skim these key directories:
      -v $(pwd):/workspace/project \
      docker.io/avencast1994/evenet:1.3
    ```
-   Inside the container, switch to `/workspace/project` to use your local checkout. If Docker is unavailable, install dependencies manually with `pip install -r requirements.txt` on Python 3.10+.
+   Inside the container, switch to `/workspace/project` to use your local checkout. If Docker is unavailable, install dependencies manually with `pip install -r requirements.txt` on Python 3.12+.
 2. **Review cluster helpers as needed.** The `Docker/` and `NERSC/` directories include recipes and SLURM launch scripts tailored for HPC environments.
 3. **Verify GPU visibility (if available).**
    ```bash
@@ -74,9 +74,10 @@ See [data preparation guide](data_preparation.md) for details on schema, normali
    ```bash
    export WANDB_API_KEY=<your_key>
    ```
-2. Launch training with your updated YAML.
+2. Launch training with your updated YAML. After installing the EveNet package (`pip install .`),
+   you can invoke the packaged CLI directly:
    ```bash
-   python evenet/train.py path/to/your-train-config.yaml
+   evenet-train path/to/your-train-config.yaml
    ```
 3. Monitor progress:
    - Console output provides per-epoch metrics and checkpoint locations.
@@ -88,9 +89,9 @@ See [data preparation guide](data_preparation.md) for details on schema, normali
 ## 7. Generate Predictions
 
 1. Ensure the prediction YAML points to your trained (or pretrained) checkpoint via `options.Training.model_checkpoint_load_path`.
-2. Launch inference.
+2. Launch inference with the packaged CLI.
    ```bash
-   python evenet/predict.py path/to/your-predict-config.yaml
+   evenet-predict path/to/your-predict-config.yaml
    ```
 3. Outputs land in the configured writers (e.g., parquet, numpy archives). See `docs/predict.md` for writer options and schema notes.
 

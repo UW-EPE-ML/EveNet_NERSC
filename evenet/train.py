@@ -19,7 +19,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Learning
 from lightning.pytorch.profilers import PyTorchProfiler
 
 from evenet.control.global_config import global_config
-from shared import make_process_fn, prepare_datasets, EveNetTrainCallback
+from evenet.shared import make_process_fn, prepare_datasets, EveNetTrainCallback
 from evenet.engine import EveNetEngine
 from evenet.utilities.logger import LocalLogger, setup_logging
 
@@ -139,7 +139,16 @@ def train_func(cfg):
     )
 
 
-def main(args):
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="EveNet Training Program")
+    parser.add_argument("config", help="Path to config file")
+    # argument for loading all dataset files into RAM
+    parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
+    parser.add_argument("--ray_dir", type=str, default="~/ray_results")
+    return parser
+
+
+def main(args: argparse.Namespace) -> None:
     assert (
             "WANDB_API_KEY" in os.environ
     ), 'Please set WANDB_API_KEY="abcde" when running this script.'
@@ -220,13 +229,11 @@ def main(args):
         dist.destroy_process_group()
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="EveNet Training Program")
-    parser.add_argument("config", help="Path to config file")
-    # argument for loading all dataset files into RAM
-    parser.add_argument("--load_all", action="store_true", help="Load all dataset files into RAM")
-    parser.add_argument("--ray_dir", type=str, default="~/ray_results")
-
+def cli() -> None:
+    parser = build_parser()
     args, _ = parser.parse_known_args()
-
     main(args)
+
+
+if __name__ == '__main__':
+    cli()
