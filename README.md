@@ -1,6 +1,6 @@
 # EveNet 🌌
 
-EveNet is a multitask, event-level neural network for large-scale high-energy physics analyses. It combines a Ray + PyTorch Lightning training loop, a flexible preprocessing pipeline for NERSC-format ntuples, and modular YAML-driven configuration so new datasets and studies can be onboarded quickly.
+EveNet is a multi-task, event-level neural network for large-scale high-energy physics analyses. It combines a Ray + PyTorch Lightning training loop, a flexible multi-GPU inferstructure for slurms, and modular YAML-driven configuration so new datasets and studies can be onboarded quickly.
 
 ---
 
