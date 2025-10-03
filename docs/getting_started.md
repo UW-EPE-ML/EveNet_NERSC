@@ -9,9 +9,9 @@ New to EveNet? This tutorial walks you through the end-to-end workflow so you ca
 Before running any commands, skim these key directories:
 
 - `evenet/` – PyTorch Lightning modules, Ray data pipelines, and trainer utilities.
-- `preprocessing/` – CLI and helpers for converting raw ntuples into parquet shards and metadata.
-- `share/` – Ready-to-edit YAML configurations for preprocessing, training, and prediction.
+- `share/` – Ready-to-edit YAML configurations for fine-tuning and prediction.
 - `docs/` – Reference documentation that expands on this tutorial. Start with [Model Architecture Tour](model_architecture.md) to see how point-cloud and global features flow through EveNet.
+- `downstreams/` – Example downstream analysis scripts built on top of EveNet outputs.
 
 ---
 
@@ -34,37 +34,41 @@ Before running any commands, skim these key directories:
 
 ---
 
-## 3. Prepare Input Data
+## 3. Download Pretrained Weights
 
-1. **Start from a preprocessing YAML.** Duplicate `share/preprocess_pretrain.yaml` (or another example) and customize:
-   - Campaign directories (`pretrain_dirs` or `in_dir`)
-   - Process lists, selections, and padding strategy
-   - Output paths (`store_dir`)
-2. **Run the preprocessing CLI.**
-   ```bash
-   python preprocessing/preprocess.py share/preprocess_pretrain.yaml \
-     --pretrain_dirs /path/to/run_A /path/to/run_B \
-     --store_dir /path/to/output \
-     --cpu_max 32
-   ```
-3. **Inspect outputs.** The command produces `data_*.parquet`, `shape_metadata.json`, and `normalization.pt` artifacts described in the [data preparation guide](data_preparation.md).
+EveNet is released as a pretrained foundation model. Start from these weights when fine-tuning or making predictions.
 
-> 🔍 Tip: Keep preprocessing configs in version control to document how each dataset was produced.
+- Browse and download weights directly from HuggingFace:  
+  👉 [Avencast/EveNet on HuggingFace](https://huggingface.co/Avencast/EveNet/tree/main)
+
+- Place the downloaded `.ckpt` file somewhere accessible and update your YAML configs with the path (see below).
 
 ---
 
-## 4. Configure an Experiment
+## 4. Prepare Input Data
+
+Do not run the scripts under `preprocessing/`, which are only for large-scale pretraining. For fine-tuning, prepare your own dataset in the EveNet format.
+
+You are responsible for converting your physics ntuples into the EveNet parquet + metadata format.  
+See [data preparation guide](data_preparation.md) for details on schema, normalization, and writer options.  
+
+> 🔍 Tip: Keep your preprocessing configs in version control so you can reproduce and document each dataset.
+
+---
+
+## 5. Configure an Experiment
 
 1. Copy `share/finetune-example.yaml` (for training) and `share/predict-example.yaml` (for inference) into a working directory.
 2. Update paths and experiment metadata:
    - `platform.data_parquet_dir` → location of your processed parquet files
-   - `Dataset.normalization_file` → normalization statistics file from preprocessing
+   - `Dataset.normalization_file` → normalization statistics file you created
+   - `options.Training.pretrain_model_load_path` → path to downloaded pretrained weights
    - `logger` → project names, WANDB API key, or local log paths
 3. Review the [configuration reference](configuration.md) for a description of every YAML section and available overrides.
 
 ---
 
-## 5. Train the Model
+## 6. Fine-Tune the Model
 
 1. Export your Weights & Biases API key if you plan to log online.
    ```bash
@@ -78,13 +82,12 @@ Before running any commands, skim these key directories:
    - Console output provides per-epoch metrics and checkpoint locations.
    - WANDB dashboards (if enabled) visualize loss curves and system stats.
    - Checkpoints and logs are stored under `options.Training.model_checkpoint_save_path`.
-4. Consult `docs/train.md` for details on checkpointing, EMA weights, and resume logic.
 
 ---
 
-## 6. Generate Predictions
+## 7. Generate Predictions
 
-1. Ensure the prediction YAML points to the trained checkpoint via `options.Training.model_checkpoint_load_path`.
+1. Ensure the prediction YAML points to your trained (or pretrained) checkpoint via `options.Training.model_checkpoint_load_path`.
 2. Launch inference.
    ```bash
    python evenet/predict.py path/to/your-predict-config.yaml
@@ -93,7 +96,7 @@ Before running any commands, skim these key directories:
 
 ---
 
-## 7. Explore and Iterate
+## 8. Explore and Iterate
 
 - Use the artifacts written in the prediction step for downstream analysis (examples live under `downstreams/`).
 - Adjust YAML hyperparameters, architecture templates, or preprocessing selections and repeat the workflow.
