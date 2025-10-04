@@ -12,10 +12,10 @@ Ideal when you want the official binaries and ready-made CLIs without touching t
 
 1. Pull the runtime image that bundles CUDA, PyTorch, Ray, and common utilities.
    ```bash
-   docker pull docker.io/avencast1994/evenet:1.3
+   docker pull docker.io/avencast1994/evenet:1.5
    docker run --gpus all -it \
      -v /path/to/your/data:/workspace/data \
-     docker.io/avencast1994/evenet:1.3
+     docker.io/avencast1994/evenet:1.5
    ```
 2. Inside the container (or any GPU-ready Python 3.12+ environment), install EveNet from PyPI.
    ```bash
