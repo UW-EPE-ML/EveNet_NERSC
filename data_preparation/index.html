@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Data Preparation - EveNet Documentation Portal</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Data Preparation";
+        var mkdocs_page_input_path = "data_preparation.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script>
+   
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> EveNet Documentation Portal
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../getting_started/">Getting Started</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Data Preparation</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#pipeline-overview">🔭 Pipeline Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#run-the-preprocessing-cli">⚙️ Run the Preprocessing CLI</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#yaml-highlights">YAML Highlights</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#outputs-artifact-map">📁 Outputs &amp; Artifact Map</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#dataset-layout">🧬 Dataset Layout</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#inputs-inputs">Inputs (INPUTS/*)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#supervision-targets">Supervision Targets</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#additional-metadata">Additional Metadata</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#reading-datasets-in-evenet">📚 Reading Datasets in EveNet</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#consistency-checklist">✅ Consistency checklist:</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../model_architecture/">Model Architecture</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../train/">Training</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../configuration/">Configuration Reference</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../preprocess_internal_only/">Internal Notes</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">EveNet Documentation Portal</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Data Preparation</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/UW-EPE-ML/EveNet_Public/edit/master/docs/data_preparation.md">Edit on EveNet_Public</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="data-preparation-input-reference">🧪 Data Preparation &amp; Input Reference<a class="headerlink" href="#data-preparation-input-reference" title="Permanent link">&para;</a></h1>
+<p>Welcome! This guide shows how to convert raw ntuples into EveNet-ready parquet shards <strong>and</strong> how to interpret every tensor stored in the dataset. Keep it handy while customizing selections or debugging inputs.</p>
+<ul>
+<li><a href="#pipeline-overview">Pipeline overview</a></li>
+<li><a href="#run-the-preprocessing-cli">⚙️ Run the preprocessing CLI</a></li>
+<li><a href="#outputs-artifact-map">📁 Outputs &amp; artifact map</a></li>
+<li><a href="#dataset-layout">🧬 Dataset layout</a></li>
+<li><a href="#reading-datasets">📚 Reading datasets in EveNet</a></li>
+</ul>
+<hr />
+<p><a id="pipeline-overview"></a></p>
+<h2 id="pipeline-overview">🔭 Pipeline Overview<a class="headerlink" href="#pipeline-overview" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Draft a config</strong> – start from your own YAML (you can peek at the internal <code>share/preprocess_pretrain.yaml</code> for inspiration) and list the processes, selections, and padding choices you need.</li>
+<li><strong>Customize selections</strong> – edit aliases, anchors, and selection blocks to match the processes you want to keep.</li>
+<li><strong>Run the CLI</strong> – point to the raw campaign directories and let the script build parquet shards, normalization stats, and cutflow summaries.</li>
+<li><strong>Train or predict</strong> – plug the generated artifacts into the example training or prediction YAMLs (see the <a href="../configuration/">configuration reference</a>).</li>
+</ol>
+<blockquote>
+<p>✨ <strong>Pro tip:</strong> keep preprocessing configs under version control so you can trace how a dataset was produced.</p>
+</blockquote>
+<hr />
+<p><a id="run-the-preprocessing-cli"></a></p>
+<h2 id="run-the-preprocessing-cli">⚙️ Run the Preprocessing CLI<a class="headerlink" href="#run-the-preprocessing-cli" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>preprocessing/preprocess.py<span class="w"> </span>share/preprocess_pretrain.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--in_dir<span class="w"> </span>/path/to/Run_XXX<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--store_dir<span class="w"> </span>/path/to/output<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cpu_max<span class="w"> </span><span class="m">32</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Switch</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preprocess_config</code></td>
+<td>Positional argument pointing to your YAML (defaults to <code>share/preprocess_pretrain.yaml</code>).</td>
+</tr>
+<tr>
+<td><code>--in_dir</code></td>
+<td>Directory with a single run (e.g., <code>Run_2.Dec20/run_yulei_13</code>). Required unless <code>--pretrain_dirs</code> is set.</td>
+</tr>
+<tr>
+<td><code>--pretrain_dirs</code></td>
+<td>Optional list of campaign roots; each immediate subdirectory is processed in parallel using the NERSC-style layout.</td>
+</tr>
+<tr>
+<td><code>--store_dir</code></td>
+<td>Destination for parquet shards, metadata, and cutflow summaries (defaults to <code>Storage/</code>).</td>
+</tr>
+<tr>
+<td><code>--cpu_max</code></td>
+<td>Cap the number of CPU cores used for multiprocessing.</td>
+</tr>
+</tbody>
+</table>
+<p>To process multiple campaigns concurrently:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>preprocessing/preprocess.py<span class="w"> </span>share/preprocess_pretrain.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pretrain_dirs<span class="w"> </span>/nersc/campaignA<span class="w"> </span>/nersc/campaignB<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--store_dir<span class="w"> </span>/workspace/datasets/evenet<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cpu_max<span class="w"> </span><span class="m">48</span>
+</code></pre></div>
+<h3 id="yaml-highlights">YAML Highlights<a class="headerlink" href="#yaml-highlights" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_neutrinos</code></td>
+<td>Padding length for invisible particle features.</td>
+</tr>
+<tr>
+<td><code>selections.aliases</code></td>
+<td>Human-readable shortcuts for raw array names (e.g., <code>n_lep → INPUTS/Conditions/nLepton</code>).</td>
+</tr>
+<tr>
+<td><code>selection_anchors</code></td>
+<td>Reusable boolean expressions ("lep1_pT_sel" etc.) assembled into full selections.</td>
+</tr>
+<tr>
+<td><code>selections.&lt;process&gt;</code></td>
+<td>Ordered list of expressions evaluated on each event to build cutflows.</td>
+</tr>
+</tbody>
+</table>
+<p>Peek at the in-repo reference (<code>share/preprocess_pretrain.yaml</code>) when you need more examples of anchors or expressions.</p>
+<hr />
+<p><a id="outputs-artifact-map"></a></p>
+<h2 id="outputs-artifact-map">📁 Outputs &amp; Artifact Map<a class="headerlink" href="#outputs-artifact-map" title="Permanent link">&para;</a></h2>
+<p>Running the pipeline fills <code>--store_dir</code> with a tidy bundle:</p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data_&lt;run&gt;.parquet</code></td>
+<td>Flattened event table per run containing all tensors listed below. See the writer in <a href="../preprocessing/preprocess.py#L361-L378"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>shape_metadata.json</code></td>
+<td>Original tensor shapes so EveNet can unflatten arrays on load. Generated in <a href="../preprocessing/preprocess.py#L370-L371"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>normalization.pt</code></td>
+<td>Torch dictionary with feature means/stds, class balances, and diffusion stats. Produced in <a href="../preprocessing/postprocessor.py#L360-L406"><code>preprocessing/postprocessor.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>cutflow_summary.txt</code>, <code>cutflows.json</code></td>
+<td>Human-readable and machine-readable summaries of selection efficiencies. Written near the end of <a href="../preprocessing/preprocess.py#L435-L440"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>🧾 Keep <code>shape_metadata.json</code> and <code>normalization.pt</code> alongside the parquet shards—training and prediction both rely on them.</p>
+</blockquote>
+<hr />
+<p><a id="dataset-layout"></a></p>
+<h2 id="dataset-layout">🧬 Dataset Layout<a class="headerlink" href="#dataset-layout" title="Permanent link">&para;</a></h2>
+<p>Each parquet row is a single event. Shapes below reference the <strong>unflattened</strong> tensors reconstructed with <code>shape_metadata.json</code>.</p>
+<h3 id="inputs-inputs">Inputs (<code>INPUTS/*</code>)<a class="headerlink" href="#inputs-inputs" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tensor</th>
+<th>Shape</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INPUTS/Source</code></td>
+<td><code>(events, particles, 7)</code></td>
+<td>Particle-level features: energy, <code>pT</code>, <code>η</code>, <code>φ</code>, b-tag, lepton flag, charge. Mask stored as <code>INPUTS/Source/MASK</code>. Defined by the event metadata documented in the <a href="../configuration/#physics-metadata">configuration reference</a>.</td>
+</tr>
+<tr>
+<td><code>INPUTS/Conditions</code></td>
+<td><code>(events, 9)</code></td>
+<td>Event-level scalars (MET, multiplicities, sums). Mask stored as <code>conditions_mask</code>. See the same event metadata section in the <a href="../configuration/#physics-metadata">configuration reference</a>.</td>
+</tr>
+<tr>
+<td><code>num_vectors</code></td>
+<td><code>(events,)</code></td>
+<td>Total object count (global + sequential). Computed during preprocessing in <a href="../preprocessing/preprocess.py#L220-L257"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>num_sequential_vectors</code></td>
+<td><code>(events,)</code></td>
+<td>Count of valid sequential objects. Set alongside <code>num_vectors</code> in <a href="../preprocessing/preprocess.py#L220-L257"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="supervision-targets">Supervision Targets<a class="headerlink" href="#supervision-targets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tensor</th>
+<th>Shape</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>classification</code></td>
+<td><code>(events,)</code></td>
+<td>Process label encoded using the process metadata introduced in the <a href="../configuration/#physics-metadata">configuration reference</a>. Generated with event weights in <a href="../preprocessing/preprocess.py#L232-L287"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>assignments-indices</code></td>
+<td><code>(events, targets, daughters)</code></td>
+<td>Maps reconstructed particles to truth daughters. Companion masks (<code>assignments-mask</code>, <code>assignments-indices-mask</code>) flag valid entries. Produced in <a href="../preprocessing/evenet_data_converter.py#L64-L122"><code>preprocessing/evenet_data_converter.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>regression-data</code></td>
+<td><code>(events, regressions)</code></td>
+<td>Continuous targets (momenta, masses) with boolean mask <code>regression-mask</code>. Created in <a href="../preprocessing/evenet_data_converter.py#L124-L190"><code>preprocessing/evenet_data_converter.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>segmentation-class</code></td>
+<td><code>(events, segments, tags)</code></td>
+<td>One-hot membership for resonance-specific particle groups. Extra tensors (<code>segmentation-data</code>, <code>segmentation-momentum</code>, <code>segmentation-full-class</code>) track auxiliary supervision. See <a href="../preprocessing/evenet_data_converter.py#L92-L163"><code>preprocessing/evenet_data_converter.py</code></a>.</td>
+</tr>
+<tr>
+<td><code>x_invisible</code></td>
+<td><code>(events, max_neutrinos, features)</code></td>
+<td>Invisible particle features (e.g., neutrinos) padded to <code>max_neutrinos</code>. Masks capture raw and valid counts inside <a href="../preprocessing/preprocess.py#L232-L247"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="additional-metadata">Additional Metadata<a class="headerlink" href="#additional-metadata" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tensor</th>
+<th>Shape</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>subprocess_id</code></td>
+<td><code>(events,)</code></td>
+<td>Integer identifier for the subprocess, matching the ordering described in the event metadata section of the <a href="../configuration/#physics-metadata">configuration reference</a>.</td>
+</tr>
+<tr>
+<td><code>event_weight</code></td>
+<td><code>(events,)</code></td>
+<td>Per-event sample weight derived from process metadata. Computed where events are written in <a href="../preprocessing/preprocess.py#L246-L268"><code>preprocessing/preprocess.py</code></a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><a id="reading-datasets"></a></p>
+<h2 id="reading-datasets-in-evenet">📚 Reading Datasets in EveNet<a class="headerlink" href="#reading-datasets-in-evenet" title="Permanent link">&para;</a></h2>
+<p>When you run training or prediction, <code>evenet/shared.py</code> stitches everything back together:</p>
+<ol>
+<li><strong>Read parquet shards</strong> from <code>platform.data_parquet_dir</code>.</li>
+<li><strong>Unflatten tensors</strong> using <code>shape_metadata.json</code>.</li>
+<li><strong>Apply normalization</strong> from <code>options.Dataset.normalization_file</code>.</li>
+<li><strong>Verify metadata</strong> – use the same <code>event_info</code>/<code>process_info</code> YAML files that were active during preprocessing.</li>
+</ol>
+<h3 id="consistency-checklist">✅ Consistency checklist:<a class="headerlink" href="#consistency-checklist" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>platform.data_parquet_dir</code> → folder with <code>data_*.parquet</code> and <code>shape_metadata.json</code>.</li>
+<li><code>options.Dataset.normalization_file</code> → matching <code>normalization.pt</code>.</li>
+</ul>
+<p>With those pieces aligned, EveNet can stream data across Ray workers and match the exact tensor schema you curated in the preprocessing config.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../getting_started/" class="btn btn-neutral float-left" title="Getting Started"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../model_architecture/" class="btn btn-neutral float-right" title="Model Architecture">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/UW-EPE-ML/EveNet_Public" class="fa fa-code-fork" style="color: #fcfcfc"> EveNet_Public</a>
+        </span>
+    
+    
+      <span><a href="../getting_started/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../model_architecture/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
