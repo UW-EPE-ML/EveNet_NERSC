@@ -228,6 +228,8 @@ class ClassificationMetrics:
 
             results[true_cls] = fig
 
+            plt.close(fig)
+
         # === 2. ROC Plot ===
         for target_cls in range(self.num_classes):
             fig_roc, ax_roc = plt.subplots(figsize=(8, 6))
@@ -280,6 +282,7 @@ class ClassificationMetrics:
             plt.tight_layout()
 
             roc_curves[target_cls] = fig_roc
+            plt.close(fig_roc)
 
         return results, roc_curves, auc_scores, auc_scores_valid
 
