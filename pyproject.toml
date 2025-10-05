@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evenet"
-version = "0.1.2"
+version = "0.1.6"
 description = "Training and inference entry points for the EveNet event processing model."
 readme = "README.md"
 requires-python = ">=3.12"
