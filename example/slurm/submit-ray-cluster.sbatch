@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#SBATCH -C gpu
-#SBATCH --time=7:00:00
-#SBATCH -q regular
-#SBATCH -A m2616_g
+#SBATCH -C XXXX
+#SBATCH --time=1:00:00
+#SBATCH -q debug
+#SBATCH -A XXXX
 
 ### This script works for any number of nodes, Ray will find and manage all resources
 #SBATCH --nodes=128
@@ -13,7 +13,7 @@
 #SBATCH --gpus-per-task=4
 #SBATCH --cpus-per-task=128
 
-#SBATCH --image=registry.nersc.gov/m2616/avencast/evenet:1.3
+#SBATCH --image=docker.io/avencast1994/evenet:latest
 
 head_node=$(hostname)
 head_node_ip=$(hostname --ip-address)
@@ -47,9 +47,7 @@ sleep 5
 # export the parent directory of the script to the PYTHONPATH
 cd ../ && source setup.sh
 
-export TORCH_NCCL_TIMEOUT=180
-
-#shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-20M-cont.yaml
-shifter python3 evenet/train.py share/pretrain_20250811/pretrain-yulei-20M-famo.yaml
+# run your python script here
+#python evenet/train.py --config share/configs.yaml
 
 exit
