@@ -1,0 +1,281 @@
+EXCLUDE:
+  Momentum: &Momentum
+    - pt
+    - eta
+    - phi
+
+  W_had: &W_had
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  W_lep: &W_lep
+    l: null
+#    v: null
+
+  W_lep_plus: &W_lep_plus
+    l+: null
+#    v: null
+  W_lep_minus: &W_lep_minus
+    l-: null
+#    v: null
+
+  Z_had: &Z_had
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  Z_lep: &Z_lep
+    l1: null
+    l2: null
+    SYMMETRY: [ l1, l2 ]
+
+  top_had: &top_had
+    b: null
+    q1: null
+    q2: null
+    SYMMETRY: [ q1, q2 ]
+
+  top_lep: &top_lep
+    b: null
+    l: null
+#    v: null
+
+  a_had: &a_had
+    b1: null
+    b2: null
+    SYMMETRY: [ b1, b2 ]
+
+# ---------------------------------------------------
+# REQUIRED - INPUTS - List all inputs to EveNet here.
+# ---------------------------------------------------
+INPUTS:
+  # -----------------------------------------------------------------------------
+  # REQUIRED - SEQUENTIAL - inputs which can have an arbitrary number of vectors.
+  # -----------------------------------------------------------------------------
+  SEQUENTIAL:
+    Source:
+      energy: log_normalize
+      pt: log_normalize
+      eta: normalize
+      phi: normalize_uniform
+      btag: none
+      isLepton: none
+      charge: none
+
+  # ---------------------------------------------------------------------
+  # REQUIRED - GLOBAL - inputs which will have a single vector per event.
+  # ---------------------------------------------------------------------
+  GLOBAL:
+    Conditions:
+      met: log_normalize
+      met_phi: normalize
+      nLepton: none
+      nbJet: none
+      nJet: none
+      HT: log_normalize
+      HT_lep: log_normalize
+      M_all: log_normalize
+      M_leps: log_normalize
+      M_bjets: log_normalize
+
+# ----------------------------------------------------------------------
+# REQUIRED - EVENT - Complete list of resonance particles and daughters.
+# ----------------------------------------------------------------------
+EVENT:
+  TTHadronics:
+    diagram: &TTHadronics
+      t1: *top_had
+      t2: *top_had
+      SYMMETRY: [ t1, t2 ]
+
+  TT1L:
+    diagram: &TT1L
+      t1: *top_had
+      t2: *top_lep
+
+  TT2L:
+    diagram: &TT2L
+      t1:
+        b: null
+        l+: null
+#        v: null
+      t2:
+        b: null
+        l-: null
+#        v: null
+
+  WJetsToQQ:
+    diagram:
+      W: *W_had
+
+  ZJetsToQQ:
+    diagram:
+      Z: *Z_had
+
+  ZJetsToLL:
+    diagram:
+      Z: *Z_lep
+
+  ZZ_4L:
+    diagram:
+      Z1: *Z_lep
+      Z2: *Z_lep
+      SYMMETRY: [ Z1, Z2 ]
+
+  ZZ_2L:
+    diagram:
+      Z1: *Z_lep
+      Z2: *Z_had
+
+  WW_1L:
+    diagram:
+      W1: *W_lep
+      W2: *W_had
+
+  WW_2L:
+    diagram:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+
+
+  WZ_1L:
+    diagram:
+      W: *W_lep
+      Z: *Z_had
+
+  WZ_2L:
+    diagram:
+      W: *W_had
+      Z: *Z_lep
+
+  WZ_3L:
+    diagram:
+      W: *W_lep
+      Z: *Z_lep
+
+  ttW_FullHadronics:
+    diagram:
+      t1: *top_had
+      t2: *top_had
+      W: *W_had
+      SYMMETRY: [ t1, t2 ]
+  ttW_Leptonic:
+    diagram:
+      t1: *top_had
+      t2: *top_had
+      W: *W_lep
+      SYMMETRY: [ t1, t2 ]
+  ttW_tHtLWH:
+    diagram:
+      t1: *top_had
+      t2: *top_lep
+      W: *W_had
+  ttW_tHtLWL:
+    diagram:
+      t1: *top_had
+      t2: *top_lep
+      W: *W_lep
+
+  ttZ_FullHadronics:
+    diagram:
+      t1: *top_had
+      t2: *top_had
+      Z: *Z_had
+      SYMMETRY: [ t1, t2 ]
+  ttZ_Leptonic:
+    diagram:
+      t1: *top_had
+      t2: *top_had
+      Z: *Z_lep
+      SYMMETRY: [ t1, t2 ]
+  ttZ_tHtLZH:
+    diagram:
+      t1: *top_had
+      t2: *top_lep
+      Z: *Z_had
+  ttZ_tHtLZL:
+    diagram:
+      t1: *top_had
+      t2: *top_lep
+      Z: *Z_lep
+
+
+  WJetsToLNu:
+    diagram:
+      W: *W_lep
+
+  HWW_WpLepWmLep:
+    diagram:
+      W+: *W_lep_plus
+      W-: *W_lep_minus
+  HWW_WpHadWmHad:
+    diagram:
+      W+: *W_had
+      W-: *W_had
+  HWW_WpHadWmLep:
+    diagram:
+      W+: *W_had
+      W-: *W_lep_minus
+  HWW_WpLepWmHad:
+    diagram:
+      W+: *W_lep_plus
+      W-: *W_had
+
+
+# -----------------------------------------------------------------------------
+# REQUIRED - SEGMENTATIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+SEGMENTATIONS:
+  regression: # log and uniform normalization not implemented yet
+    pt: normalize # log_normalize
+    eta: normalize
+    phi: normalize_uniform
+    mass: normalize # log_normalize
+
+# -----------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+CLASSIFICATIONS:
+  EVENT:
+    - signal
+
+
+CLASSLABEL:
+  EVENT:
+    signal:
+      - [ QCD, TT, ttW, ttZ, WJets, ZJets, WW, ZZ, WZ, HWW ]
+
+
+RESONANCE_LABEL:
+  - [ "null", "t(had)", "t1l", "W(had)", "W(off-s)", "Z(had)", "Z(l)", "W(l)", "W(l,off-s)" ]
+
+PARTICLE_PROPERTIES:
+  - Energy
+  - Spin
+  - nProduct_BJet
+  - nProduct_Jet
+  - nProduct_Lepton
+  - Product_LeptonCharge
+
+GENERATIONS:
+  Conditions:
+    - met
+    - met_phi
+    - M_all
+  GlobalTargets:
+    - HT
+
+  Events:
+    - energy
+    - pt
+    - eta
+    - phi
+    - btag
+    - isLepton
+    - charge
+
+  Neutrinos:
+    pt: log_normalize
+    eta: normalize
+    phi: normalize_uniform

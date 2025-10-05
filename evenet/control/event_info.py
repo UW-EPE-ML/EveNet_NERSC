@@ -454,8 +454,41 @@ class EventInfo:
                     for name, normalize in input_information.items()
                 )
 
+        def synthesize_permutations_from_symmetry():
+            cfg = deepcopy(config)
+            if SpecialKey.Permutations in cfg:
+                return cfg
+            if SpecialKey.Event not in cfg:
+                return cfg
+
+            perms = defaultdict(dict)
+
+            for proc, node in cfg[SpecialKey.Event].items():
+                diag = node.get("diagram", node)
+
+                # event-level SYMMETRY
+                evt_groups = diag.get("SYMMETRY")
+                if isinstance(evt_groups, list):
+                    perms[proc][SpecialKey.Event] = [evt_groups]
+
+                # product-level SYMMETRY for each event particle
+                for ep, prods in diag.items():
+                    if ep == "SYMMETRY":
+                        continue
+                    if isinstance(prods, dict):
+                        groups = prods.get("SYMMETRY")
+                        if isinstance(groups, list):
+                            perms[proc][ep] = [groups]
+
+                if proc not in perms:
+                    perms[proc] = {}
+
+            cfg[SpecialKey.Permutations] = dict(perms)
+            return cfg
+
         # Extract event and permutation information.
         # ------------------------------------------
+        config = synthesize_permutations_from_symmetry()
         permutation_config = key_with_default(config, SpecialKey.Permutations, default={})
 
         event_particles_summary = OrderedDict()
@@ -465,14 +498,19 @@ class EventInfo:
         product_particles = OrderedDict()  # Default value
 
         for process in permutation_config:
-            event_names = tuple(config[SpecialKey.Event][process].keys())
+            event_cfg = config[SpecialKey.Event].get(process, {})
+            diagram = event_cfg.get("diagram", event_cfg)
+            event_names = tuple([k for k in diagram.keys() if k != "SYMMETRY"])
             event_permutations = key_with_default(permutation_config[process], SpecialKey.Event, default=[])
             event_permutations = expand_permutations(event_permutations)
             event_particles = Particles(event_names, event_permutations)
             product_particles = OrderedDict()
 
             for event_particle in event_particles:
-                products = config[SpecialKey.Event][process][event_particle]
+                if isinstance(diagram[event_particle], list):
+                    products = diagram[event_particle]
+                else:
+                    products = {k: v for k, v in diagram[event_particle].items() if k != "SYMMETRY"}
 
                 product_names = [
                     next(iter(product.keys())) if isinstance(product, dict) else product
@@ -543,8 +581,6 @@ class EventInfo:
 
             for name, normalize in invisible.items()
         )
-
-        # TODO: feynman_fill (not necessary, but would be nice)
 
         return cls(
             input_types,
