@@ -304,7 +304,7 @@ class SegmentationMetrics:
         cm = matrix.astype(np.float64)
         if normalize:
             row_sums = cm.sum(axis=1, keepdims=True)
-            cm = np.nan_to_num(cm / row_sums)
+            cm = np.nan_to_num(cm / (row_sums + 1e-8))
         return cm
 
 
@@ -452,7 +452,6 @@ class SegmentationMetrics:
         metrics = dict()
         for cluster_name in self.cluster_matching.keys():
             metrics[cluster_name] = dict()
-            print(cluster_name, self.cluster_matching[cluster_name])
             metrics[cluster_name]["cluster-purity/true-class"] = self.cluster_matching[cluster_name]["pred-cls-correct-cluster"] / self.cluster_matching[cluster_name]["true-cluster"] if self.cluster_matching[cluster_name]["true-cluster"] > 0 else 0
             metrics[cluster_name]["cluster-purity/false-class"] = self.cluster_matching[cluster_name]["pred-cls-wrong-cluster"] / self.cluster_matching[cluster_name]["true-cluster"] if self.cluster_matching[cluster_name]["true-cluster"] > 0 else 0
             metrics[cluster_name]["cluster-purity/all"] = metrics[cluster_name]["cluster-purity/true-class"] + metrics[cluster_name]["cluster-purity/false-class"]

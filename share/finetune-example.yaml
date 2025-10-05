@@ -102,8 +102,8 @@ network:
 
 
 event_info:
+#  default: event_info/pretrain.yaml
   default: event_info/multi_process.yaml
-
   # overwrites
   # ...
 

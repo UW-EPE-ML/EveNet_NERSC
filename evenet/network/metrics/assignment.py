@@ -547,7 +547,7 @@ class SingleProcessAssignmentMetrics:
         fig, ax = plt.subplots(figsize=(9, 6))
         base_colors = plt.cm.Set2(np.linspace(0.2, 0.8, 2))
         lighter = lambda c: tuple(min(1.0, x + 0.3) for x in c)
-        efficiency_detection = (predict_correct.sum() + predict_wrong.sum()) / truth.sum()
+        efficiency_detection = (predict_correct.sum() + predict_wrong.sum()) / (truth.sum() + 1e-8)
         text = f"* reco eff (WP: {self.detection_cut}): {efficiency_detection:.2f}"
         # if train_predict_correct is not None:
         #     efficiency_detection_train = (train_predict_correct.sum() + train_predict_wrong.sum())/truth.sum()
@@ -556,7 +556,7 @@ class SingleProcessAssignmentMetrics:
 
         total_pred = np.zeros_like(predict_wrong)
 
-        predict_accuracy = predict_correct.sum() / (predict_correct.sum() + predict_wrong.sum())
+        predict_accuracy = predict_correct.sum() / (predict_correct.sum() + predict_wrong.sum() + 1e-8)
         logs["pred_accuracy"] = predict_accuracy
 
         bin_widths = np.diff(self.bins)
@@ -619,7 +619,7 @@ class SingleProcessAssignmentMetrics:
             logs["pred_resolution"] = None
 
         if train_predict_correct is not None:
-            train_accuracy = train_predict_correct.sum() / (train_predict_correct.sum() + train_predict_wrong.sum())
+            train_accuracy = train_predict_correct.sum() / (train_predict_correct.sum() + train_predict_wrong.sum() + 1e-8)
             logs["train_accuracy"] = train_accuracy
             train_predict_sum = train_predict_correct + train_predict_wrong
             train_predict_correct = train_predict_correct / np.maximum(1, (train_predict_sum).sum() * bin_widths)

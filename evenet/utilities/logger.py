@@ -82,7 +82,6 @@ class LocalLogger(Logger):
             self.buffer[key][keyname] = float(v)
 
     def flush_metrics(self, stage: str) -> None:
-        print(f"Flushing metrics for stage {stage}")
 
         if not self.buffer:
             return
