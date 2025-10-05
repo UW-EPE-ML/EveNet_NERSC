@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from evenet.control.global_config import global_config
 from evenet.control.event_info import EventInfo
-from evenet.utilities.tool import flatten_dict
+from evenet.dataset.preprocess import flatten_dict
 from preprocessing.monitor_gen_matching import monitor_gen_matching
 from preprocessing.evenet_data_converter import EveNetDataConverter
 from preprocessing.postprocessor import PostProcessor
