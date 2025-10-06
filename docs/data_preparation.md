@@ -32,10 +32,10 @@ Each event is described by the following feature tensors. Shapes are shown with 
 | `num_vectors` | `(N,)` | Total count of global + sequential objects per event. Populate if you have heterogeneous object sets; otherwise leave empty (`[]`) to signal that only sequential objects are present. |
 | `num_sequential_vectors` | `(N,)` | Number of valid sequential entries per event. Mirrors `num_vectors` behaviour. |
 | `subprocess_id` | `(N,)` | Integer label identifying the subprocess drawn from the YAML metadata. |
-| `x` | `(N, P, F)` | Point-cloud tensor with **up to** `P` particles and `F` features. In the example YAML, `P = 18` and `F = 7` ordered as energy, `pT`, `η`, `φ`, b‑tag score, lepton flag, charge. Padding is allowed; mark invalid particles with `0` in `x_mask`. |
-| `x_mask` | `(N, P)` | Boolean (or `0/1`) mask indicating which particle slots in `x` correspond to real objects. Only entries with mask `1` contribute to losses and metrics. |
-| `conditions` | `(N, C)` | Event-level scalars. `C` is the number of global variables you define (10 in the example). You may add or remove variables as long as the order matches your YAML. |
-| `conditions_mask` | `(N, 1)` | Mask for `conditions`. Set to `1` when the global features are present. |
+| `x` | `(N, 18, 7)` | Point-cloud tensor storing exactly **18 slots** with **7 features each**. These dimensions are fixed so datasets can leverage the released pretraining weights. Order the features exactly as your YAML lists them (energy, `pT`, `η`, `φ`, b-tag score, lepton flag, charge in the example). Use padding for missing particles and mask them out via `x_mask`. |
+| `x_mask` | `(N, 18)` | Boolean (or `0/1`) mask indicating which particle slots in `x` correspond to real objects. Only entries with mask `1` contribute to losses and metrics. |
+| `conditions` | `(N, C)` | Event-level scalars. `C` is the number of global variables you define (10 in the example). You may add or remove variables as long as the order matches your YAML; if you do not supply any conditions, drop the key entirely. |
+| `conditions_mask` | `(N, 1)` | Mask for `conditions`. Set to `1` when the global features are present. If you omit `conditions`, omit this mask as well. |
 
 > 💡 **Tip:** If you only have a single event while debugging, `N = 1`. The EveNet converter flattens the leading dimension when it writes parquet shards, so you can use any event count per `.npz` bundle.
 
@@ -88,7 +88,7 @@ index_mask = np.zeros((num_events, n_targets, max_daughters), dtype=bool)
 | Key | Shape | Meaning |
 | --- | --- | --- |
 | `segmentation-class` | `(N, S, T)` | One-hot daughter class per slot. `S` is the maximum number of segments per event (4 in the example) and `T` is the number of resonance tags (9 in the example). |
-| `segmentation-data` | `(N, S, P)` | Assignment of each daughter slot to one of the `P` input particles used in the point cloud. |
+| `segmentation-data` | `(N, S, 18)` | Assignment of each daughter slot to one of the 18 input particles used in the point cloud. |
 | `segmentation-momentum` | `(N, S, 4)` | Ground-truth four-momenta for the segmented daughters. |
 | `segmentation-full-class` | `(N, S, T)` | Boolean indicator: `1` if all daughters of the resonance are reconstructed. |
 
@@ -102,10 +102,12 @@ If you disable the segmentation head, you can skip all four tensors.
 import numpy as np
 
 example = {
-    "x": np.zeros((N, 18, 7), dtype=np.float32),
+    "x": np.zeros((N, 18, 7), dtype=np.float32),  # fixed to (18, 7) for pretraining compatibility
     "x_mask": np.zeros((N, 18), dtype=bool),
-    "conditions": np.zeros((N, 12), dtype=np.float32),  # customise global count
+    # Optional globals — drop both keys if unused
+    "conditions": np.zeros((N, C), dtype=np.float32),
     "conditions_mask": np.ones((N, 1), dtype=bool),
+    # Head-specific entries sized by your resonance/segment definitions
     "assignments-indices": np.full((N, R, D), -1, dtype=int),
     "assignments-mask": np.zeros((N, R), dtype=bool),
     "segmentation-data": np.zeros((N, S, 18), dtype=bool),
@@ -113,7 +115,7 @@ example = {
 }
 ```
 
-Feel free to increase or shrink the dimensions (`P`, `C`, `R`, `D`, `S`, `T`) to match your physics process. Just keep the YAML in sync so the converter knows how many channels to expect.
+Feel free to adjust the head-specific dimensions (`R`, `D`, `S`, `T`) and the number of condition scalars `C` to match your physics process. The only fixed sizes are the point-cloud slots `(18, 7)` shared across datasets. Keep the YAML in sync so the converter knows how many channels to expect.
 
 ---
 
