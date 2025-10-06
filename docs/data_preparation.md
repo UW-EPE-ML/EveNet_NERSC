@@ -2,6 +2,8 @@
 
 This page documents the **new preprocessing contract** for EveNet. The reference schema in `share/event_info/pretrain.yaml` is bundled with the repository as an example, but you are free to adapt the feature lists to match your campaign. The goal of this guide is to help you build the `.npz` files that the EveNet converter ingests and to clarify how each tensor maps onto the model heads.
 
+> ⚠️ **Ownership reminder:** Users are responsible for generating the `.npz` files. EveNet does not reorder or reshape features for you—the arrays must already follow the size and ordering implied by your event-info YAML. The converter simply validates the layout and writes the parquet outputs. Keep the YAML and the `.npz` dictionary in sync at all times.
+
 - [Config + CLI workflow](#config--cli-workflow)
 - [Input tensor dictionary](#input-tensor-dictionary)
 - [Supervision targets by head](#supervision-targets-by-head)
@@ -14,8 +16,8 @@ This page documents the **new preprocessing contract** for EveNet. The reference
 ## 🛠️ Config + CLI Workflow
 
 1. **Start from an event-info YAML.** The repository ships an example at `share/event_info/pretrain.yaml`; copy or extend it to describe the objects, global variables, and heads you plan to enable. The display names inside the `INPUTS` block are just labels used for logging and plotting—what matters is the order, which **must** match the tensor layout you write to disk.
-2. **Produce an event dictionary.** Create one Python dictionary per event with the keys and shapes described below. Store the events in a compressed `.npz` file. Masks indicate which padded entries are valid and should contribute to the loss.
-3. **Run the EveNet converter.** Point `preprocessing/preprocess.py` at your `.npz` bundle and pass the matching YAML so the loader can recover feature names, the number of sequential vectors, and the heads you are enabling.
+2. **Produce an event dictionary.** For every event, assemble a Python dictionary that satisfies the shapes described below and append it to the archive you will write to disk. When you call `numpy.savez` (or `savez_compressed`), each key becomes an array with leading dimension `N`, the number of events in the file. Masks indicate which padded entries are valid and should contribute to the loss.
+3. **Run the EveNet converter.** Point `preprocessing/preprocess.py` at your `.npz` bundle and pass the matching YAML so the loader can recover feature names, the number of sequential vectors, and the heads you are enabling. The converter assumes both artifacts describe the same structure—mismatches will surface as validation errors.
 4. **Train or evaluate.** Training configs reference the resulting parquet directory via `platform.data_parquet_dir` and reuse the same YAML in `options.Dataset.event_info`.
 
 > ✨ **Normalization note.** The `normalize`, `log_normalize`, and `none` tags in the YAML are metadata only. EveNet derives channel-wise statistics during conversion. The sole special case is `normalize_uniform`, which reserves a transformation for circular variables (`φ`); the model automatically maps to and from the wrapped representation.
@@ -51,7 +53,7 @@ Only provide the tensors required for the heads you enable in your training YAML
 | Key | Shape | Meaning |
 | --- | --- | --- |
 | `classification` | `(N,)` | Process label per event. Combine with `event_weight` for weighted cross-entropy when sampling imbalanced campaigns. |
-| `event_weight` | `(N,)` | Optional sample weight; defaults to `1` if omitted. |
+| `event_weight` | `(N,)` | Optional per-event weight; defaults to `1` if omitted. Populate it alongside `classification` so the converter can broadcast the weights into the parquet shards. |
 
 ### TruthGeneration Head
 
@@ -107,6 +109,9 @@ example = {
     # Optional globals — drop both keys if unused
     "conditions": np.zeros((N, C), dtype=np.float32),
     "conditions_mask": np.ones((N, 1), dtype=bool),
+    # Classification head (weights default to ones if omitted)
+    "classification": np.zeros((N,), dtype=np.int32),
+    "event_weight": np.ones((N,), dtype=np.float32),
     # Head-specific entries sized by your resonance/segment definitions
     "assignments-indices": np.full((N, R, D), -1, dtype=int),
     "assignments-mask": np.zeros((N, R), dtype=bool),
@@ -115,7 +120,7 @@ example = {
 }
 ```
 
-Feel free to adjust the head-specific dimensions (`R`, `D`, `S`, `T`) and the number of condition scalars `C` to match your physics process. The only fixed sizes are the point-cloud slots `(18, 7)` shared across datasets. Keep the YAML in sync so the converter knows how many channels to expect.
+Feel free to adjust the head-specific dimensions (`R`, `D`, `S`, `T`) and the number of condition scalars `C` to match your physics process. The only fixed sizes are the point-cloud slots `(18, 7)` shared across datasets. Keep the YAML and the `.npz` dictionary in sync so the converter knows how many channels to expect and how to name them.
 
 ---
 
