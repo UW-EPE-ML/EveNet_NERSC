@@ -1,129 +1,193 @@
-# 🧪 Data Preparation & Input Reference
+# 🧪 Data Preparation & Updated Input Reference
 
-Welcome! This guide shows how to convert raw ntuples into EveNet-ready parquet shards **and** how to interpret every tensor stored in the dataset. Keep it handy while customizing selections or debugging inputs.
+This page documents the **new preprocessing contract** for EveNet. The reference schema in
+`share/event_info/pretrain.yaml` is bundled with the repository as an example, but you are free to adapt the feature
+lists to match your campaign. The goal of this guide is to help you build the `.npz` files that the EveNet converter
+ingests and to clarify how each tensor maps onto the model heads.
 
-- [Pipeline overview](#pipeline-overview)
-- [⚙️ Run the preprocessing CLI](#run-the-preprocessing-cli)
-- [📁 Outputs & artifact map](#outputs-artifact-map)
-- [🧬 Dataset layout](#dataset-layout)
-- [📚 Reading datasets in EveNet](#reading-datasets)
+> ⚠️ **Ownership reminder:** Users are responsible for generating the `.npz` files. EveNet does not reorder or reshape
+> features for you—the arrays must already follow the size and ordering implied by your event-info YAML. The converter
+> simply validates the layout and writes the parquet outputs. Keep the YAML and the `.npz` dictionary in sync at all
+> times.
 
----
-
-<a id="pipeline-overview"></a>
-## 🔭 Pipeline Overview
-
-1. **Draft a config** – start from your own YAML (you can peek at the internal `share/preprocess_pretrain.yaml` for inspiration) and list the processes, selections, and padding choices you need.
-2. **Customize selections** – edit aliases, anchors, and selection blocks to match the processes you want to keep.
-3. **Run the CLI** – point to the raw campaign directories and let the script build parquet shards, normalization stats, and cutflow summaries.
-4. **Train or predict** – plug the generated artifacts into the example training or prediction YAMLs (see the [configuration reference](configuration.md)).
-
-> ✨ **Pro tip:** keep preprocessing configs under version control so you can trace how a dataset was produced.
+- [Config + CLI workflow](#config--cli-workflow)
+- [Input tensor dictionary](#input-tensor-dictionary)
+- [Supervision targets by head](#supervision-targets-by-head)
+- [NPZ → Parquet conversion](#npz--parquet-conversion)
+- [Runtime checklist](#runtime-checklist)
 
 ---
 
-<a id="run-the-preprocessing-cli"></a>
-## ⚙️ Run the Preprocessing CLI
+<a id="config--cli-workflow"></a>
 
-```bash
-python preprocessing/preprocess.py share/preprocess_pretrain.yaml \
-  --in_dir /path/to/Run_XXX \
-  --store_dir /path/to/output \
-  --cpu_max 32
+## 🛠️ Config + CLI Workflow
+
+1. **Start from an event-info YAML.** The repository ships an example at `share/event_info/pretrain.yaml`; copy or
+   extend it to describe the objects, global variables, and heads you plan to enable. The display names inside the
+   `INPUTS` block are just labels used for logging and plotting—what matters is the order, which **must** match the
+   tensor layout you write to disk.
+2. **Produce an event dictionary.** For every event, assemble a Python dictionary that satisfies the shapes described
+   below and append it to the archive you will write to disk. When you call `numpy.savez` (or `savez_compressed`), each
+   key becomes an array with leading dimension `N`, the number of events in the file. Masks indicate which padded
+   entries are valid and should contribute to the loss.
+3. **Run the EveNet converter.** Point `preprocessing/preprocess.py` at your `.npz` bundle and pass the matching YAML so
+   the loader can recover feature names, the number of sequential vectors, and the heads you are enabling. The converter
+   assumes both artifacts describe the same structure—mismatches will surface as validation errors.
+4. **Train or evaluate.** Training configs reference the resulting parquet directory via `platform.data_parquet_dir` and
+   reuse the same YAML in `options.Dataset.event_info`.
+
+> ✨ **Normalization note.** The `normalize`, `log_normalize`, and `none` tags in the YAML are metadata only. EveNet
+> derives channel-wise statistics during conversion. The sole special case is `normalize_uniform`, which reserves a
+> transformation for circular variables (`φ`); the model automatically maps to and from the wrapped representation.
+
+---
+
+<a id="input-tensor-dictionary"></a>
+
+## 📦 Input Tensor Dictionary
+
+Each event is described by the following feature tensors. Shapes are shown with a leading `N` to indicate the number of
+stored events in a given `.npz` file. Masks share the same leading dimension as the value they gate.
+
+| Key                      | Shape        | Description                                                                                                                                                                                                                                                                                                                                                     |
+|--------------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `num_vectors`            | `(N,)`       | Total count of global + sequential objects per event.                                                                                                                                                                                                                                                                                                           |
+| `num_sequential_vectors` | `(N,)`       | Number of valid sequential entries per event. Mirrors `num_vectors` behaviour.                                                                                                                                                                                                                                                                                  |
+| `subprocess_id`          | `(N,)`       | Integer label identifying the subprocess drawn from the YAML metadata.                                                                                                                                                                                                                                                                                          |
+| `x`                      | `(N, 18, 7)` | Point-cloud tensor storing exactly **18 slots** with **7 features each**. These dimensions are fixed so datasets can leverage the released pretraining weights. Order the features exactly as your YAML lists them (energy, `pT`, `η`, `φ`, b-tag score, lepton flag, charge in the example). Use padding for missing particles and mask them out via `x_mask`. |
+| `x_mask`                 | `(N, 18)`    | Boolean (or `0/1`) mask indicating which particle slots in `x` correspond to real objects. Only entries with mask `1` contribute to losses and metrics.                                                                                                                                                                                                         |
+| `conditions`             | `(N, C)`     | Event-level scalars. `C` is the number of global variables you define (10 in the example). You may add or remove variables as long as the order matches your YAML; if you do not supply any conditions, drop the key entirely.                                                                                                                                  |
+| `conditions_mask`        | `(N, 1)`     | Mask for `conditions`. Set to `1` when the global features are present. If you omit `conditions`, omit this mask as well.                                                                                                                                                                                                                                       |
+
+---
+
+<a id="supervision-targets-by-head"></a>
+
+## 🎯 Supervision Targets by Head
+
+Only provide the tensors required for the heads you enable in your training YAML. Omit unused targets or set them to
+empty arrays so the converter skips unnecessary storage.
+
+### Classification Head
+
+| Key              | Shape  | Meaning                                                                                                                                                           |
+|------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `classification` | `(N,)` | Process label per event. Combine with `event_weight` for weighted cross-entropy when sampling imbalanced campaigns.                                               |
+| `event_weight`   | `(N,)` | Optional per-event weight; defaults to `1` if omitted. Populate it alongside `classification` so the converter can broadcast the weights into the parquet shards. |
+
+### TruthGeneration Head
+
+| Key                   | Shape            | Meaning                                                                                                                                                                                                                                                               |
+|-----------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `x_invisible`         | `(N, N_nu, F_nu)` | Invisible particle (e.g., neutrino) features. `N_nu` is the **maximum** number of invisible objects you intend to pad, `2` in the example, and `F_nu` is the number of features per invisible. Feature order is defined in your YAML under the TruthGeneration block. |
+| `x_invisible_mask`    | `(N, N_nu)`      | Flags which invisible entries are valid.                                                                                                                                                                                                                              |
+| `num_invisible_raw`   | `(N,)`           | Count of all invisible objects before quality cuts.                                                                                                                                                                                                                   |
+| `num_invisible_valid` | `(N,)`           | Number of invisible objects associated with reconstructed parents.                                                                                                                                                                                                    |
+
+### ReconGeneration Head
+
+ReconGeneration is self-supervised: it perturbs the visible point-cloud channels and learns to denoise them. The target
+specification (which channels to regenerate) lives **directly in the YAML** under the ReconGeneration configuration. No
+additional tensors beyond the standard inputs are required.
+
+### Resonance Assignment Head
+
+| Key                        | Shape       | Meaning                                                                                                                                                                                                                                                 |
+|----------------------------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `assignments-indices`      | `(N, R, D)` | Resonance-to-child mapping. `R` is the number of resonances you describe in the YAML (56 in the example) and `D` is the maximum number of children a resonance may have (3 in the example). Each entry stores indices drawn from the sequential inputs. |
+| `assignments-mask`         | `(N, R)`    | Indicates whether **all** children for a given resonance were reconstructed.                                                                                                                                                                            |
+| `assignments-indices-mask` | `(N, R, D)` | Per-child validity flags. Use `0` to pad absent daughters while keeping other children active.                                                                                                                                                          |
+
+> 📐 **Assignment internals:** During conversion EveNet scans your assignment map to determine `R` and `D`, initialises
+> arrays filled with `-1`, and then writes the actual child indices along with boolean masks. The snippet below mirrors
+> the loader logic so you can generate matching tensors in your own pipeline:
+
+```python
+full_indices = np.full((num_events, n_targets, max_daughters), -1, dtype=int)
+full_mask = np.zeros((num_events, n_targets), dtype=bool)
+index_mask = np.zeros((num_events, n_targets, max_daughters), dtype=bool)
+# Fill with your resonance→daughter mappings; mark valid entries in the masks.
 ```
 
-| Switch | Purpose |
-| --- | --- |
-| `preprocess_config` | Positional argument pointing to your YAML (defaults to `share/preprocess_pretrain.yaml`). |
-| `--in_dir` | Directory with a single run (e.g., `Run_2.Dec20/run_yulei_13`). Required unless `--pretrain_dirs` is set. |
-| `--pretrain_dirs` | Optional list of campaign roots; each immediate subdirectory is processed in parallel using the NERSC-style layout. |
-| `--store_dir` | Destination for parquet shards, metadata, and cutflow summaries (defaults to `Storage/`). |
-| `--cpu_max` | Cap the number of CPU cores used for multiprocessing. |
+### Segmentation Head
 
-To process multiple campaigns concurrently:
+| Key                       | Shape        | Meaning                                                                                                                                                         |
+|---------------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `segmentation-class`      | `(N, S, T)`  | One-hot daughter class per slot. `S` is the maximum number of segments per event (4 in the example) and `T` is the number of resonance tags (9 in the example). |
+| `segmentation-data`       | `(N, S, 18)` | Assignment of each daughter slot to one of the 18 input particles used in the point cloud.                                                                      |
+| `segmentation-momentum`   | `(N, S, 4)`  | Ground-truth four-momenta for the segmented daughters.                                                                                                          |
+| `segmentation-full-class` | `(N, S, T)`  | Boolean indicator: `1` if all daughters of the resonance are reconstructed.                                                                                     |
 
-```bash
-python preprocessing/preprocess.py share/preprocess_pretrain.yaml \
-  --pretrain_dirs /nersc/campaignA /nersc/campaignB \
-  --store_dir /workspace/datasets/evenet \
-  --cpu_max 48
+As with assignments, the converter computes `S` and `T` by scanning your segment-tag map. The internal helper creates
+zero-initialised arrays sized `(num_events, max_event_segments, max_segment_tags)` and fills them according to the
+resonance definitions. Any slots you leave unused remain associated with the catch-all background class (`0`).
+
+If you disable the segmentation head, you can skip all four tensors.
+
+### Worked Input Example
+
+```python
+import numpy as np
+
+example = {
+    "x": np.zeros((N, 18, 7), dtype=np.float32),  # fixed to (18, 7) for pretraining compatibility
+    "x_mask": np.zeros((N, 18), dtype=bool),
+    # Optional globals — drop both keys if unused
+    "conditions": np.zeros((N, C), dtype=np.float32),
+    "conditions_mask": np.ones((N, 1), dtype=bool),
+    # Classification head (weights default to ones if omitted)
+    "classification": np.zeros((N,), dtype=np.int32),
+    "event_weight": np.ones((N,), dtype=np.float32),
+    # Head-specific entries sized by your resonance/segment definitions
+    "assignments-indices": np.full((N, R, D), -1, dtype=int),
+    "assignments-mask": np.zeros((N, R), dtype=bool),
+    "segmentation-data": np.zeros((N, S, 18), dtype=bool),
+    # ... add heads you enabled ...
+}
 ```
 
-### YAML Highlights
-
-| Block | What it controls |
-| --- | --- |
-| `max_neutrinos` | Padding length for invisible particle features. |
-| `selections.aliases` | Human-readable shortcuts for raw array names (e.g., `n_lep → INPUTS/Conditions/nLepton`). |
-| `selection_anchors` | Reusable boolean expressions ("lep1_pT_sel" etc.) assembled into full selections. |
-| `selections.<process>` | Ordered list of expressions evaluated on each event to build cutflows. |
-
-Peek at the in-repo reference (`share/preprocess_pretrain.yaml`) when you need more examples of anchors or expressions.
+Feel free to adjust the head-specific dimensions (`R`, `D`, `S`, `T`) and the number of condition scalars `C` to match
+your physics process. The only fixed sizes are the point-cloud slots `(18, 7)` shared across datasets. Keep the YAML and
+the `.npz` dictionary in sync so the converter knows how many channels to expect and how to name them.
 
 ---
 
-<a id="outputs-artifact-map"></a>
-## 📁 Outputs & Artifact Map
+<a id="npz--parquet-conversion"></a>
 
-Running the pipeline fills `--store_dir` with a tidy bundle:
+## 🔄 NPZ → Parquet Conversion
 
-| Artifact | Description |
-| --- | --- |
-| `data_<run>.parquet` | Flattened event table per run containing all tensors listed below. See the writer in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L361-L378). |
-| `shape_metadata.json` | Original tensor shapes so EveNet can unflatten arrays on load. Generated in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L370-L371). |
-| `normalization.pt` | Torch dictionary with feature means/stds, class balances, and diffusion stats. Produced in [`preprocessing/postprocessor.py`](../preprocessing/postprocessor.py#L360-L406). |
-| `cutflow_summary.txt`, `cutflows.json` | Human-readable and machine-readable summaries of selection efficiencies. Written near the end of [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L435-L440). |
+1. **Assemble events** into Python lists and save them with `numpy.savez` (or `savez_compressed`). Each key listed above
+   becomes an array inside the archive.
+2. **Invoke the converter**:
 
-> 🧾 Keep `shape_metadata.json` and `normalization.pt` alongside the parquet shards—training and prediction both rely on them.
+   ```bash
+   python preprocessing/preprocess.py \
+     share/event_info/pretrain.yaml \
+     --in_npz /path/to/events.npz \
+     --store_dir /path/to/output \
+     --cpu_max 32
+   ```
 
----
+   The converter reads the YAML to recover feature names, masks, and head activation flags, then emits:
 
-<a id="dataset-layout"></a>
-## 🧬 Dataset Layout
+    - `data_*.parquet` containing flattened tensors.
+    - `shape_metadata.json` with the original shapes (e.g., `(18, 7)` for `x`).
+    - `normalization.pt` with channel-wise statistics and class weights.
 
-Each parquet row is a single event. Shapes below reference the **unflattened** tensors reconstructed with `shape_metadata.json`.
-
-### Inputs (`INPUTS/*`)
-
-| Tensor | Shape | Description |
-| --- | --- | --- |
-| `INPUTS/Source` | `(events, particles, 7)` | Particle-level features: energy, `pT`, `η`, `φ`, b-tag, lepton flag, charge. Mask stored as `INPUTS/Source/MASK`. Defined by the event metadata documented in the [configuration reference](configuration.md#physics-metadata). |
-| `INPUTS/Conditions` | `(events, 9)` | Event-level scalars (MET, multiplicities, sums). Mask stored as `conditions_mask`. See the same event metadata section in the [configuration reference](configuration.md#physics-metadata). |
-| `num_vectors` | `(events,)` | Total object count (global + sequential). Computed during preprocessing in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L220-L257). |
-| `num_sequential_vectors` | `(events,)` | Count of valid sequential objects. Set alongside `num_vectors` in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L220-L257). |
-
-### Supervision Targets
-
-| Tensor | Shape | Description |
-| --- | --- | --- |
-| `classification` | `(events,)` | Process label encoded using the process metadata introduced in the [configuration reference](configuration.md#physics-metadata). Generated with event weights in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L232-L287). |
-| `assignments-indices` | `(events, targets, daughters)` | Maps reconstructed particles to truth daughters. Companion masks (`assignments-mask`, `assignments-indices-mask`) flag valid entries. Produced in [`preprocessing/evenet_data_converter.py`](../preprocessing/evenet_data_converter.py#L64-L122). |
-| `regression-data` | `(events, regressions)` | Continuous targets (momenta, masses) with boolean mask `regression-mask`. Created in [`preprocessing/evenet_data_converter.py`](../preprocessing/evenet_data_converter.py#L124-L190). |
-| `segmentation-class` | `(events, segments, tags)` | One-hot membership for resonance-specific particle groups. Extra tensors (`segmentation-data`, `segmentation-momentum`, `segmentation-full-class`) track auxiliary supervision. See [`preprocessing/evenet_data_converter.py`](../preprocessing/evenet_data_converter.py#L92-L163). |
-| `x_invisible` | `(events, max_neutrinos, features)` | Invisible particle features (e.g., neutrinos) padded to `max_neutrinos`. Masks capture raw and valid counts inside [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L232-L247). |
-
-### Additional Metadata
-
-| Tensor | Shape | Description |
-| --- | --- | --- |
-| `subprocess_id` | `(events,)` | Integer identifier for the subprocess, matching the ordering described in the event metadata section of the [configuration reference](configuration.md#physics-metadata). |
-| `event_weight` | `(events,)` | Per-event sample weight derived from process metadata. Computed where events are written in [`preprocessing/preprocess.py`](../preprocessing/preprocess.py#L246-L268). |
+3. **Inspect the logs.** The script reports how many particles, invisible objects, and resonances were valid across the
+   dataset—helpful when debugging mask alignment.
 
 ---
 
-<a id="reading-datasets"></a>
-## 📚 Reading Datasets in EveNet
+<a id="runtime-checklist"></a>
 
-When you run training or prediction, `evenet/shared.py` stitches everything back together:
+## ✅ Runtime Checklist
 
-1. **Read parquet shards** from `platform.data_parquet_dir`.
-2. **Unflatten tensors** using `shape_metadata.json`.
-3. **Apply normalization** from `options.Dataset.normalization_file`.
-4. **Verify metadata** – use the same `event_info`/`process_info` YAML files that were active during preprocessing.
+- `platform.data_parquet_dir` points to the folder with the generated parquet shards and `shape_metadata.json`.
+- `options.Dataset.event_info` references the same YAML (`share/event_info/pretrain.yaml` or your copy).
+- `options.Dataset.normalization_file` matches the `normalization.pt` produced during conversion.
+- Only the heads you activated in the training YAML have matching supervision tensors in the parquet files.
 
-### ✅ Consistency checklist:
-- `platform.data_parquet_dir` → folder with `data_*.parquet` and `shape_metadata.json`.
-- `options.Dataset.normalization_file` → matching `normalization.pt`.
-
-With those pieces aligned, EveNet can stream data across Ray workers and match the exact tensor schema you curated in the preprocessing config.
+With those pieces in place, EveNet will rebuild the full event dictionary on the fly, apply the appropriate circular
+normalization for `normalize_uniform` channels, and route each tensor to the corresponding head.
 
